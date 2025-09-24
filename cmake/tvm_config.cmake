@@ -1,3 +1,3 @@
 set(USE_CUDA ON)
-set(USE_CUDNN ON)
+set(USE_CUDNN OFF)
 set(USE_CUBLAS ON)

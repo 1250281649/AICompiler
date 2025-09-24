@@ -15,6 +15,10 @@ TARGET_DEVICE="cuda"
 CUDA_PATH="/usr/local/cuda-13.0"
 # ===================================================
 
+# 提取物理核心数（每个插槽的核心数 × 插槽数）
+PHYSICAL_CORES=$(lscpu -p | awk -F, '/^[^#]/ {core=$2} END {print core+1}')
+echo "物理CPU核心数: $PHYSICAL_CORES"
+
 # 日志函数
 log_info() {
     echo "[INFO] $(date '+%Y-%m-%d %H:%M:%S') - $1"
@@ -39,31 +43,6 @@ check_directory() {
     fi
 }
 
-# 安装系统依赖
-install_dependencies() {
-    log_info "安装系统依赖..."
-    if command -v apt-get &> /dev/null; then
-        sudo apt-get update
-        sudo apt-get install -y git build-essential cmake ninja-build doxygen libssl-dev
-    else
-        log_error "不支持的包管理器，请手动安装依赖。"
-    fi
-
-    wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb
-    sudo dpkg -i cuda-keyring_1.1-1_all.deb
-    sudo apt-get update
-    sudo apt-get install -y cuda-toolkit-13-0
-    rm -f cuda-keyring_1.1-1_all.deb
-
-    # echo "export PATH=/usr/local/cuda-13-0/bin:$PATH" >> ~/.bashrc
-    # echo "export LD_LIBRARY_PATH=/usr/local/cuda-13-0/lib64:$LD_LIBRARY_PATH" >> ~/.bashrc
-    source ~/.bashrc
-
-    # 检查 CUDA 安装
-    nvcc --version || log_error "CUDA 安装失败，请检查。"
-    nvidia-smi || log_error "NVIDIA 驱动未正确安装，请检查。"
-}
-
 compile_tvm() {
     log_info "开始编译 TVM..."
 
@@ -75,27 +54,32 @@ compile_tvm() {
         mkdir -p ${tvm_build}
     fi
 
-    cp ${PROJECT_ROOT}/cmake/tvm_config.cmake ${tvm_home}/build
+    cp ${PROJECT_ROOT}/cmake/tvm_config.cmake ${tvm_home}/build/config.cmake
     cd ${tvm_build}
 
     cmake ..
-    make -j4
+    make -j$PHYSICAL_CORES
 }
 
 compile_mlc_llm() {
     log_info "开始编译 MLC-LLM..."
 
-    cd "${PROJECT_ROOT}"
-    if [ ! -d "build" ]; then mkdir -p build; fi
+    mlc_home=${PROJECT_ROOT}/3rdparty/mlc-llm
+    cd ${mlc_home}
+    mlc_build=${mlc_home}/build
+    if [ ! -d "${mlc_build}" ]; then
+        log_info "目录 ${mlc_build} 不存在，自动创建该目录。"
+        mkdir -p ${mlc_build}
+    fi
 
-    cd build
+    cp ${PROJECT_ROOT}/cmake/mlc_llm_config.cmake ${mlc_build}/config.cmake
+    cd ${mlc_build}
     cmake ..
-    make -j4
+    make -j$PHYSICAL_CORES
 }
 
 # 主函数
 main() {
-    log_info "开始 MLC-LLM 编译流程..."
     # 检查必要命令
     check_command git
     check_command cmake
@@ -106,8 +90,7 @@ main() {
     log_info "开始 MLC-LLM 编译流程..."
 
     # # 步骤执行
-    # install_dependencies
-    # compile_mlc_llm
+    compile_mlc_llm
 
     log_info "编译完成！"
 }
