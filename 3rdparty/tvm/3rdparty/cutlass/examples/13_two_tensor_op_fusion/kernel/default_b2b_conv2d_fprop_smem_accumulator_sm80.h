@@ -606,7 +606,7 @@ struct DefaultB2bConv2dFprop <
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Defines a kernel for Conv2dFprop specialization for Optimized IteratorAlgorithm and 
+/// Defines a kernel for Conv2dFprop specialization for Optimzed IteratorAlgorithm and 
 // multistage pipeline with interleaved layout.
 /// Accumulator will be staged in shared memory.
 template <

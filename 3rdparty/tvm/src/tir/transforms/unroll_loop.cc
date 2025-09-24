@@ -24,7 +24,6 @@
 // Unrolls the loop as in Halide pipeline.
 #include <tvm/arith/analyzer.h>
 #include <tvm/ffi/function.h>
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/tir/expr.h>
 #include <tvm/tir/op.h>
 #include <tvm/tir/stmt_functor.h>
@@ -64,17 +63,18 @@ struct UnrollLoopConfigNode : public AttrsNodeReflAdapter<UnrollLoopConfigNode> 
         .def_ro("unroll_local_access", &UnrollLoopConfigNode::unroll_local_access,
                 "Whether to always unroll local access", refl::DefaultValue(false));
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("tir.transform.UnrollLoopConfig", UnrollLoopConfigNode,
-                                    BaseAttrsNode);
+
+  static constexpr const char* _type_key = "tir.transform.UnrollLoopConfig";
+  TVM_FFI_DECLARE_FINAL_OBJECT_INFO(UnrollLoopConfigNode, BaseAttrsNode);
 };
 
 class UnrollLoopConfig : public Attrs {
  public:
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NOTNULLABLE(UnrollLoopConfig, Attrs, UnrollLoopConfigNode);
+  TVM_DEFINE_NOTNULLABLE_OBJECT_REF_METHODS(UnrollLoopConfig, Attrs, UnrollLoopConfigNode);
 };
 
-TVM_FFI_STATIC_INIT_BLOCK() { UnrollLoopConfigNode::RegisterReflection(); }
-
+TVM_FFI_STATIC_INIT_BLOCK({ UnrollLoopConfigNode::RegisterReflection(); });
+TVM_REGISTER_NODE_TYPE(UnrollLoopConfigNode);
 TVM_REGISTER_PASS_CONFIG_OPTION("tir.UnrollLoop", UnrollLoopConfig);
 
 class VarLocalAccessMarker : public ExprVisitor {
@@ -82,7 +82,7 @@ class VarLocalAccessMarker : public ExprVisitor {
   explicit VarLocalAccessMarker(std::unordered_set<Var>* var_touched_local)
       : var_touched_local_(var_touched_local) {}
 
-  void VisitExpr_(const VarNode* op) final { var_touched_local_->insert(ffi::GetRef<Var>(op)); }
+  void VisitExpr_(const VarNode* op) final { var_touched_local_->insert(GetRef<Var>(op)); }
 
  private:
   std::unordered_set<Var>* var_touched_local_;
@@ -175,7 +175,7 @@ class LoopUnroller : public StmtExprMutator {
         }
       }
     }
-    return ffi::GetRef<PrimExpr>(op);
+    return GetRef<PrimExpr>(op);
   }
 
   Stmt VisitStmt_(const BufferStoreNode* op) final {
@@ -221,8 +221,8 @@ class LoopUnroller : public StmtExprMutator {
     ICHECK_NE(value, -1) << "loop doesn't have a constant integer extent";
     if (value == 0) return Evaluate(0);
     Stmt body = op->body;
-    ffi::Map<Var, PrimExpr> vmap;
-    ffi::Array<Stmt> unrolled;
+    Map<Var, PrimExpr> vmap;
+    Array<Stmt> unrolled;
     for (int i = 0; i < value; ++i) {
       vmap.Set(op->loop_var, op->min + make_const(op->loop_var.dtype(), i));
       Stmt step = Substitute(body, vmap);
@@ -292,10 +292,7 @@ Pass UnrollLoop() {
   return CreatePrimFuncPass(pass_func, 0, "tir.UnrollLoop", {});
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("tir.transform.UnrollLoop", UnrollLoop);
-}
+TVM_FFI_REGISTER_GLOBAL("tir.transform.UnrollLoop").set_body_typed(UnrollLoop);
 
 }  // namespace transform
 

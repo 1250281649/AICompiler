@@ -39,7 +39,7 @@ namespace tir {
 /*!
  * \brief Global symbol of the op after lowering.
  */
-using TGlobalSymbol = ffi::String;
+using TGlobalSymbol = String;
 
 /*!
  * \brief Whether the op is overloaded for vector form.
@@ -59,7 +59,7 @@ using FLegalize = ffi::TypedFunction<PrimExpr(PrimExpr)>;
 /*!
  * \brief The operator's name in TVMScript printer
  */
-using TScriptPrinterName = ffi::String;
+using TScriptPrinterName = String;
 
 /*!
  * \brief Specifies that TVMScript printer prints the dtype as the first/last argument.

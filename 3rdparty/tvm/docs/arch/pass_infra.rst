@@ -93,9 +93,9 @@ needs to be executed when running under a user-provided optimization level. The
 .. code:: c++
 
     class PassInfoNode : public Object {
-      ffi::String name;
+      String name;
       int opt_level;
-      ffi::Array<ffi::String> required;
+      Array<String> required;
     };
 
 PassContext
@@ -125,11 +125,11 @@ Python APIs to create a compilation pipeline using pass context.
     class PassContextNode : public Object {
      public:
       int opt_level{2};
-      tvm::ffi::Array<tvm::Expr> required_pass;
-      tvm::ffi::Array<tvm::Expr> disabled_pass;
-      mutable ffi::Optional<DiagnosticContext> diag_ctx;
-      ffi::Map<ffi::String, Any> config;
-      ffi::Array<instrument::PassInstrument> instruments;
+      tvm::Array<tvm::Expr> required_pass;
+      tvm::Array<tvm::Expr> disabled_pass;
+      mutable Optional<DiagnosticContext> diag_ctx;
+      Map<String, Any> config;
+      Array<instrument::PassInstrument> instruments;
     };
 
     class PassContext : public NodeRef {
@@ -262,7 +262,7 @@ of passes for execution.
     class SequentialPassNode : PassNode {
       PassInfo pass_info;
       // Passes need to be executed.
-      ffi::Array<Pass> passes;
+      Array<Pass> passes;
       bool PassEnabled(const PassInfo& info) const;
       Module operator()(const Module& mod, const PassContext& pass_ctx) const final;
     };
@@ -321,22 +321,22 @@ favorably use Python APIs to create a specific pass object.
     Pass CreateFunctionPass(
         std::function<Function(Function, IRModule, PassContext)> pass_func,
         int opt_level,
-        ffi::String name,
-        ffi::Array<ffi::String> required);
+        String name,
+        Array<String> required);
 
     Pass CreatePrimFuncPass(
         std::function<PrimFunc(PrimFunc, IRModule, PassContext)> pass_func,
         int opt_level,
-        ffi::String name,
-        ffi::Array<ffi::String> required);
+        String name,
+        Array<String> required);
 
     Pass CreateModulePass(
         std::function<IRModule(IRModule, PassContext)> pass_func,
         int opt_level,
-        ffi::String name,
-        ffi::Array<ffi::String> required);
+        String name,
+        Array<String> required);
 
-    Pass Sequential(tvm::ffi::Array<Pass> passes, PassInfo pass_info);
+    Pass Sequential(tvm::Array<Pass> passes, PassInfo pass_info);
 
 Pass Registration
 ^^^^^^^^^^^^^^^^^
@@ -376,10 +376,8 @@ Python when needed.
       return CreateFunctionPass(pass_func, 0, "FoldConstant", {});
     }
 
-    TVM_FFI_STATIC_INIT_BLOCK() {
-      namespace refl = tvm::ffi::reflection;
-      refl::GlobalDef().def("relax.transform.FoldConstant", FoldConstant);
-    }
+    TVM_FFI_REGISTER_GLOBAL("relax.transform.FoldConstant")
+    .set_body_typed(FoldConstant);
 
     }  // namespace transform
 
@@ -440,7 +438,7 @@ Multiple ``PassInstrument`` instances can be registed into a single
 
     class PassInstrumentNode : public Object {
      public:
-      ffi::String name;
+      String name;
       virtual void EnterPassContext() const = 0;
       virtual void ExitPassContext() const = 0;
       virtual bool ShouldRun(const IRModule& mod, const transform::PassInfo& info) const = 0;
@@ -451,7 +449,7 @@ Multiple ``PassInstrument`` instances can be registed into a single
 
     class PassInstrument : public ObjectRef {
      public:
-      TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(PassInstrument, ObjectRef, PassInstrumentNode);
+      TVM_DEFINE_OBJECT_REF_METHODS(PassInstrument, ObjectRef, PassInstrumentNode);
     };
 
     }  // namespace instrument
@@ -552,7 +550,7 @@ a certain scope.
 
 .. code:: python
 
-    @tvm_ffi.register_object("transform.PassContext")
+    @tvm.ffi.register_object("transform.PassContext")
     class PassContext(tvm.runtime.Object):
         def __enter__(self):
             _transform.EnterPassContext(self)

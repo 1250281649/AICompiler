@@ -19,7 +19,7 @@ from typing import Callable, Optional, List, Dict
 import numpy as np  # type: ignore
 
 import tvm
-from tvm.runtime import Tensor
+from tvm.runtime import NDArray
 
 
 def generate_input_data(
@@ -81,8 +81,8 @@ def create_calculator(backend: str) -> Callable:
     def f_calculator(
         rt_mod: tvm.runtime.Module,
         dev: tvm.runtime.Device,  # pylint: disable=unused-argument
-        input_data: Dict[str, Tensor],
-    ) -> List[Tensor]:
+        input_data: Dict[str, NDArray],
+    ) -> List[NDArray]:
         """Fetch the result of running the given runtime module.
 
         Parameters

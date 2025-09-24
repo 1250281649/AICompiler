@@ -54,7 +54,6 @@
  * is important since the dependency relation is transitive.
  */
 
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/relax/expr_functor.h>
 #include <tvm/relax/struct_info.h>
 #include <tvm/relax/transform.h>
@@ -166,14 +165,14 @@ class CompositeGroupsBuilder : public MemoizedExprTranslator<Group*> {
   }
 
  private:
-  ffi::Optional<ffi::String> GetCodegenName(const Expr& callee) {
+  Optional<String> GetCodegenName(const Expr& callee) {
     auto const* gvar = callee.as<GlobalVarNode>();
     if (!gvar) {
       return std::nullopt;
     }
 
     auto composite_name_opt =
-        mod_->Lookup(ffi::GetRef<GlobalVar>(gvar))->GetAttr<ffi::String>(attr::kComposite);
+        mod_->Lookup(GetRef<GlobalVar>(gvar))->GetAttr<String>(attr::kComposite);
     if (!composite_name_opt) {
       return std::nullopt;
     }
@@ -181,16 +180,16 @@ class CompositeGroupsBuilder : public MemoizedExprTranslator<Group*> {
     return relax::GetCodegenName(composite_name_opt.value());
   }
 
-  ffi::Optional<ffi::String> GetCodegenName(Group* group) {
+  Optional<String> GetCodegenName(Group* group) {
     if (auto opt_str = group->attrs.Get(attr::kCodegen)) {
-      return Downcast<ffi::String>(opt_str.value());
+      return Downcast<String>(opt_str.value());
     }
     return std::nullopt;
   }
 
   Group* CreateNewGroup(const CallNode* call) {
     Group* group = arena_->make<Group>();
-    if (ffi::Optional<ffi::String> codegen_name = GetCodegenName(call->op)) {
+    if (Optional<String> codegen_name = GetCodegenName(call->op)) {
       group->attrs.Set(attr::kCodegen, codegen_name.value());
     }
     return group;
@@ -220,7 +219,7 @@ class CompositeGroupsBuilder : public MemoizedExprTranslator<Group*> {
     }
   }
 
-  std::unordered_set<Group*> GetParentGroupDependencies(const ffi::Array<Expr>& args) {
+  std::unordered_set<Group*> GetParentGroupDependencies(const Array<Expr>& args) {
     // Collect groups that parent groups depend on
     std::unordered_set<Group*> dependencies;
 
@@ -233,7 +232,7 @@ class CompositeGroupsBuilder : public MemoizedExprTranslator<Group*> {
     return dependencies;
   }
 
-  void UpdateGroupDependencies(Group* group, const ffi::Array<Expr>& args) {
+  void UpdateGroupDependencies(Group* group, const Array<Expr>& args) {
     Group* group_root = group->FindRoot();
 
     std::function<void(Expr)> visit_expr = [&](Expr expr) {
@@ -269,8 +268,8 @@ class CompositeGroupsBuilder : public MemoizedExprTranslator<Group*> {
   }
 
   std::vector<Group*> GetGroupsToMerge(const CallNode* call) {
-    ffi::Optional<ffi::String> codegen_name = GetCodegenName(call->op);
-    if (!codegen_name.has_value()) {
+    Optional<String> codegen_name = GetCodegenName(call->op);
+    if (!codegen_name.defined()) {
       return {};
     }
 
@@ -279,7 +278,7 @@ class CompositeGroupsBuilder : public MemoizedExprTranslator<Group*> {
 
     for (const auto& arg : call->args) {
       auto arg_group = memo_[arg];
-      ffi::Optional<ffi::String> arg_codegen_name = GetCodegenName(arg_group);
+      Optional<String> arg_codegen_name = GetCodegenName(arg_group);
       if (arg_codegen_name == codegen_name && !parent_dependencies.count(arg_group->FindRoot())) {
         // If there is a parent group with the same target, which none of the parent dependency
         // groups depends on, merging "this" call node into the parent group will not form a cyclic
@@ -308,7 +307,7 @@ class CompositeInliner : public ExprMutator {
   using ExprMutator::VisitExpr_;
 
   Function Run(Function func) {
-    inlined_functions_ = ffi::Map<Function, Function>();
+    inlined_functions_ = Map<Function, Function>();
     auto new_body = VisitExpr(ToNonDataflow(func->body));
     auto new_func = Function(func->params, new_body, func->ret_struct_info, func->is_pure,
                              func->attrs, func->span);
@@ -319,7 +318,7 @@ class CompositeInliner : public ExprMutator {
     if (call->op->IsInstance<GlobalVarNode>()) {
       auto gvar = Downcast<GlobalVar>(call->op);
       auto func = Downcast<Function>(mod_->Lookup(gvar));
-      if (func->GetAttr<ffi::String>(attr::kComposite)) {
+      if (func->GetAttr<String>(attr::kComposite)) {
         if (!inlined_functions_.count(func)) {
           auto new_func = CopyWithNewVars(func);
           new_func = WithoutAttr(new_func, tvm::relax::attr::kPrimitive);
@@ -334,7 +333,7 @@ class CompositeInliner : public ExprMutator {
 
  private:
   IRModule mod_;
-  ffi::Map<Function, Function> inlined_functions_;
+  Map<Function, Function> inlined_functions_;
 };
 
 /*!
@@ -361,7 +360,7 @@ class CompositeFunctionAnnotator : public ExprMutator {
     if (call->op->IsInstance<GlobalVarNode>()) {
       GlobalVar cur_var = Downcast<GlobalVar>(call->op);
       auto func = Downcast<Function>(mod_->Lookup(cur_var));
-      if (auto codegen_name = func->GetAttr<ffi::String>(attr::kCodegen)) {
+      if (auto codegen_name = func->GetAttr<String>(attr::kCodegen)) {
         GlobalVar new_var;
         if (var_map_.count(cur_var) > 0) {
           // if we visited before, we don't need to create the new function,
@@ -374,7 +373,7 @@ class CompositeFunctionAnnotator : public ExprMutator {
           builder_->GetContextIRModule()->Remove(old_var);
 
           // rename the function.
-          ffi::String new_func_name = cur_var->name_hint + "_" + codegen_name.value();
+          String new_func_name = cur_var->name_hint + "_" + codegen_name.value();
           Function new_func = inliner.Run(Downcast<Function>(func));
           new_func = WithAttr(new_func, tvm::attr::kGlobalSymbol, new_func_name);
           new_func = WithoutAttr(std::move(new_func), tvm::relax::attr::kPrimitive);
@@ -388,7 +387,7 @@ class CompositeFunctionAnnotator : public ExprMutator {
         return Call(new_var, call->args);
       }
     }
-    return ffi::GetRef<Call>(call);
+    return GetRef<Call>(call);
   }
 
  private:
@@ -422,10 +421,8 @@ Pass MergeCompositeFunctions() {
                           /*required=*/{});
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("relax.transform.MergeCompositeFunctions", MergeCompositeFunctions);
-}
+TVM_FFI_REGISTER_GLOBAL("relax.transform.MergeCompositeFunctions")
+    .set_body_typed(MergeCompositeFunctions);
 
 }  // namespace transform
 

@@ -30,4 +30,4 @@
 #
 #################################################################################################
 
-from cutlass_cppgen.emit.pytorch import pytorch
+from cutlass.emit.pytorch import pytorch

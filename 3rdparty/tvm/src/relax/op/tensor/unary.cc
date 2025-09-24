@@ -24,8 +24,6 @@
 
 #include "unary.h"
 
-#include <tvm/ffi/reflection/registry.h>
-
 #include <utility>
 
 namespace tvm {
@@ -87,10 +85,7 @@ Expr clip(Expr x, Expr min, Expr max) {
   return Call(op, {std::move(x), std::move(min), std::move(max)});
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("relax.op.clip", clip);
-}
+TVM_FFI_REGISTER_GLOBAL("relax.op.clip").set_body_typed(clip);
 
 /***************** Check operators *****************/
 

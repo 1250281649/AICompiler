@@ -20,5 +20,4 @@ tvm.tir.transform
 -----------------
 .. automodule:: tvm.tir.transform
    :members:
-   :exclude-members: Attrs
    :imported-members:

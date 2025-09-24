@@ -52,7 +52,7 @@ inline PrimExpr DispatchPureExternOCML(const PrimExpr& e) {
   std::ostringstream intrinsic_name;
   intrinsic_name << "__ocml_" << name.substr(4) << "_f" << call->dtype.bits();
 
-  ffi::Array<PrimExpr> new_args = {StringImm(intrinsic_name.str())};
+  Array<PrimExpr> new_args = {StringImm(intrinsic_name.str())};
   for (auto arg : call->args) {
     new_args.push_back(arg);
   }

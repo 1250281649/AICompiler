@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/tir/analysis.h>
 #include <tvm/tir/stmt_functor.h>
 
@@ -37,7 +36,7 @@ int32_t DataType2Int(const tvm::DataType& dtype) {
   return converter.dst;
 }
 
-ffi::String Int2DataTypeStr(int32_t dtype) {
+String Int2DataTypeStr(int32_t dtype) {
   union {
     DLDataType dst;
     int32_t src;
@@ -247,20 +246,18 @@ double EstimateTIRFlops(const IRModule& mod) {
   return PostprocessResults(result) + cached_result;
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("tir.analysis.EstimateTIRFlops", [](ObjectRef obj) -> double {
-    if (auto mod = obj.as<IRModule>()) {
-      return EstimateTIRFlops(mod.value());
-    } else if (auto stmt = obj.as<Stmt>()) {
-      return EstimateTIRFlops(stmt.value());
-    } else {
-      LOG(FATAL) << "TypeError: Expect the input to be either IRModule or Stmt, but gets: "
-                 << obj->GetTypeKey();
-      throw;
-    }
-  });
-}
+TVM_FFI_REGISTER_GLOBAL("tir.analysis.EstimateTIRFlops")
+    .set_body_typed([](ObjectRef obj) -> double {
+      if (auto mod = obj.as<IRModule>()) {
+        return EstimateTIRFlops(mod.value());
+      } else if (auto stmt = obj.as<Stmt>()) {
+        return EstimateTIRFlops(stmt.value());
+      } else {
+        LOG(FATAL) << "TypeError: Expect the input to be either IRModule or Stmt, but gets: "
+                   << obj->GetTypeKey();
+        throw;
+      }
+    });
 
 }  // namespace tir
 }  // namespace tvm

@@ -35,8 +35,8 @@ namespace target {
 namespace parsers {
 namespace aprofile {
 
-double GetArchVersion(ffi::Array<ffi::String> mattr) {
-  for (const ffi::String& attr : mattr) {
+double GetArchVersion(Array<String> mattr) {
+  for (const String& attr : mattr) {
     std::string attr_string = attr;
     size_t attr_len = attr_string.size();
     if (attr_len >= 4 && attr_string.substr(0, 2) == "+v" && attr_string.back() == 'a') {
@@ -47,14 +47,14 @@ double GetArchVersion(ffi::Array<ffi::String> mattr) {
   return 0.0;
 }
 
-double GetArchVersion(ffi::Optional<ffi::Array<ffi::String>> attr) {
+double GetArchVersion(Optional<Array<String>> attr) {
   if (!attr) {
     return false;
   }
   return GetArchVersion(attr.value());
 }
 
-bool IsAArch32(ffi::Optional<ffi::String> mtriple, ffi::Optional<ffi::String> mcpu) {
+bool IsAArch32(Optional<String> mtriple, Optional<String> mcpu) {
   if (mtriple) {
     bool is_mprofile = mcpu && support::StartsWith(mcpu.value(), "cortex-m");
     return support::StartsWith(mtriple.value(), "arm") && !is_mprofile;
@@ -62,7 +62,7 @@ bool IsAArch32(ffi::Optional<ffi::String> mtriple, ffi::Optional<ffi::String> mc
   return false;
 }
 
-bool IsAArch64(ffi::Optional<ffi::String> mtriple) {
+bool IsAArch64(Optional<String> mtriple) {
   if (mtriple) {
     return support::StartsWith(mtriple.value(), "aarch64");
   }
@@ -70,32 +70,28 @@ bool IsAArch64(ffi::Optional<ffi::String> mtriple) {
 }
 
 bool IsArch(TargetJSON attrs) {
-  ffi::Optional<ffi::String> mtriple =
-      Downcast<ffi::Optional<ffi::String>>(attrs.Get("mtriple").value_or(nullptr));
-  ffi::Optional<ffi::String> mcpu =
-      Downcast<ffi::Optional<ffi::String>>(attrs.Get("mcpu").value_or(nullptr));
+  Optional<String> mtriple = Downcast<Optional<String>>(attrs.Get("mtriple").value_or(nullptr));
+  Optional<String> mcpu = Downcast<Optional<String>>(attrs.Get("mcpu").value_or(nullptr));
 
   return IsAArch32(mtriple, mcpu) || IsAArch64(mtriple);
 }
 
-bool CheckContains(ffi::Array<ffi::String> array, ffi::String predicate) {
-  return std::any_of(array.begin(), array.end(), [&](ffi::String var) { return var == predicate; });
+bool CheckContains(Array<String> array, String predicate) {
+  return std::any_of(array.begin(), array.end(), [&](String var) { return var == predicate; });
 }
 
 static TargetFeatures GetFeatures(TargetJSON target) {
 #ifdef TVM_LLVM_VERSION
-  ffi::String kind = Downcast<ffi::String>(target.Get("kind").value());
+  String kind = Downcast<String>(target.Get("kind").value());
   ICHECK_EQ(kind, "llvm") << "Expected target kind 'llvm', but got '" << kind << "'";
 
-  ffi::Optional<ffi::String> mtriple =
-      Downcast<ffi::Optional<ffi::String>>(target.Get("mtriple").value_or(nullptr));
-  ffi::Optional<ffi::String> mcpu =
-      Downcast<ffi::Optional<ffi::String>>(target.Get("mcpu").value_or(nullptr));
+  Optional<String> mtriple = Downcast<Optional<String>>(target.Get("mtriple").value_or(nullptr));
+  Optional<String> mcpu = Downcast<Optional<String>>(target.Get("mcpu").value_or(nullptr));
 
   // Check that LLVM has been compiled with the correct target support
   auto llvm_instance = std::make_unique<codegen::LLVMInstance>();
-  codegen::LLVMTargetInfo llvm_backend(*llvm_instance, {{"kind", ffi::String("llvm")}});
-  ffi::Array<ffi::String> targets = llvm_backend.GetAllLLVMTargets();
+  codegen::LLVMTargetInfo llvm_backend(*llvm_instance, {{"kind", String("llvm")}});
+  Array<String> targets = llvm_backend.GetAllLLVMTargets();
   if ((IsAArch64(mtriple) && !CheckContains(targets, "aarch64")) ||
       (IsAArch32(mtriple, mcpu) && !CheckContains(targets, "arm"))) {
     LOG(WARNING) << "Cannot parse target features for target: " << target
@@ -104,9 +100,9 @@ static TargetFeatures GetFeatures(TargetJSON target) {
   }
 
   codegen::LLVMTargetInfo llvm_target(*llvm_instance, target);
-  ffi::Map<ffi::String, ffi::String> features = llvm_target.GetAllLLVMCpuFeatures();
+  Map<String, String> features = llvm_target.GetAllLLVMCpuFeatures();
 
-  auto has_feature = [features](const ffi::String& feature) {
+  auto has_feature = [features](const String& feature) {
     return features.find(feature) != features.end();
   };
 
@@ -124,15 +120,15 @@ static TargetFeatures GetFeatures(TargetJSON target) {
   return {};
 }
 
-static ffi::Array<ffi::String> MergeKeys(ffi::Optional<ffi::Array<ffi::String>> existing_keys) {
-  const ffi::Array<ffi::String> kExtraKeys = {"arm_cpu", "cpu"};
+static Array<String> MergeKeys(Optional<Array<String>> existing_keys) {
+  const Array<String> kExtraKeys = {"arm_cpu", "cpu"};
 
   if (!existing_keys) {
     return kExtraKeys;
   }
 
-  ffi::Array<ffi::String> keys = existing_keys.value();
-  for (ffi::String key : kExtraKeys) {
+  Array<String> keys = existing_keys.value();
+  for (String key : kExtraKeys) {
     if (std::find(keys.begin(), keys.end(), key) == keys.end()) {
       keys.push_back(key);
     }
@@ -142,8 +138,7 @@ static ffi::Array<ffi::String> MergeKeys(ffi::Optional<ffi::Array<ffi::String>> 
 
 TargetJSON ParseTarget(TargetJSON target) {
   target.Set("features", GetFeatures(target));
-  target.Set("keys",
-             MergeKeys(Downcast<ffi::Optional<ffi::Array<ffi::String>>>(target.Get("keys"))));
+  target.Set("keys", MergeKeys(Downcast<Optional<Array<String>>>(target.Get("keys"))));
 
   return target;
 }

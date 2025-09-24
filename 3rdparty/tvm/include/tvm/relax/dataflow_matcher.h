@@ -44,12 +44,11 @@ namespace relax {
  * \return true if matched
  * \return false if unmatched
  */
-bool MatchExpr(DFPattern pattern, Expr expr,
-               ffi::Optional<ffi::Map<Var, Expr>> bindings = std::nullopt);
+bool MatchExpr(DFPattern pattern, Expr expr, Optional<Map<Var, Expr>> bindings = std::nullopt);
 
 /* \brief Similar to above, but return pairs of a matching pattern and an expression.  */
-ffi::Optional<ffi::Map<DFPattern, Expr>> ExtractMatchedExpr(
-    DFPattern pattern, Expr expr, ffi::Optional<ffi::Map<Var, Expr>> bindings = std::nullopt);
+Optional<Map<DFPattern, Expr>> ExtractMatchedExpr(DFPattern pattern, Expr expr,
+                                                  Optional<Map<Var, Expr>> bindings = std::nullopt);
 
 /**
  * \brief Match a sub-graph in a DataflowBlock with a graph of patterns and return the mapping.
@@ -57,8 +56,8 @@ ffi::Optional<ffi::Map<DFPattern, Expr>> ExtractMatchedExpr(
  * \param dfb The function to match.
  * \return Matched patterns and corresponding bound variables
  */
-TVM_DLL ffi::Optional<ffi::Map<DFPattern, Var>> MatchGraph(const PatternContext& ctx,
-                                                           const DataflowBlock& dfb);
+TVM_DLL Optional<Map<DFPattern, Var>> MatchGraph(const PatternContext& ctx,
+                                                 const DataflowBlock& dfb);
 
 /**
  * \brief Rewrite a function with the given pattern and the rewriter function.
@@ -71,8 +70,7 @@ TVM_DLL ffi::Optional<ffi::Map<DFPattern, Var>> MatchGraph(const PatternContext&
  */
 TVM_DLL Function RewriteBindings(
     const PatternContext& ctx,
-    ffi::TypedFunction<ffi::Map<Var, Expr>(ffi::Map<DFPattern, Var>, ffi::Map<Var, Expr>)> rewriter,
-    Function f);
+    ffi::TypedFunction<Map<Var, Expr>(Map<DFPattern, Var>, Map<Var, Expr>)> rewriter, Function f);
 
 /**
  * \brief Rewrite a function with the given pattern and the rewriter function.
@@ -98,7 +96,7 @@ TVM_DLL Function RewriteBindings(
  * \return The updated function, if any updates were applied.
  */
 TVM_DLL Function RewriteCall(const DFPattern& pattern,
-                             ffi::TypedFunction<Expr(Expr, ffi::Map<DFPattern, Expr>)> rewriter,
+                             ffi::TypedFunction<Expr(Expr, Map<DFPattern, Expr>)> rewriter,
                              Function func);
 
 }  // namespace relax

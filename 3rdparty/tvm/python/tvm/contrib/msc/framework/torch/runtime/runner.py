@@ -37,7 +37,7 @@ from tvm.contrib.msc.framework.torch import tools
 class TorchRunner(ModelRunner):
     """Runner of Torch"""
 
-    def _translate(self, mod: tvm.IRModule) -> Tuple[List[MSCGraph], Dict[str, tvm.runtime.Tensor]]:
+    def _translate(self, mod: tvm.IRModule) -> Tuple[List[MSCGraph], Dict[str, tvm.nd.array]]:
         """Translate IRModule to MSCgraphs
 
         Parameters
@@ -49,7 +49,7 @@ class TorchRunner(ModelRunner):
         -------
         graph_list: list<MSCGraph>
             The translated graphs
-        weights_list: list<dict<str, tvm.runtime.tensor>>
+        weights_list: list<dict<str, tvm.nd.array>>
             The translated weights
         """
         graphs, weights = super()._translate(mod)
@@ -107,12 +107,12 @@ class TorchRunner(ModelRunner):
         ]
         return runnable(*torch_inputs)
 
-    def _get_runtime_params(self) -> Dict[str, tvm.runtime.Tensor]:
+    def _get_runtime_params(self) -> Dict[str, tvm.nd.array]:
         """Get the runtime parameters
 
         Returns
         -------
-        params: dict<str, tvm.runtime.tensor>
+        params: dict<str, tvm.nd.array>
             The parameters from runtime.
         """
 

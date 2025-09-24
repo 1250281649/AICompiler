@@ -325,7 +325,7 @@ class StmtExprMutator : public StmtMutator, public ExprMutator {
  *          when the IRNode's type key is in the list.
  */
 TVM_DLL Stmt IRTransform(Stmt stmt, const ffi::Function& preorder, const ffi::Function& postorder,
-                         ffi::Optional<ffi::Array<ffi::String>> only_enable = std::nullopt);
+                         Optional<Array<String>> only_enable = std::nullopt);
 
 /*!
  * \brief Recursively visit the ir in post DFS order node, apply fvisit
@@ -341,7 +341,7 @@ TVM_DLL void PostOrderVisit(const ObjectRef& node, std::function<void(const Obje
  * \param vmap returns a new value if re-mapping is needed, otherwise returns nullptr.
  * \return The converted form.
  */
-TVM_DLL Stmt Substitute(Stmt stmt, std::function<ffi::Optional<PrimExpr>(const Var& var)> vmap);
+TVM_DLL Stmt Substitute(Stmt stmt, std::function<Optional<PrimExpr>(const Var& var)> vmap);
 
 /*!
  * \brief Substitute the var specified by vmap.
@@ -349,8 +349,7 @@ TVM_DLL Stmt Substitute(Stmt stmt, std::function<ffi::Optional<PrimExpr>(const V
  * \param vmap returns a new value if re-mapping is needed, otherwise returns nullptr.
  * \return The result.
  */
-TVM_DLL PrimExpr Substitute(PrimExpr expr,
-                            std::function<ffi::Optional<PrimExpr>(const Var& var)> vmap);
+TVM_DLL PrimExpr Substitute(PrimExpr expr, std::function<Optional<PrimExpr>(const Var& var)> vmap);
 
 /*!
  * \brief Substitute the var specified by vmap.
@@ -359,8 +358,7 @@ TVM_DLL PrimExpr Substitute(PrimExpr expr,
  * \return The result.
  */
 template <typename T>
-ffi::Array<T> Substitute(const ffi::Array<T>& arr,
-                         std::function<ffi::Optional<PrimExpr>(const Var& var)> vmap) {
+Array<T> Substitute(const Array<T>& arr, std::function<Optional<PrimExpr>(const Var& var)> vmap) {
   return arr.Map([&vmap](const auto& elem) { return Substitute(elem, vmap); });
 }
 
@@ -371,7 +369,7 @@ ffi::Array<T> Substitute(const ffi::Array<T>& arr,
  * \return The modified Range.
  */
 inline Range Substitute(const Range& range,
-                        std::function<ffi::Optional<PrimExpr>(const Var& var)> vmap) {
+                        std::function<Optional<PrimExpr>(const Var& var)> vmap) {
   return Range::FromMinExtent(Substitute(range->min, vmap), Substitute(range->extent, vmap));
 }
 
@@ -387,8 +385,8 @@ inline Range Substitute(const Range& range,
  * \return The modified object.
  */
 template <typename Obj>
-auto Substitute(Obj&& obj, const ffi::Map<Var, PrimExpr>& vmap) {
-  auto func = [&vmap](const Var& var) -> ffi::Optional<PrimExpr> { return vmap.Get(var); };
+auto Substitute(Obj&& obj, const Map<Var, PrimExpr>& vmap) {
+  auto func = [&vmap](const Var& var) -> Optional<PrimExpr> { return vmap.Get(var); };
   return Substitute(std::forward<Obj>(obj), func);
 }
 
@@ -403,8 +401,8 @@ auto Substitute(Obj&& obj, const ffi::Map<Var, PrimExpr>& vmap) {
  */
 template <typename Obj, typename Expr,
           typename = std::enable_if_t<std::is_base_of_v<PrimExpr, Expr>>>
-auto Substitute(Obj&& obj, const ffi::Map<Var, Expr>& vmap) {
-  auto func = [&vmap](const Var& var) -> ffi::Optional<PrimExpr> {
+auto Substitute(Obj&& obj, const Map<Var, Expr>& vmap) {
+  auto func = [&vmap](const Var& var) -> Optional<PrimExpr> {
     if (auto opt = vmap.Get(var)) {
       return opt.value();
     } else {
@@ -426,7 +424,7 @@ auto Substitute(Obj&& obj, const ffi::Map<Var, Expr>& vmap) {
 template <typename Obj, typename Expr,
           typename = std::enable_if_t<std::is_base_of_v<PrimExpr, Expr>>>
 auto Substitute(Obj&& obj, const std::unordered_map<const VarNode*, Expr>& vmap) {
-  auto func = [&vmap](const Var& var) -> ffi::Optional<PrimExpr> {
+  auto func = [&vmap](const Var& var) -> Optional<PrimExpr> {
     if (auto it = vmap.find(var.get()); it != vmap.end()) {
       return it->second;
     } else {
@@ -448,7 +446,7 @@ auto Substitute(Obj&& obj, const std::unordered_map<const VarNode*, Expr>& vmap)
 template <typename Obj, typename Expr, typename Hasher, typename EqualityChecker,
           typename = std::enable_if_t<std::is_base_of_v<PrimExpr, Expr>>>
 auto Substitute(Obj&& obj, const std::unordered_map<Var, Expr, Hasher, EqualityChecker>& vmap) {
-  auto func = [&vmap](const Var& var) -> ffi::Optional<PrimExpr> {
+  auto func = [&vmap](const Var& var) -> Optional<PrimExpr> {
     if (auto it = vmap.find(var); it != vmap.end()) {
       return it->second;
     } else {
@@ -475,7 +473,7 @@ auto Substitute(Obj&& obj, const std::unordered_map<IterVar, Expr>& iter_vmap) {
     vmap[iter_var->var.get()] = expr;
   }
 
-  auto func = [&vmap](const Var& var) -> ffi::Optional<PrimExpr> {
+  auto func = [&vmap](const Var& var) -> Optional<PrimExpr> {
     if (auto it = vmap.find(var.get()); it != vmap.end()) {
       return it->second;
     } else {
@@ -495,8 +493,8 @@ auto Substitute(Obj&& obj, const std::unordered_map<IterVar, Expr>& iter_vmap) {
  * \sa Substitute
  * \return The result.
  */
-TVM_DLL Stmt SubstituteWithDataTypeLegalization(
-    Stmt stmt, std::function<ffi::Optional<PrimExpr>(const Var&)> vmap);
+TVM_DLL Stmt SubstituteWithDataTypeLegalization(Stmt stmt,
+                                                std::function<Optional<PrimExpr>(const Var&)> vmap);
 
 /*!
  * \brief Substitute the var specified by vmap and legalize data types after substitution.
@@ -509,7 +507,7 @@ TVM_DLL Stmt SubstituteWithDataTypeLegalization(
  * \return The result.
  */
 TVM_DLL PrimExpr SubstituteWithDataTypeLegalization(
-    PrimExpr expr, std::function<ffi::Optional<PrimExpr>(const Var&)> vmap);
+    PrimExpr expr, std::function<Optional<PrimExpr>(const Var&)> vmap);
 
 /*!
  * \brief Recursively visit the IR in pre DFS order node, apply fvisit.

@@ -76,9 +76,9 @@ class gen_verify:
             )
 
 
-    def get_params(self, declaration = True):
+    def get_params(self, declartion = True):
         code = ""
-        if declaration:
+        if declartion:
             for param in self.params:
                 code += param[0] + " " + param[1] + ";\n"
 

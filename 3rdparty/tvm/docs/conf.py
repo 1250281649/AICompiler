@@ -507,7 +507,9 @@ header_logo_link = "https://tvm.apache.org/"
 header_links = [
     ("Community", "https://tvm.apache.org/community"),
     ("Download", "https://tvm.apache.org/download"),
+    ("Blog", "https://tvm.apache.org/blog"),
     ("Docs", "https://tvm.apache.org/docs"),
+    ("Conference", "https://tvmconf.org"),
     ("Github", "https://github.com/apache/tvm/"),
 ]
 

@@ -15,10 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 import tvm
-
-# needed for attrs
-import tvm.testing
 import pytest
+import tvm.ir._ffi_api
 
 
 def test_make_attrs():

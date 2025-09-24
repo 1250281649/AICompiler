@@ -27,8 +27,6 @@
 #define TVM_VM_ENABLE_PROFILER 1
 #endif
 
-#include <tvm/ffi/extra/module.h>
-
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -68,7 +66,7 @@ class VMClosureObj : public Object {
    * \brief The function name. The function could be any
    * function object that is compatible to the VM runtime.
    */
-  ffi::String func_name;
+  String func_name;
 
   /*!
    * \brief The implementation of the Closure.
@@ -77,14 +75,16 @@ class VMClosureObj : public Object {
    *       the same arguments as the normal function call.
    */
   ffi::Function impl;
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("relax.vm.Closure", VMClosureObj, Object);
+
+  static constexpr const char* _type_key = "relax.vm.Closure";
+  TVM_DECLARE_FINAL_OBJECT_INFO(VMClosureObj, Object);
 };
 
 /*! \brief reference to closure. */
 class VMClosure : public ObjectRef {
  public:
-  VMClosure(ffi::String func_name, ffi::Function impl);
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(VMClosure, ObjectRef, VMClosureObj);
+  VMClosure(String func_name, ffi::Function impl);
+  TVM_DEFINE_OBJECT_REF_METHODS(VMClosure, ObjectRef, VMClosureObj);
 
   /*!
    * \brief Create another ffi::Function with last arguments already bound to last_args.
@@ -107,13 +107,14 @@ class VMClosure : public ObjectRef {
  */
 class VMExtensionNode : public Object {
  protected:
-  TVM_FFI_DECLARE_OBJECT_INFO("runtime.VMExtension", VMExtensionNode, Object);
+  static constexpr const char* _type_key = "runtime.VMExtension";
+  TVM_DECLARE_BASE_OBJECT_INFO(VMExtensionNode, Object);
 };
 
 /*! \brief Managed reference to VM extension. */
 class VMExtension : public ObjectRef {
  public:
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(VMExtension, ObjectRef, VMExtensionNode);
+  TVM_DEFINE_OBJECT_REF_METHODS(VMExtension, ObjectRef, VMExtensionNode);
 };
 
 /*!
@@ -127,7 +128,7 @@ class VMExtension : public ObjectRef {
  * multiple threads, or serialize them to disk or over the
  * wire.
  */
-class VirtualMachine : public ffi::ModuleObj {
+class VirtualMachine : public runtime::ModuleNode {
  public:
   /*!
    * \brief Initialize the virtual machine for a set of devices.
@@ -146,7 +147,7 @@ class VirtualMachine : public ffi::ModuleObj {
    * \param func_name The name of the function.
    * \return The closure
    */
-  virtual VMClosure GetClosure(const ffi::String& func_name) = 0;
+  virtual VMClosure GetClosure(const String& func_name) = 0;
   /*!
    * \brief Invoke closure or packed function using ffi::Function convention.
    * \param closure_or_packedfunc A VM closure or a packed_func.
@@ -188,12 +189,10 @@ class VirtualMachine : public ffi::ModuleObj {
     using ContainerType = typename T::ContainerType;
     uint32_t key = ContainerType::RuntimeTypeIndex();
     if (auto it = extensions.find(key); it != extensions.end()) {
-      ffi::Any value = (*it).second;
-      return value.cast<T>();
+      return Downcast<T>((*it).second);
     }
     auto [it, _] = extensions.emplace(key, T::Create());
-    ffi::Any value = (*it).second;
-    return value.cast<T>();
+    return Downcast<T>((*it).second);
   }
 
   /*!
@@ -225,7 +224,7 @@ class VirtualMachine : public ffi::ModuleObj {
   std::vector<Device> devices;
   /*! \brief The VM extensions. Mapping from the type index of the extension to the extension
    * instance. */
-  std::unordered_map<uint32_t, Any> extensions;
+  std::unordered_map<uint32_t, VMExtension> extensions;
 };
 
 }  // namespace vm

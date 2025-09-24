@@ -68,24 +68,24 @@ void StructInfoVisitor::VisitStructInfo_(const FuncStructInfoNode* op) {
 }
 
 StructInfo StructInfoMutator::VisitStructInfo_(const ObjectStructInfoNode* op) {
-  return ffi::GetRef<StructInfo>(op);
+  return GetRef<StructInfo>(op);
 }
 
 StructInfo StructInfoMutator::VisitStructInfo_(const PrimStructInfoNode* op) {
   if (!op->value.defined()) {
-    return ffi::GetRef<StructInfo>(op);
+    return GetRef<StructInfo>(op);
   }
 
   auto new_expr = VisitStructInfoExprField(op->value.value());
   if (new_expr.same_as(op->value)) {
-    return ffi::GetRef<StructInfo>(op);
+    return GetRef<StructInfo>(op);
   } else {
     return PrimStructInfo(new_expr);
   }
 }
 
 StructInfo StructInfoMutator::VisitStructInfo_(const ShapeStructInfoNode* op) {
-  ffi::Optional<ffi::Array<PrimExpr>> values;
+  Optional<Array<PrimExpr>> values;
 
   if (op->values.defined()) {
     // if no changes are made the original array will be returned.
@@ -94,14 +94,14 @@ StructInfo StructInfoMutator::VisitStructInfo_(const ShapeStructInfoNode* op) {
   }
 
   if (values.same_as(op->values)) {
-    return ffi::GetRef<StructInfo>(op);
+    return GetRef<StructInfo>(op);
   } else {
     return ShapeStructInfo(values.value(), op->span);
   }
 }
 
 StructInfo StructInfoMutator::VisitStructInfo_(const TensorStructInfoNode* op) {
-  ffi::Optional<Expr> shape;
+  Optional<Expr> shape;
 
   if (op->shape.defined()) {
     shape = this->VisitStructInfoExprField(op->shape.value());
@@ -110,7 +110,7 @@ StructInfo StructInfoMutator::VisitStructInfo_(const TensorStructInfoNode* op) {
   VDevice vdev = op->vdevice.value_or(VDevice());
 
   if (shape.same_as(op->shape)) {
-    return ffi::GetRef<StructInfo>(op);
+    return GetRef<StructInfo>(op);
   } else {
     return TensorStructInfo(shape.value(), op->dtype, vdev, op->span);
   }
@@ -123,18 +123,18 @@ StructInfo StructInfoMutator::VisitStructInfo_(const distributed::DTensorStructI
 }
 
 StructInfo StructInfoMutator::VisitStructInfo_(const TupleStructInfoNode* op) {
-  ffi::Array<StructInfo> fields =
+  Array<StructInfo> fields =
       op->fields.Map([this](const StructInfo& sinfo) { return this->VisitStructInfo(sinfo); });
 
   if (fields.same_as(op->fields)) {
-    return ffi::GetRef<StructInfo>(op);
+    return GetRef<StructInfo>(op);
   } else {
     return TupleStructInfo(fields, op->span);
   }
 }
 
 StructInfo StructInfoMutator::VisitStructInfo_(const FuncStructInfoNode* op) {
-  ffi::Optional<ffi::Array<StructInfo>> params;
+  Optional<Array<StructInfo>> params;
 
   if (op->params.defined()) {
     params = op->params.value().Map(
@@ -144,7 +144,7 @@ StructInfo StructInfoMutator::VisitStructInfo_(const FuncStructInfoNode* op) {
   StructInfo ret = this->VisitStructInfo(op->ret);
 
   if (params.same_as(op->params) && ret.same_as(op->ret)) {
-    return ffi::GetRef<StructInfo>(op);
+    return GetRef<StructInfo>(op);
   } else {
     ICHECK(ret.defined()) << "FuncStructInfo that contains params must contain ret";
     return FuncStructInfo(params.value(), ret, op->purity, op->span);

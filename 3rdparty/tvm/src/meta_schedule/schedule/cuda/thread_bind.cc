@@ -31,10 +31,10 @@ namespace meta_schedule {
 
 using namespace tvm::tir;
 
-std::function<ExprRV(int64_t)> MakeFactorSampler(Schedule sch, ffi::Array<Integer> thread_extents) {
+std::function<ExprRV(int64_t)> MakeFactorSampler(Schedule sch, Array<Integer> thread_extents) {
   return [sch = std::move(sch),
           thread_extents = std::move(thread_extents)](int64_t max_extent) -> ExprRV {
-    ffi::Array<Integer> extents;
+    Array<Integer> extents;
     extents.reserve(thread_extents.size());
     for (const Integer extent : thread_extents) {
       if (extent->value <= max_extent) {
@@ -48,14 +48,14 @@ std::function<ExprRV(int64_t)> MakeFactorSampler(Schedule sch, ffi::Array<Intege
     if (n == 1) {
       return Integer(extents[0]);
     }
-    ffi::Array<FloatImm> probs(n, FloatImm(DataType::Float(32), 1.0 / n));
+    Array<FloatImm> probs(n, FloatImm(DataType::Float(32), 1.0 / n));
     return sch->SampleCategorical(extents, probs);
   };
 }
 
-ffi::Array<LoopRV> BindSpatialLoop(Schedule sch, LoopRV loop, int64_t max_threadblocks,
-                                   int64_t max_threads_per_block,
-                                   std::function<ExprRV(int64_t)> get_factor) {
+Array<LoopRV> BindSpatialLoop(Schedule sch, LoopRV loop, int64_t max_threadblocks,
+                              int64_t max_threads_per_block,
+                              std::function<ExprRV(int64_t)> get_factor) {
   int64_t extent = -1;
   if (const int64_t* e = as_const_int(sch->Get(loop)->extent)) {
     extent = *e;
@@ -67,15 +67,15 @@ ffi::Array<LoopRV> BindSpatialLoop(Schedule sch, LoopRV loop, int64_t max_thread
       get_factor = MakeFactorSampler(sch, {32, 64, 128, 256, 512, 1024});
     }
     ExprRV factor = get_factor(std::min(extent, max_threads_per_block));
-    ffi::Array<LoopRV> splits = sch->Split(loop, {std::nullopt, factor});
+    Array<LoopRV> splits = sch->Split(loop, {std::nullopt, factor});
     ICHECK_EQ(splits.size(), 2);
     sch->Bind(splits[0], "blockIdx.x");
     sch->Bind(splits[1], "threadIdx.x");
     return {splits[0], splits[1]};
   } else {
-    ffi::Array<LoopRV> splits = sch->Split(loop, {std::nullopt,
-                                                  Integer(max_threadblocks),  //
-                                                  Integer(max_threads_per_block)});
+    Array<LoopRV> splits = sch->Split(loop, {std::nullopt,
+                                             Integer(max_threadblocks),  //
+                                             Integer(max_threads_per_block)});
     ICHECK_EQ(splits.size(), 3);
     sch->Reorder({splits[1], splits[2], splits[0]});
     sch->Bind(splits[1], "blockIdx.x");
@@ -95,7 +95,7 @@ void BindBlockThreadIdx(tir::Schedule sch, tir::BlockRV block_rv,  //
   if (tir::HasBeenMultiLevelTiled(block_sref)) {
     return;
   }
-  ffi::Array<StmtSRef> loops = tir::GetLoops(block_sref);
+  Array<StmtSRef> loops = tir::GetLoops(block_sref);
   int n = loops.size();
   int i_block_idx = -1;
   int i_thread_idx = -1;
@@ -141,11 +141,11 @@ void BindBlockThreadIdx(tir::Schedule sch, tir::BlockRV block_rv,  //
     ICHECK(false) << "Unsupported case, where blockIdx is bound but threadIdx is not";
     throw;
   }
-  LoopRV loop_rv{ffi::UnsafeInit()};
+  LoopRV loop_rv{nullptr};
   {
-    ffi::Array<LoopRV> loop_rvs = sch->GetLoops(block_rv);
+    Array<LoopRV> loop_rvs = sch->GetLoops(block_rv);
     if (i_spatial_loop == -1) {
-      LoopRV spatial_loop_rv{ffi::UnsafeInit()};
+      LoopRV spatial_loop_rv{nullptr};
       if (loop_rvs.empty()) {
         spatial_loop_rv = sch->AddUnitLoop(block_rv);
       } else {
@@ -165,7 +165,7 @@ void BindBlockThreadIdx(tir::Schedule sch, tir::BlockRV block_rv,  //
     }
     if (i_block_idx == -1 && i_thread_idx != -1) {
       int num_fuse = std::min(std::min(i_multi_child, i_thread_idx), i_spatial_loop + 1);
-      ffi::Array<LoopRV> loop_rvs = sch->GetLoops(block_rv);
+      Array<LoopRV> loop_rvs = sch->GetLoops(block_rv);
       loop_rv = sch->Fuse({loop_rvs.begin(), loop_rvs.begin() + num_fuse});
       sch->Bind(loop_rv, "blockIdx.x");
       return;

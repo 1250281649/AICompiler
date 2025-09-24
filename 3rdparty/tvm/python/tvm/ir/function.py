@@ -19,8 +19,6 @@
 from typing import Union, Dict
 
 from enum import IntEnum
-import tvm_ffi
-
 import tvm.runtime
 from tvm.runtime.object import Object
 from .expr import RelaxExpr
@@ -36,7 +34,7 @@ class CallingConv(IntEnum):
     DEVICE_KERNEL_LAUNCH = 2
 
 
-@tvm_ffi.register_object("ir.BaseFunc")
+@tvm.ffi.register_object("ir.BaseFunc")
 class BaseFunc(RelaxExpr):
     """Base class of all functions."""
 

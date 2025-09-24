@@ -29,8 +29,7 @@ namespace relax {
 namespace distributed {
 
 StructInfo InferDistStructInfoPermuteDims(const Call& call, const BlockBuilder& ctx) {
-  ffi::Array<distributed::DTensorStructInfo> input_dtensor_sinfos =
-      GetInputDTensorStructInfo(call, ctx);
+  Array<distributed::DTensorStructInfo> input_dtensor_sinfos = GetInputDTensorStructInfo(call, ctx);
   TensorStructInfo data_sinfo = input_dtensor_sinfos[0]->tensor_sinfo;
 
   const auto* attrs = call->attrs.as<PermuteDimsAttrs>();
@@ -85,8 +84,7 @@ StructInfo InferDistStructInfoReshape(const Call& call, const BlockBuilder& ctx)
   if (call->args.size() != 2) {
     ctx->ReportFatal(Diagnostic::Error(call) << "Reshape op should take 2 arguments");
   }
-  ffi::Array<distributed::DTensorStructInfo> input_dtensor_sinfos =
-      GetInputDTensorStructInfo(call, ctx);
+  Array<distributed::DTensorStructInfo> input_dtensor_sinfos = GetInputDTensorStructInfo(call, ctx);
   TensorStructInfo data_sinfo = input_dtensor_sinfos[0]->tensor_sinfo;
 
   const auto* new_shape_sinfo = GetStructInfoAs<ShapeStructInfoNode>(call->args[1]);
@@ -102,7 +100,7 @@ StructInfo InferDistStructInfoReshape(const Call& call, const BlockBuilder& ctx)
         << call->args[1]->struct_info_->GetTypeKey());
   }
 
-  ffi::Optional<ffi::Array<PrimExpr>> old_shape_values;
+  Optional<Array<PrimExpr>> old_shape_values;
   if (data_sinfo->shape.defined()) {
     const auto* old_shape_sinfo = GetStructInfoAs<ShapeStructInfoNode>(data_sinfo->shape.value());
     ICHECK_NOTNULL(old_shape_sinfo);

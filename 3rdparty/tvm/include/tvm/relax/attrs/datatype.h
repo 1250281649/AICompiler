@@ -37,7 +37,9 @@ struct AstypeAttrs : public AttrsNodeReflAdapter<AstypeAttrs> {
     namespace refl = tvm::ffi::reflection;
     refl::ObjectDef<AstypeAttrs>().def_ro("dtype", &AstypeAttrs::dtype, "Target data type");
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("relax.attrs.AstypeAttrs", AstypeAttrs, BaseAttrsNode);
+
+  static constexpr const char* _type_key = "relax.attrs.AstypeAttrs";
+  TVM_FFI_DECLARE_FINAL_OBJECT_INFO(AstypeAttrs, BaseAttrsNode);
 };  // struct AstypeAttrs.
 
 /*! \brief Attributes used in wrap_param operator */
@@ -48,7 +50,9 @@ struct WrapParamAttrs : public AttrsNodeReflAdapter<WrapParamAttrs> {
     namespace refl = tvm::ffi::reflection;
     refl::ObjectDef<WrapParamAttrs>().def_ro("dtype", &WrapParamAttrs::dtype, "Target data type");
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("relax.attrs.WrapParamAttrs", WrapParamAttrs, BaseAttrsNode);
+
+  static constexpr const char* _type_key = "relax.attrs.WrapParamAttrs";
+  TVM_FFI_DECLARE_FINAL_OBJECT_INFO(WrapParamAttrs, BaseAttrsNode);
 };  // struct WrapParamAttrs.
 
 }  // namespace relax

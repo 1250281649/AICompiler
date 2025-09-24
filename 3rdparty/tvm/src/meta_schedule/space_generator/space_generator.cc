@@ -16,15 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-#include <tvm/ffi/reflection/registry.h>
-
 #include "../../target/parsers/aprofile.h"
 #include "../utils.h"
 
 namespace tvm {
 namespace meta_schedule {
 
-ffi::String GetRuleKindFromTarget(const Target& target) {
+String GetRuleKindFromTarget(const Target& target) {
   if (target->kind->name == "llvm") {
     static auto target_has_feature_fn_ptr =
         tvm::ffi::Function::GetGlobalRequired("target.target_has_feature");
@@ -38,10 +36,6 @@ ffi::String GetRuleKindFromTarget(const Target& target) {
       if (have_avx512bw && have_avx512f) {
         return "avx512";
       }
-    }
-    bool have_rvv = target_has_feature_fn_ptr("v", target).cast<bool>();
-    if (have_rvv) {
-      return "rvv";
     }
 
     TargetJSON target_json = target::parsers::aprofile::ParseTarget(target->Export());
@@ -59,7 +53,7 @@ ffi::String GetRuleKindFromTarget(const Target& target) {
     return "hexagon";
   }
   if (target->kind->name == "cuda") {
-    if (ffi::Optional<ffi::String> opt_sm = target->GetAttr<ffi::String>("arch")) {
+    if (Optional<String> opt_sm = target->GetAttr<String>("arch")) {
       std::string sm = opt_sm.value();
       if (support::StartsWith(sm, "sm_")) {
         sm = sm.substr(3);
@@ -92,10 +86,10 @@ void SpaceGeneratorNode::InitializeWithTuneContext(const TuneContext& context) {
       !(sch_rules.defined() &&      //
         postprocs.defined() &&      //
         mutator_probs.defined())) {
-    ffi::String kind = GetRuleKindFromTarget(context->target.value());
-    ffi::Array<ScheduleRule> default_sch_rules;
-    ffi::Array<Postproc> default_postprocs;
-    ffi::Map<Mutator, FloatImm> default_mutator_probs;
+    String kind = GetRuleKindFromTarget(context->target.value());
+    Array<ScheduleRule> default_sch_rules;
+    Array<Postproc> default_postprocs;
+    Map<Mutator, FloatImm> default_mutator_probs;
     // for target with skylake-avx512
     if (kind == "llvm") {
       default_sch_rules = ScheduleRule::DefaultLLVM();
@@ -120,13 +114,6 @@ void SpaceGeneratorNode::InitializeWithTuneContext(const TuneContext& context) {
     } else if (kind == "avx512") {
       default_sch_rules = ScheduleRule::DefaultX86("avx512");
       default_postprocs = Postproc::DefaultCPUTensorization();
-      default_mutator_probs = Mutator::DefaultLLVM();
-    } else if (kind == "rvv") {
-      static auto llvm_get_vector_width =
-          tvm::ffi::Function::GetGlobalRequired("target.llvm_get_vector_width");
-      const int vlen = llvm_get_vector_width(context->target.value()).cast<int>();
-      default_sch_rules = ScheduleRule::DefaultRISCV(vlen);
-      default_postprocs = Postproc::DefaultRISCV();
       default_mutator_probs = Mutator::DefaultLLVM();
     } else if (kind == "asimd") {
       default_sch_rules = ScheduleRule::DefaultARM("neon");
@@ -174,7 +161,7 @@ void PySpaceGeneratorNode::InitializeWithTuneContext(const TuneContext& context)
   f_initialize_with_tune_context(context);
 }
 
-ffi::Array<tir::Schedule> PySpaceGeneratorNode::GenerateDesignSpace(const IRModule& mod) {
+Array<tir::Schedule> PySpaceGeneratorNode::GenerateDesignSpace(const IRModule& mod) {
   ICHECK(f_generate_design_space != nullptr)
       << "PySpaceGenerator's GenerateDesignSpace method not implemented!";
   return f_generate_design_space(mod);
@@ -186,12 +173,11 @@ SpaceGenerator PySpaceGeneratorNode::Clone() const {
 }
 
 SpaceGenerator SpaceGenerator::PySpaceGenerator(
-    ffi::Optional<ffi::Array<ScheduleRule>> sch_rules,
-    ffi::Optional<ffi::Array<Postproc>> postprocs,
-    ffi::Optional<ffi::Map<Mutator, FloatImm>> mutator_probs,
+    Optional<Array<ScheduleRule>> sch_rules, Optional<Array<Postproc>> postprocs,
+    Optional<Map<Mutator, FloatImm>> mutator_probs,
     FInitializeWithTuneContext f_initialize_with_tune_context,
     FGenerateDesignSpace f_generate_design_space, FClone f_clone) {
-  ObjectPtr<PySpaceGeneratorNode> n = ffi::make_object<PySpaceGeneratorNode>();
+  ObjectPtr<PySpaceGeneratorNode> n = make_object<PySpaceGeneratorNode>();
   n->sch_rules = sch_rules;
   n->postprocs = postprocs;
   n->mutator_probs = mutator_probs;
@@ -201,21 +187,22 @@ SpaceGenerator SpaceGenerator::PySpaceGenerator(
   return SpaceGenerator(n);
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
+TVM_FFI_STATIC_INIT_BLOCK({
   SpaceGeneratorNode::RegisterReflection();
   PySpaceGeneratorNode::RegisterReflection();
-}
+});
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef()
-      .def_method("meta_schedule.SpaceGeneratorInitializeWithTuneContext",
-                  &SpaceGeneratorNode::InitializeWithTuneContext)
-      .def_method("meta_schedule.SpaceGeneratorGenerateDesignSpace",
-                  &SpaceGeneratorNode::GenerateDesignSpace)
-      .def("meta_schedule.SpaceGeneratorPySpaceGenerator", SpaceGenerator::PySpaceGenerator)
-      .def_method("meta_schedule.SpaceGeneratorClone", &SpaceGeneratorNode::Clone);
-}
+TVM_REGISTER_OBJECT_TYPE(SpaceGeneratorNode);
+TVM_REGISTER_NODE_TYPE(PySpaceGeneratorNode);
+
+TVM_FFI_REGISTER_GLOBAL("meta_schedule.SpaceGeneratorInitializeWithTuneContext")
+    .set_body_method(&SpaceGeneratorNode::InitializeWithTuneContext);
+TVM_FFI_REGISTER_GLOBAL("meta_schedule.SpaceGeneratorGenerateDesignSpace")
+    .set_body_method(&SpaceGeneratorNode::GenerateDesignSpace);
+TVM_FFI_REGISTER_GLOBAL("meta_schedule.SpaceGeneratorPySpaceGenerator")
+    .set_body_typed(SpaceGenerator::PySpaceGenerator);
+TVM_FFI_REGISTER_GLOBAL("meta_schedule.SpaceGeneratorClone")
+    .set_body_method(&SpaceGeneratorNode::Clone);
 
 }  // namespace meta_schedule
 }  // namespace tvm

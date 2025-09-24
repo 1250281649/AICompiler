@@ -21,7 +21,6 @@
  * \file detect_common_subexpr.cc
  * \brief Utility to detect common sub expressions.
  */
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/tir/expr.h>
 
 #include <limits>
@@ -33,7 +32,7 @@ namespace arith {
 
 using namespace tir;
 
-ffi::Map<PrimExpr, Integer> DetectCommonSubExpr(const PrimExpr& e, int thresh) {
+Map<PrimExpr, Integer> DetectCommonSubExpr(const PrimExpr& e, int thresh) {
   // Check the threshold in the range of size_t
   CHECK_GE(thresh, std::numeric_limits<size_t>::min());
   CHECK_LE(thresh, std::numeric_limits<size_t>::max());
@@ -63,16 +62,13 @@ ffi::Map<PrimExpr, Integer> DetectCommonSubExpr(const PrimExpr& e, int thresh) {
   }
 
   // Return the common sub expr that occur more than thresh times
-  ffi::Map<PrimExpr, Integer> results;
+  Map<PrimExpr, Integer> results;
   for (auto& it : semantic_comp_done_by_expr) {
     if (it.second >= repeat_thr) results.Set(it.first, it.second);
   }
   return results;
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("arith.DetectCommonSubExpr", DetectCommonSubExpr);
-}
+TVM_FFI_REGISTER_GLOBAL("arith.DetectCommonSubExpr").set_body_typed(DetectCommonSubExpr);
 }  // namespace arith
 }  // namespace tvm

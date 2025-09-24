@@ -70,4 +70,3 @@ tvm.relax.op.op_attrs
 *********************
 .. automodule:: tvm.relax.op.op_attrs
    :members:
-   :exclude-members: Attrs

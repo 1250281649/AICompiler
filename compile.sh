@@ -64,6 +64,24 @@ install_dependencies() {
     nvidia-smi || log_error "NVIDIA 驱动未正确安装，请检查。"
 }
 
+compile_tvm() {
+    log_info "开始编译 TVM..."
+
+    tvm_home=${PROJECT_ROOT}/3rdparty/tvm
+    cd ${tvm_home}
+    tvm_build=${tvm_home}/build
+    if [ ! -d "${tvm_build}" ]; then
+        log_info "目录 ${tvm_build} 不存在，自动创建该目录。"
+        mkdir -p ${tvm_build}
+    fi
+
+    cp ${PROJECT_ROOT}/cmake/tvm_config.cmake ${tvm_home}/build
+    cd ${tvm_build}
+
+    cmake ..
+    make -j4
+}
+
 compile_mlc_llm() {
     log_info "开始编译 MLC-LLM..."
 
@@ -78,15 +96,18 @@ compile_mlc_llm() {
 # 主函数
 main() {
     log_info "开始 MLC-LLM 编译流程..."
-
     # 检查必要命令
     check_command git
     check_command cmake
     check_command python3
 
+    compile_tvm
+
+    log_info "开始 MLC-LLM 编译流程..."
+
     # # 步骤执行
     # install_dependencies
-    compile_mlc_llm
+    # compile_mlc_llm
 
     log_info "编译完成！"
 }

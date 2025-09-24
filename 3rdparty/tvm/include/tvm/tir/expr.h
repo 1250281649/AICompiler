@@ -49,17 +49,25 @@ namespace tir {
 using IntImmNode = tvm::IntImmNode;
 using FloatImmNode = tvm::FloatImmNode;
 
-/*! \brief ffi::String constants, only used in asserts. */
+/*! \brief String constants, only used in asserts. */
 class StringImmNode : public PrimExprNode {
  public:
   /*! \brief The constant value content. */
-  ffi::String value;
+  String value;
 
   static void RegisterReflection() {
     namespace refl = tvm::ffi::reflection;
     refl::ObjectDef<StringImmNode>().def_ro("value", &StringImmNode::value);
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("tir.StringImm", StringImmNode, PrimExprNode);
+
+  bool SEqualReduce(const StringImmNode* other, SEqualReducer equal) const {
+    return equal(value, other->value);
+  }
+
+  void SHashReduce(SHashReducer hash_reduce) const { hash_reduce(value); }
+
+  static constexpr const char* _type_key = "tir.StringImm";
+  TVM_DECLARE_FINAL_OBJECT_INFO(StringImmNode, PrimExprNode);
 };
 
 /*!
@@ -68,8 +76,8 @@ class StringImmNode : public PrimExprNode {
  */
 class StringImm : public PrimExpr {
  public:
-  TVM_DLL StringImm(ffi::String value, Span span = Span());
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(StringImm, PrimExpr, StringImmNode);
+  TVM_DLL StringImm(String value, Span span = Span());
+  TVM_DEFINE_OBJECT_REF_METHODS(StringImm, PrimExpr, StringImmNode);
   TVM_DEFINE_OBJECT_REF_COW_METHOD(StringImmNode);
 };
 
@@ -86,7 +94,18 @@ class CastNode : public PrimExprNode {
     namespace refl = tvm::ffi::reflection;
     refl::ObjectDef<CastNode>().def_ro("value", &CastNode::value);
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("tir.Cast", CastNode, PrimExprNode);
+
+  bool SEqualReduce(const CastNode* other, SEqualReducer equal) const {
+    return equal(dtype, other->dtype) && equal(value, other->value);
+  }
+
+  void SHashReduce(SHashReducer hash_reduce) const {
+    hash_reduce(dtype);
+    hash_reduce(value);
+  }
+
+  static constexpr const char* _type_key = "tir.Cast";
+  TVM_DECLARE_FINAL_OBJECT_INFO(CastNode, PrimExprNode);
 };
 
 /*!
@@ -96,7 +115,7 @@ class CastNode : public PrimExprNode {
 class Cast : public PrimExpr {
  public:
   TVM_DLL Cast(DataType dtype, PrimExpr value, Span span = Span());
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(Cast, PrimExpr, CastNode);
+  TVM_DEFINE_OBJECT_REF_METHODS(Cast, PrimExpr, CastNode);
   TVM_DEFINE_OBJECT_REF_COW_METHOD(CastNode);
 };
 
@@ -117,9 +136,17 @@ class BinaryOpNode : public PrimExprNode {
     refl::ObjectDef<T>().def_ro("a", &T::a).def_ro("b", &T::b);
   }
 
-  static const constexpr int _type_child_slots [[maybe_unused]] = 0;
-  static const constexpr bool _type_final [[maybe_unused]] = true;
-  TVM_FFI_DECLARE_OBJECT_INFO_PREDEFINED_TYPE_KEY(T, PrimExprNode);
+  bool SEqualReduce(const T* other, SEqualReducer equal) const {
+    return equal(dtype, other->dtype) && equal(a, other->a) && equal(b, other->b);
+  }
+
+  void SHashReduce(SHashReducer hash_reduce) const {
+    hash_reduce(dtype);
+    hash_reduce(a);
+    hash_reduce(b);
+  }
+
+  TVM_DECLARE_FINAL_OBJECT_INFO(T, PrimExprNode);
 };
 
 /*! \brief a + b */
@@ -135,7 +162,7 @@ class AddNode : public BinaryOpNode<AddNode> {
 class Add : public PrimExpr {
  public:
   TVM_DLL Add(PrimExpr a, PrimExpr b, Span span = Span());
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(Add, PrimExpr, AddNode);
+  TVM_DEFINE_OBJECT_REF_METHODS(Add, PrimExpr, AddNode);
   TVM_DEFINE_OBJECT_REF_COW_METHOD(AddNode);
 };
 
@@ -153,7 +180,7 @@ class Sub : public PrimExpr {
  public:
   TVM_DLL Sub(PrimExpr a, PrimExpr b, Span span = Span());
 
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(Sub, PrimExpr, SubNode);
+  TVM_DEFINE_OBJECT_REF_METHODS(Sub, PrimExpr, SubNode);
   TVM_DEFINE_OBJECT_REF_COW_METHOD(SubNode);
 };
 
@@ -170,7 +197,7 @@ class MulNode : public BinaryOpNode<MulNode> {
 class Mul : public PrimExpr {
  public:
   TVM_DLL Mul(PrimExpr a, PrimExpr b, Span span = Span());
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(Mul, PrimExpr, MulNode);
+  TVM_DEFINE_OBJECT_REF_METHODS(Mul, PrimExpr, MulNode);
   TVM_DEFINE_OBJECT_REF_COW_METHOD(MulNode);
 };
 
@@ -190,7 +217,7 @@ class DivNode : public BinaryOpNode<DivNode> {
 class Div : public PrimExpr {
  public:
   TVM_DLL Div(PrimExpr a, PrimExpr b, Span span = Span());
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(Div, PrimExpr, DivNode);
+  TVM_DEFINE_OBJECT_REF_METHODS(Div, PrimExpr, DivNode);
   TVM_DEFINE_OBJECT_REF_COW_METHOD(DivNode);
 };
 
@@ -210,7 +237,7 @@ class ModNode : public BinaryOpNode<ModNode> {
 class Mod : public PrimExpr {
  public:
   TVM_DLL Mod(PrimExpr a, PrimExpr b, Span span = Span());
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(Mod, PrimExpr, ModNode);
+  TVM_DEFINE_OBJECT_REF_METHODS(Mod, PrimExpr, ModNode);
   TVM_DEFINE_OBJECT_REF_COW_METHOD(ModNode);
 };
 
@@ -227,7 +254,7 @@ class FloorDivNode : public BinaryOpNode<FloorDivNode> {
 class FloorDiv : public PrimExpr {
  public:
   TVM_DLL FloorDiv(PrimExpr a, PrimExpr b, Span span = Span());
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(FloorDiv, PrimExpr, FloorDivNode);
+  TVM_DEFINE_OBJECT_REF_METHODS(FloorDiv, PrimExpr, FloorDivNode);
   TVM_DEFINE_OBJECT_REF_COW_METHOD(FloorDivNode);
 };
 
@@ -244,7 +271,7 @@ class FloorModNode : public BinaryOpNode<FloorModNode> {
 class FloorMod : public PrimExpr {
  public:
   TVM_DLL FloorMod(PrimExpr a, PrimExpr b, Span span = Span());
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(FloorMod, PrimExpr, FloorModNode);
+  TVM_DEFINE_OBJECT_REF_METHODS(FloorMod, PrimExpr, FloorModNode);
   TVM_DEFINE_OBJECT_REF_COW_METHOD(FloorModNode);
 };
 
@@ -261,7 +288,7 @@ class MinNode : public BinaryOpNode<MinNode> {
 class Min : public PrimExpr {
  public:
   TVM_DLL Min(PrimExpr a, PrimExpr b, Span span = Span());
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(Min, PrimExpr, MinNode);
+  TVM_DEFINE_OBJECT_REF_METHODS(Min, PrimExpr, MinNode);
   TVM_DEFINE_OBJECT_REF_COW_METHOD(MinNode);
 };
 
@@ -278,7 +305,7 @@ class MaxNode : public BinaryOpNode<MaxNode> {
 class Max : public PrimExpr {
  public:
   TVM_DLL Max(PrimExpr a, PrimExpr b, Span span = Span());
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(Max, PrimExpr, MaxNode);
+  TVM_DEFINE_OBJECT_REF_METHODS(Max, PrimExpr, MaxNode);
   TVM_DEFINE_OBJECT_REF_COW_METHOD(MaxNode);
 };
 
@@ -299,9 +326,17 @@ class CmpOpNode : public PrimExprNode {
     refl::ObjectDef<T>().def_ro("a", &T::a).def_ro("b", &T::b);
   }
 
-  static const constexpr int _type_child_slots [[maybe_unused]] = 0;
-  static const constexpr bool _type_final [[maybe_unused]] = true;
-  TVM_FFI_DECLARE_OBJECT_INFO_PREDEFINED_TYPE_KEY(T, PrimExprNode);
+  bool SEqualReduce(const T* other, SEqualReducer equal) const {
+    return equal(dtype, other->dtype) && equal(a, other->a) && equal(b, other->b);
+  }
+
+  void SHashReduce(SHashReducer hash_reduce) const {
+    hash_reduce(dtype);
+    hash_reduce(a);
+    hash_reduce(b);
+  }
+
+  TVM_DECLARE_FINAL_OBJECT_INFO(T, PrimExprNode);
 };
 
 /*! \brief a == b */
@@ -317,7 +352,7 @@ class EQNode : public CmpOpNode<EQNode> {
 class EQ : public PrimExpr {
  public:
   TVM_DLL EQ(PrimExpr a, PrimExpr b, Span span = Span());
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(EQ, PrimExpr, EQNode);
+  TVM_DEFINE_OBJECT_REF_METHODS(EQ, PrimExpr, EQNode);
   TVM_DEFINE_OBJECT_REF_COW_METHOD(EQNode);
 };
 
@@ -334,7 +369,7 @@ class NENode : public CmpOpNode<NENode> {
 class NE : public PrimExpr {
  public:
   TVM_DLL NE(PrimExpr a, PrimExpr b, Span span = Span());
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(NE, PrimExpr, NENode);
+  TVM_DEFINE_OBJECT_REF_METHODS(NE, PrimExpr, NENode);
   TVM_DEFINE_OBJECT_REF_COW_METHOD(NENode);
 };
 
@@ -351,7 +386,7 @@ class LTNode : public CmpOpNode<LTNode> {
 class LT : public PrimExpr {
  public:
   TVM_DLL LT(PrimExpr a, PrimExpr b, Span span = Span());
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(LT, PrimExpr, LTNode);
+  TVM_DEFINE_OBJECT_REF_METHODS(LT, PrimExpr, LTNode);
   TVM_DEFINE_OBJECT_REF_COW_METHOD(LTNode);
 };
 
@@ -368,7 +403,7 @@ struct LENode : public CmpOpNode<LENode> {
 class LE : public PrimExpr {
  public:
   TVM_DLL LE(PrimExpr a, PrimExpr b, Span span = Span());
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(LE, PrimExpr, LENode);
+  TVM_DEFINE_OBJECT_REF_METHODS(LE, PrimExpr, LENode);
   TVM_DEFINE_OBJECT_REF_COW_METHOD(LENode);
 };
 
@@ -385,7 +420,7 @@ class GTNode : public CmpOpNode<GTNode> {
 class GT : public PrimExpr {
  public:
   TVM_DLL GT(PrimExpr a, PrimExpr b, Span span = Span());
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(GT, PrimExpr, GTNode);
+  TVM_DEFINE_OBJECT_REF_METHODS(GT, PrimExpr, GTNode);
   TVM_DEFINE_OBJECT_REF_COW_METHOD(GTNode);
 };
 
@@ -402,7 +437,7 @@ class GENode : public CmpOpNode<GENode> {
 class GE : public PrimExpr {
  public:
   TVM_DLL GE(PrimExpr a, PrimExpr b, Span span = Span());
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(GE, PrimExpr, GENode);
+  TVM_DEFINE_OBJECT_REF_METHODS(GE, PrimExpr, GENode);
   TVM_DEFINE_OBJECT_REF_COW_METHOD(GENode);
 };
 
@@ -418,7 +453,19 @@ class AndNode : public PrimExprNode {
     namespace refl = tvm::ffi::reflection;
     refl::ObjectDef<AndNode>().def_ro("a", &AndNode::a).def_ro("b", &AndNode::b);
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("tir.And", AndNode, PrimExprNode);
+
+  bool SEqualReduce(const AndNode* other, SEqualReducer equal) const {
+    return equal(dtype, other->dtype) && equal(a, other->a) && equal(b, other->b);
+  }
+
+  void SHashReduce(SHashReducer hash_reduce) const {
+    hash_reduce(dtype);
+    hash_reduce(a);
+    hash_reduce(b);
+  }
+
+  static constexpr const char* _type_key = "tir.And";
+  TVM_DECLARE_FINAL_OBJECT_INFO(AndNode, PrimExprNode);
 };
 
 /*!
@@ -428,7 +475,7 @@ class AndNode : public PrimExprNode {
 class And : public PrimExpr {
  public:
   TVM_DLL And(PrimExpr a, PrimExpr b, Span span = Span());
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(And, PrimExpr, AndNode);
+  TVM_DEFINE_OBJECT_REF_METHODS(And, PrimExpr, AndNode);
   TVM_DEFINE_OBJECT_REF_COW_METHOD(AndNode);
 };
 
@@ -444,7 +491,19 @@ class OrNode : public PrimExprNode {
     namespace refl = tvm::ffi::reflection;
     refl::ObjectDef<OrNode>().def_ro("a", &OrNode::a).def_ro("b", &OrNode::b);
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("tir.Or", OrNode, PrimExprNode);
+
+  bool SEqualReduce(const OrNode* other, SEqualReducer equal) const {
+    return equal(dtype, other->dtype) && equal(a, other->a) && equal(b, other->b);
+  }
+
+  void SHashReduce(SHashReducer hash_reduce) const {
+    hash_reduce(dtype);
+    hash_reduce(a);
+    hash_reduce(b);
+  }
+
+  static constexpr const char* _type_key = "tir.Or";
+  TVM_DECLARE_FINAL_OBJECT_INFO(OrNode, PrimExprNode);
 };
 
 /*!
@@ -454,7 +513,7 @@ class OrNode : public PrimExprNode {
 class Or : public PrimExpr {
  public:
   TVM_DLL Or(PrimExpr a, PrimExpr b, Span span = Span());
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(Or, PrimExpr, OrNode);
+  TVM_DEFINE_OBJECT_REF_METHODS(Or, PrimExpr, OrNode);
   TVM_DEFINE_OBJECT_REF_COW_METHOD(OrNode);
 };
 
@@ -468,7 +527,18 @@ class NotNode : public PrimExprNode {
     namespace refl = tvm::ffi::reflection;
     refl::ObjectDef<NotNode>().def_ro("a", &NotNode::a);
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("tir.Not", NotNode, PrimExprNode);
+
+  bool SEqualReduce(const NotNode* other, SEqualReducer equal) const {
+    return equal(dtype, other->dtype) && equal(a, other->a);
+  }
+
+  void SHashReduce(SHashReducer hash_reduce) const {
+    hash_reduce(dtype);
+    hash_reduce(a);
+  }
+
+  static constexpr const char* _type_key = "tir.Not";
+  TVM_DECLARE_FINAL_OBJECT_INFO(NotNode, PrimExprNode);
 };
 
 /*!
@@ -478,7 +548,7 @@ class NotNode : public PrimExprNode {
 class Not : public PrimExpr {
  public:
   TVM_DLL Not(PrimExpr a, Span span = Span());
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(Not, PrimExpr, NotNode);
+  TVM_DEFINE_OBJECT_REF_METHODS(Not, PrimExpr, NotNode);
   TVM_DEFINE_OBJECT_REF_COW_METHOD(NotNode);
 };
 
@@ -505,7 +575,21 @@ class SelectNode : public PrimExprNode {
         .def_ro("true_value", &SelectNode::true_value)
         .def_ro("false_value", &SelectNode::false_value);
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("tir.Select", SelectNode, PrimExprNode);
+
+  bool SEqualReduce(const SelectNode* other, SEqualReducer equal) const {
+    return equal(dtype, other->dtype) && equal(condition, other->condition) &&
+           equal(true_value, other->true_value) && equal(false_value, other->false_value);
+  }
+
+  void SHashReduce(SHashReducer hash_reduce) const {
+    hash_reduce(dtype);
+    hash_reduce(condition);
+    hash_reduce(true_value);
+    hash_reduce(false_value);
+  }
+
+  static constexpr const char* _type_key = "tir.Select";
+  TVM_DECLARE_FINAL_OBJECT_INFO(SelectNode, PrimExprNode);
 };
 
 /*!
@@ -516,7 +600,7 @@ class Select : public PrimExpr {
  public:
   TVM_DLL Select(PrimExpr condition, PrimExpr true_value, PrimExpr false_value, Span span = Span());
 
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(Select, PrimExpr, SelectNode);
+  TVM_DEFINE_OBJECT_REF_METHODS(Select, PrimExpr, SelectNode);
   TVM_DEFINE_OBJECT_REF_COW_METHOD(SelectNode);
 };
 
@@ -535,9 +619,9 @@ class BufferLoadNode : public PrimExprNode {
   /*! \brief The buffer variable. */
   Buffer buffer;
   /*! \brief The indices location to be loaded. */
-  ffi::Array<PrimExpr> indices;
+  Array<PrimExpr> indices;
   /*! \brief The predicate mask for loading values. */
-  ffi::Optional<PrimExpr> predicate;
+  Optional<PrimExpr> predicate;
 
   static void RegisterReflection() {
     namespace refl = tvm::ffi::reflection;
@@ -546,7 +630,21 @@ class BufferLoadNode : public PrimExprNode {
         .def_ro("indices", &BufferLoadNode::indices)
         .def_ro("predicate", &BufferLoadNode::predicate);
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("tir.BufferLoad", BufferLoadNode, PrimExprNode);
+
+  bool SEqualReduce(const BufferLoadNode* other, SEqualReducer equal) const {
+    return equal(dtype, other->dtype) && equal(buffer, other->buffer) &&
+           equal(indices, other->indices);
+  }
+
+  void SHashReduce(SHashReducer hash_reduce) const {
+    hash_reduce(dtype);
+    hash_reduce(buffer);
+    hash_reduce(indices);
+    hash_reduce(predicate);
+  }
+
+  static constexpr const char* _type_key = "tir.BufferLoad";
+  TVM_DECLARE_FINAL_OBJECT_INFO(BufferLoadNode, PrimExprNode);
 
  private:
   /*! \brief Set the dtype based on the buffer/indices
@@ -571,9 +669,9 @@ class BufferLoadNode : public PrimExprNode {
  */
 class BufferLoad : public PrimExpr {
  public:
-  TVM_DLL explicit BufferLoad(Buffer buffer, ffi::Array<PrimExpr> indices,
-                              ffi::Optional<PrimExpr> predicate = std::nullopt, Span span = Span());
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(BufferLoad, PrimExpr, BufferLoadNode);
+  TVM_DLL explicit BufferLoad(Buffer buffer, Array<PrimExpr> indices,
+                              Optional<PrimExpr> predicate = std::nullopt, Span span = Span());
+  TVM_DEFINE_OBJECT_REF_METHODS(BufferLoad, PrimExpr, BufferLoadNode);
   TVM_DEFINE_OBJECT_REF_COW_METHOD(BufferLoadNode);
 };
 
@@ -591,7 +689,7 @@ class ProducerLoadNode : public PrimExprNode {
   /*! \brief The buffer producer. */
   DataProducer producer;
   /*! \brief The location arguments. */
-  ffi::Array<PrimExpr> indices;
+  Array<PrimExpr> indices;
 
   static void RegisterReflection() {
     namespace refl = tvm::ffi::reflection;
@@ -599,7 +697,20 @@ class ProducerLoadNode : public PrimExprNode {
         .def_ro("producer", &ProducerLoadNode::producer)
         .def_ro("indices", &ProducerLoadNode::indices);
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("tir.ProducerLoad", ProducerLoadNode, PrimExprNode);
+
+  bool SEqualReduce(const ProducerLoadNode* other, SEqualReducer equal) const {
+    return equal(dtype, other->dtype) && equal(producer, other->producer) &&
+           equal(indices, other->indices);
+  }
+
+  void SHashReduce(SHashReducer hash_reduce) const {
+    hash_reduce(dtype);
+    hash_reduce(producer);
+    hash_reduce(indices);
+  }
+
+  static constexpr const char* _type_key = "tir.ProducerLoad";
+  TVM_DECLARE_FINAL_OBJECT_INFO(ProducerLoadNode, PrimExprNode);
 };
 
 /*!
@@ -608,10 +719,9 @@ class ProducerLoadNode : public PrimExprNode {
  */
 class ProducerLoad : public PrimExpr {
  public:
-  TVM_DLL explicit ProducerLoad(DataProducer producer, ffi::Array<PrimExpr> indices,
-                                Span span = Span());
+  TVM_DLL explicit ProducerLoad(DataProducer producer, Array<PrimExpr> indices, Span span = Span());
 
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(ProducerLoad, PrimExpr, ProducerLoadNode);
+  TVM_DEFINE_OBJECT_REF_METHODS(ProducerLoad, PrimExpr, ProducerLoadNode);
   TVM_DEFINE_OBJECT_REF_COW_METHOD(ProducerLoadNode);
 };
 
@@ -640,7 +750,21 @@ class RampNode : public PrimExprNode {
         .def_ro("stride", &RampNode::stride)
         .def_ro("lanes", &RampNode::lanes);
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("tir.Ramp", RampNode, PrimExprNode);
+
+  bool SEqualReduce(const RampNode* other, SEqualReducer equal) const {
+    return equal(dtype, other->dtype) && equal(base, other->base) && equal(stride, other->stride) &&
+           equal(lanes, other->lanes);
+  }
+
+  void SHashReduce(SHashReducer hash_reduce) const {
+    hash_reduce(dtype);
+    hash_reduce(base);
+    hash_reduce(stride);
+    hash_reduce(lanes);
+  }
+
+  static constexpr const char* _type_key = "tir.Ramp";
+  TVM_DECLARE_FINAL_OBJECT_INFO(RampNode, PrimExprNode);
 };
 
 /*!
@@ -650,7 +774,7 @@ class RampNode : public PrimExprNode {
 class Ramp : public PrimExpr {
  public:
   TVM_DLL Ramp(PrimExpr base, PrimExpr stride, PrimExpr lanes, Span span = Span());
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(Ramp, PrimExpr, RampNode);
+  TVM_DEFINE_OBJECT_REF_METHODS(Ramp, PrimExpr, RampNode);
   TVM_DEFINE_OBJECT_REF_COW_METHOD(RampNode);
 };
 
@@ -668,7 +792,19 @@ class BroadcastNode : public PrimExprNode {
         .def_ro("value", &BroadcastNode::value)
         .def_ro("lanes", &BroadcastNode::lanes);
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("tir.Broadcast", BroadcastNode, PrimExprNode);
+
+  bool SEqualReduce(const BroadcastNode* other, SEqualReducer equal) const {
+    return equal(dtype, other->dtype) && equal(value, other->value) && equal(lanes, other->lanes);
+  }
+
+  void SHashReduce(SHashReducer hash_reduce) const {
+    hash_reduce(dtype);
+    hash_reduce(value);
+    hash_reduce(lanes);
+  }
+
+  static constexpr const char* _type_key = "tir.Broadcast";
+  TVM_DECLARE_FINAL_OBJECT_INFO(BroadcastNode, PrimExprNode);
 };
 
 /*!
@@ -678,7 +814,7 @@ class BroadcastNode : public PrimExprNode {
 class Broadcast : public PrimExpr {
  public:
   TVM_DLL Broadcast(PrimExpr value, PrimExpr lanes, Span span = Span());
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(Broadcast, PrimExpr, BroadcastNode);
+  TVM_DEFINE_OBJECT_REF_METHODS(Broadcast, PrimExpr, BroadcastNode);
   TVM_DEFINE_OBJECT_REF_COW_METHOD(BroadcastNode);
 };
 
@@ -697,11 +833,25 @@ class LetNode : public PrimExprNode {
   static void RegisterReflection() {
     namespace refl = tvm::ffi::reflection;
     refl::ObjectDef<LetNode>()
-        .def_ro("var", &LetNode::var, refl::AttachFieldFlag::SEqHashDef())
+        .def_ro("var", &LetNode::var)
         .def_ro("value", &LetNode::value)
         .def_ro("body", &LetNode::body);
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("tir.Let", LetNode, PrimExprNode);
+
+  bool SEqualReduce(const LetNode* other, SEqualReducer equal) const {
+    return equal(dtype, other->dtype) && equal.DefEqual(var, other->var) &&
+           equal(value, other->value) && equal(body, other->body);
+  }
+
+  void SHashReduce(SHashReducer hash_reduce) const {
+    hash_reduce(dtype);
+    hash_reduce.DefHash(var);
+    hash_reduce(value);
+    hash_reduce(body);
+  }
+
+  static constexpr const char* _type_key = "tir.Let";
+  TVM_DECLARE_FINAL_OBJECT_INFO(LetNode, PrimExprNode);
 };
 
 /*!
@@ -711,7 +861,7 @@ class LetNode : public PrimExprNode {
 class Let : public PrimExpr {
  public:
   TVM_DLL Let(Var var, PrimExpr value, PrimExpr body, Span span = Span());
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(Let, PrimExpr, LetNode);
+  TVM_DEFINE_OBJECT_REF_METHODS(Let, PrimExpr, LetNode);
   TVM_DEFINE_OBJECT_REF_COW_METHOD(LetNode);
 };
 
@@ -729,13 +879,25 @@ class CallNode : public PrimExprNode {
   RelaxExpr op;
 
   /*! \brief The arguments. */
-  ffi::Array<PrimExpr> args;
+  Array<PrimExpr> args;
 
   static void RegisterReflection() {
     namespace refl = tvm::ffi::reflection;
     refl::ObjectDef<CallNode>().def_ro("op", &CallNode::op).def_ro("args", &CallNode::args);
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("tir.Call", CallNode, PrimExprNode);
+
+  bool SEqualReduce(const CallNode* other, SEqualReducer equal) const {
+    return equal(dtype, other->dtype) && equal(op, other->op) && equal(args, other->args);
+  }
+
+  void SHashReduce(SHashReducer hash_reduce) const {
+    hash_reduce(dtype);
+    hash_reduce(op);
+    hash_reduce(args);
+  }
+
+  static constexpr const char* _type_key = "tir.Call";
+  TVM_DECLARE_FINAL_OBJECT_INFO(CallNode, PrimExprNode);
 };
 
 /*!
@@ -744,8 +906,8 @@ class CallNode : public PrimExprNode {
  */
 class Call : public PrimExpr {
  public:
-  TVM_DLL Call(DataType dtype, RelaxExpr op, ffi::Array<PrimExpr> args, Span span = Span());
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(Call, PrimExpr, CallNode);
+  TVM_DLL Call(DataType dtype, RelaxExpr op, Array<PrimExpr> args, Span span = Span());
+  TVM_DEFINE_OBJECT_REF_METHODS(Call, PrimExpr, CallNode);
   TVM_DEFINE_OBJECT_REF_COW_METHOD(CallNode);
 };
 
@@ -757,9 +919,9 @@ class Call : public PrimExpr {
 class ShuffleNode : public PrimExprNode {
  public:
   /*! \brief the input vectors. */
-  ffi::Array<PrimExpr> vectors;
+  Array<PrimExpr> vectors;
   /*! \brief The indices of each element. */
-  ffi::Array<PrimExpr> indices;
+  Array<PrimExpr> indices;
 
   static void RegisterReflection() {
     namespace refl = tvm::ffi::reflection;
@@ -767,7 +929,20 @@ class ShuffleNode : public PrimExprNode {
         .def_ro("vectors", &ShuffleNode::vectors)
         .def_ro("indices", &ShuffleNode::indices);
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("tir.Shuffle", ShuffleNode, PrimExprNode);
+
+  bool SEqualReduce(const ShuffleNode* other, SEqualReducer equal) const {
+    return equal(dtype, other->dtype) && equal(vectors, other->vectors) &&
+           equal(indices, other->indices);
+  }
+
+  void SHashReduce(SHashReducer hash_reduce) const {
+    hash_reduce(dtype);
+    hash_reduce(vectors);
+    hash_reduce(indices);
+  }
+
+  static constexpr const char* _type_key = "tir.Shuffle";
+  TVM_DECLARE_FINAL_OBJECT_INFO(ShuffleNode, PrimExprNode);
 };
 
 /*!
@@ -776,11 +951,11 @@ class ShuffleNode : public PrimExprNode {
  */
 class Shuffle : public PrimExpr {
  public:
-  TVM_DLL Shuffle(ffi::Array<PrimExpr> vectors, ffi::Array<PrimExpr> indices, Span span = Span());
-  TVM_DLL static PrimExpr Concat(ffi::Array<PrimExpr> vectors, Span span = Span());
+  TVM_DLL Shuffle(Array<PrimExpr> vectors, Array<PrimExpr> indices, Span span = Span());
+  TVM_DLL static PrimExpr Concat(Array<PrimExpr> vectors, Span span = Span());
   TVM_DLL static PrimExpr ExtractElement(PrimExpr vector, int index, Span span = Span());
 
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(Shuffle, PrimExpr, ShuffleNode);
+  TVM_DEFINE_OBJECT_REF_METHODS(Shuffle, PrimExpr, ShuffleNode);
   TVM_DEFINE_OBJECT_REF_COW_METHOD(ShuffleNode);
 };
 
@@ -792,19 +967,19 @@ class Shuffle : public PrimExpr {
 class CommReducerNode : public Object {
  public:
   /*! \brief The left argument of reducer */
-  ffi::Array<Var> lhs;
+  Array<Var> lhs;
   /*! \brief The right argument of reducer */
-  ffi::Array<Var> rhs;
+  Array<Var> rhs;
   /*! \brief The result of reducer */
-  ffi::Array<PrimExpr> result;
+  Array<PrimExpr> result;
   /*!
    * \brief The identity element of reducer, which leaves other
    *  elements unchanged when combined with it, with respect to
    *  the binary operation of this reducer uses.
    */
-  ffi::Array<PrimExpr> identity_element;
+  Array<PrimExpr> identity_element;
   /*! \brief Function call operator to combine a and b */
-  ffi::Array<PrimExpr> operator()(ffi::Array<PrimExpr> a, ffi::Array<PrimExpr> b) const;
+  Array<PrimExpr> operator()(Array<PrimExpr> a, Array<PrimExpr> b) const;
   /*!
    * \brief Span that points to the original source code.
    *        Reserved debug information.
@@ -814,15 +989,29 @@ class CommReducerNode : public Object {
   static void RegisterReflection() {
     namespace refl = tvm::ffi::reflection;
     refl::ObjectDef<CommReducerNode>()
-        .def_ro("lhs", &CommReducerNode::lhs, refl::AttachFieldFlag::SEqHashDef())
-        .def_ro("rhs", &CommReducerNode::rhs, refl::AttachFieldFlag::SEqHashDef())
+        .def_ro("lhs", &CommReducerNode::lhs)
+        .def_ro("rhs", &CommReducerNode::rhs)
         .def_ro("result", &CommReducerNode::result)
         .def_ro("identity_element", &CommReducerNode::identity_element)
-        .def_ro("span", &CommReducerNode::span, refl::AttachFieldFlag::SEqHashIgnore());
+        .def_ro("span", &CommReducerNode::span);
   }
 
-  static constexpr TVMFFISEqHashKind _type_s_eq_hash_kind = kTVMFFISEqHashKindTreeNode;
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("tir.CommReducer", CommReducerNode, Object);
+  bool SEqualReduce(const CommReducerNode* other, SEqualReducer equal) const {
+    return equal.DefEqual(lhs, other->lhs) && equal.DefEqual(rhs, other->rhs) &&
+           equal(result, other->result) && equal(identity_element, other->identity_element);
+  }
+
+  void SHashReduce(SHashReducer hash_reduce) const {
+    hash_reduce.DefHash(lhs);
+    hash_reduce.DefHash(rhs);
+    hash_reduce(result);
+    hash_reduce(identity_element);
+  }
+
+  static constexpr const char* _type_key = "tir.CommReducer";
+  static constexpr const bool _type_has_method_sequal_reduce = true;
+  static constexpr const bool _type_has_method_shash_reduce = true;
+  TVM_DECLARE_FINAL_OBJECT_INFO(CommReducerNode, Object);
 };
 
 /*!
@@ -831,10 +1020,10 @@ class CommReducerNode : public Object {
  */
 class CommReducer : public ObjectRef {
  public:
-  TVM_DLL CommReducer(ffi::Array<Var> lhs, ffi::Array<Var> rhs, ffi::Array<PrimExpr> result,
-                      ffi::Array<PrimExpr> identity_element, Span span = Span());
+  TVM_DLL CommReducer(Array<Var> lhs, Array<Var> rhs, Array<PrimExpr> result,
+                      Array<PrimExpr> identity_element, Span span = Span());
 
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(CommReducer, ObjectRef, CommReducerNode);
+  TVM_DEFINE_OBJECT_REF_METHODS(CommReducer, ObjectRef, CommReducerNode);
 };
 
 /*! \brief Reduction operator */
@@ -843,11 +1032,11 @@ class ReduceNode : public PrimExprNode {
   /*! \brief The commutative combiner */
   CommReducer combiner;
   /*! \brief The source operand */
-  ffi::Array<PrimExpr> source;
+  Array<PrimExpr> source;
   /*! \brief The init operand */
-  ffi::Array<PrimExpr> init;
+  Array<PrimExpr> init;
   /*! \brief The reduction axis */
-  ffi::Array<IterVar> axis;
+  Array<IterVar> axis;
   /*!
    * \brief Predicate on the reduction
    *  Only add the body to reduction if condition is true.
@@ -866,7 +1055,27 @@ class ReduceNode : public PrimExprNode {
         .def_ro("condition", &ReduceNode::condition)
         .def_ro("value_index", &ReduceNode::value_index);
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("tir.Reduce", ReduceNode, PrimExprNode);
+
+  bool SEqualReduce(const ReduceNode* other, SEqualReducer equal) const {
+    // check axis first so IterVars can define the necessary variables.
+    return equal(dtype, other->dtype) && equal(axis, other->axis) &&
+           equal(combiner, other->combiner) && equal(source, other->source) &&
+           equal(init, other->init) && equal(condition, other->condition) &&
+           equal(value_index, other->value_index);
+  }
+
+  void SHashReduce(SHashReducer hash_reduce) const {
+    hash_reduce(dtype);
+    hash_reduce(axis);
+    hash_reduce(combiner);
+    hash_reduce(source);
+    hash_reduce(init);
+    hash_reduce(condition);
+    hash_reduce(value_index);
+  }
+
+  static constexpr const char* _type_key = "tir.Reduce";
+  TVM_DECLARE_FINAL_OBJECT_INFO(ReduceNode, PrimExprNode);
 };
 
 /*!
@@ -875,11 +1084,10 @@ class ReduceNode : public PrimExprNode {
  */
 class Reduce : public PrimExpr {
  public:
-  TVM_DLL Reduce(CommReducer combiner, ffi::Array<PrimExpr> src, ffi::Array<IterVar> rdom,
-                 PrimExpr condition, int value_index, ffi::Array<PrimExpr> init,
-                 Span span = Span());
+  TVM_DLL Reduce(CommReducer combiner, Array<PrimExpr> src, Array<IterVar> rdom, PrimExpr condition,
+                 int value_index, Array<PrimExpr> init, Span span = Span());
 
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(Reduce, PrimExpr, ReduceNode);
+  TVM_DEFINE_OBJECT_REF_METHODS(Reduce, PrimExpr, ReduceNode);
   TVM_DEFINE_OBJECT_REF_COW_METHOD(ReduceNode);
 };
 
@@ -892,7 +1100,7 @@ class Reduce : public PrimExpr {
  * \tparam V the value of the Map.
  */
 template <typename K, typename V>
-inline std::unordered_map<K, V> as_unordered_map(const ffi::Map<K, V>& dmap) {
+inline std::unordered_map<K, V> as_unordered_map(const Map<K, V>& dmap) {
   std::unordered_map<K, V> ret;
   for (auto kv : dmap) {
     ret[kv.first] = kv.second;
@@ -908,8 +1116,8 @@ inline constexpr bool use_default_type_traits_v<tvm::tir::StringImm> = false;
 
 template <>
 struct TypeTraits<tvm::tir::StringImm>
-    : public ObjectRefWithFallbackTraitsBase<tvm::tir::StringImm, ffi::String> {
-  TVM_FFI_INLINE static tvm::tir::StringImm ConvertFallbackValue(ffi::String value) {
+    : public ObjectRefWithFallbackTraitsBase<tvm::tir::StringImm, String> {
+  TVM_FFI_INLINE static tvm::tir::StringImm ConvertFallbackValue(String value) {
     return tvm::tir::StringImm(value);
   }
 };

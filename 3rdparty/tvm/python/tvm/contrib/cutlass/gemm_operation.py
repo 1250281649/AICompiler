@@ -341,14 +341,15 @@ def instantiate_gemm_template(attrs):
   cutlass::device_memory::allocation<uint8_t> workspace(workspace_size);
   ${kernel} gemm_op;
   cutlass::Status status = gemm_op.can_implement(arguments);
-  TVM_FFI_ICHECK(status == cutlass::Status::kSuccess);
+  CHECK(status == cutlass::Status::kSuccess);
   status = gemm_op.initialize(arguments, workspace.get());
-  TVM_FFI_ICHECK(status == cutlass::Status::kSuccess);
+  CHECK(status == cutlass::Status::kSuccess);
 
-  cudaStream_t stream = static_cast<cudaStream_t>(TVMFFIEnvGetStream(kDLCUDA, ${A_arg}->device.device_id));
+  auto func = tvm::ffi::Function::GetGlobalRequired("runtime.get_cuda_stream");
+  cudaStream_t stream = static_cast<cudaStream_t>(func().cast<void*>());
 
   status = gemm_op(stream);
-  TVM_FFI_ICHECK(status == cutlass::Status::kSuccess);
+  CHECK(status == cutlass::Status::kSuccess);
 """
     op_type = attrs["op_type"]
     has_bias = "bias" in op_type
@@ -427,8 +428,8 @@ def emit_fp16A_intB_matmul(attrs):
   int n = ${B_arg}->shape[1] * ${float_per_int};
   int k = ${B_arg}->shape[0];
 
-  cudaStream_t stream = static_cast<cudaStream_t>(
-    TVMFFIEnvGetStream(kDLCUDA, ${A_arg}->device.device_id));
+  auto func = tvm::ffi::Function::GetGlobalRequired("runtime.get_cuda_stream");
+  cudaStream_t stream = static_cast<cudaStream_t>(func().cast<void*>());
     """,
         attrs,
     )
@@ -446,14 +447,12 @@ def emit_fp16A_intB_matmul(attrs):
 
     template_residual = """
   ${template_common}
-  gemm_fp16_int_bias_act_residual<${weight_dtype}, QuantOp>(
-                static_cast<cutlass::half_t*>(${A_arg}->data),
+  gemm_fp16_int_bias_act_residual<${weight_dtype}, QuantOp>(static_cast<cutlass::half_t*>(${A_arg}->data),
                 static_cast<${weight_dtype}*>(${B_arg}->data),
                 static_cast<cutlass::half_t*>(${scales_arg}->data),
                 ${bias},
                 static_cast<cutlass::half_t*>(${residual_arg}->data),
-                static_cast<cutlass::half_t*>(out0->data),
-                "${activation}", "${binary_op}", "${unary_op}",
+                static_cast<cutlass::half_t*>(out0->data), "${activation}", "${binary_op}", "${unary_op}",
                 m, n, k, ${group_size}, nullptr, 0, stream);
 """
 

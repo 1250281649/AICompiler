@@ -16,8 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-#include <tvm/ffi/reflection/registry.h>
-
 #include "../utils.h"
 
 namespace tvm {
@@ -31,7 +29,7 @@ class ReplayTraceNode : public SearchStrategyNode {
     /*! \brief The search strategy itself */
     ReplayTraceNode* self;
     /*! \brief The design spaces. */
-    ffi::Array<tir::Trace> design_spaces;
+    Array<tir::Trace> design_spaces;
     /*! \brief The number of total trials. */
     int max_trials;
     /*! \brief The number of trials per iteration. */
@@ -42,9 +40,9 @@ class ReplayTraceNode : public SearchStrategyNode {
     int ed;
 
     /*! \brief The module to be tuned. */
-    ffi::Array<IRModule> per_thread_mod_{nullptr};
+    Array<IRModule> per_thread_mod_{nullptr};
 
-    explicit State(ReplayTraceNode* self, ffi::Array<tir::Trace> design_spaces, int max_trials,
+    explicit State(ReplayTraceNode* self, Array<tir::Trace> design_spaces, int max_trials,
                    int num_trials_per_iter)
         : self(self),
           design_spaces(design_spaces),
@@ -59,8 +57,8 @@ class ReplayTraceNode : public SearchStrategyNode {
       }
     }
 
-    inline ffi::Optional<ffi::Array<MeasureCandidate>> GenerateMeasureCandidates();
-    inline void NotifyRunnerResults(const ffi::Array<RunnerResult>& results);
+    inline Optional<Array<MeasureCandidate>> GenerateMeasureCandidates();
+    inline void NotifyRunnerResults(const Array<RunnerResult>& results);
   };
 
   /*! \brief The max number of failures during trace replaying. */
@@ -69,11 +67,11 @@ class ReplayTraceNode : public SearchStrategyNode {
   /*! \brief The random state. -1 means using random number. */
   TRandState rand_state_ = -1;
   /*! \brief The IRModule to be scheduled from TuneContext. */
-  ffi::Optional<IRModule> mod_ = std::nullopt;
+  Optional<IRModule> mod_ = std::nullopt;
   /*! \brief The number of threads to be used. */
   int num_threads_ = -1;
   /*! \brief The postprocessors. */
-  ffi::Array<Postproc> postprocs_ = {};
+  Array<Postproc> postprocs_ = {};
   /*! \brief The state of the search strategy. */
   std::unique_ptr<State> state_ = nullptr;
 
@@ -81,8 +79,9 @@ class ReplayTraceNode : public SearchStrategyNode {
     namespace refl = tvm::ffi::reflection;
     refl::ObjectDef<ReplayTraceNode>().def_ro("max_fail_count", &ReplayTraceNode::max_fail_count);
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("meta_schedule.ReplayTrace", ReplayTraceNode,
-                                    SearchStrategyNode);
+
+  static constexpr const char* _type_key = "meta_schedule.ReplayTrace";
+  TVM_DECLARE_FINAL_OBJECT_INFO(ReplayTraceNode, SearchStrategyNode);
 
   void InitializeWithTuneContext(const TuneContext& ctx) final {
     CHECK(ctx->mod.defined()) << "ValueError: TuneContext.mod is not defined";
@@ -101,14 +100,12 @@ class ReplayTraceNode : public SearchStrategyNode {
     this->state_.reset();
   }
 
-  void PreTuning(int max_trials, int num_trials_per_iter,
-                 const ffi::Array<tir::Schedule>& design_spaces,
-                 const ffi::Optional<Database>& database,
-                 const ffi::Optional<CostModel>& cost_model) final {
+  void PreTuning(int max_trials, int num_trials_per_iter, const Array<tir::Schedule>& design_spaces,
+                 const Optional<Database>& database, const Optional<CostModel>& cost_model) final {
     ICHECK(!design_spaces.empty());
     CHECK(this->state_ == nullptr)
         << "ValueError: `PreTuning` is already invoked without corresponding `PostTuning`.";
-    ffi::Array<tir::Trace> design_space_traces;
+    Array<tir::Trace> design_space_traces;
     design_space_traces.reserve(design_spaces.size());
     for (const tir::Schedule& space : design_spaces) {
       design_space_traces.push_back(space->trace().value()->Simplified(true));
@@ -122,19 +119,19 @@ class ReplayTraceNode : public SearchStrategyNode {
     this->state_.reset();
   }
 
-  ffi::Optional<ffi::Array<MeasureCandidate>> GenerateMeasureCandidates() final {
+  Optional<Array<MeasureCandidate>> GenerateMeasureCandidates() final {
     ICHECK(this->state_ != nullptr);
     return this->state_->GenerateMeasureCandidates();
   }
 
-  void NotifyRunnerResults(const ffi::Array<MeasureCandidate>& measure_candidates,
-                           const ffi::Array<RunnerResult>& results) final {
+  void NotifyRunnerResults(const Array<MeasureCandidate>& measure_candidates,
+                           const Array<RunnerResult>& results) final {
     ICHECK(this->state_ != nullptr);
     this->state_->NotifyRunnerResults(results);
   }
 
   SearchStrategy Clone() const final {
-    ObjectPtr<ReplayTraceNode> n = ffi::make_object<ReplayTraceNode>();
+    ObjectPtr<ReplayTraceNode> n = make_object<ReplayTraceNode>();
     n->max_fail_count = this->max_fail_count;
     n->rand_state_ = this->rand_state_;
     n->state_ = nullptr;  // cleared the state
@@ -142,15 +139,14 @@ class ReplayTraceNode : public SearchStrategyNode {
   }
 };
 
-inline ffi::Optional<ffi::Array<MeasureCandidate>>
-ReplayTraceNode::State::GenerateMeasureCandidates() {
+inline Optional<Array<MeasureCandidate>> ReplayTraceNode::State::GenerateMeasureCandidates() {
   if (st >= max_trials) {
     return std::nullopt;
   }
   ed = std::min(ed, max_trials);
   ICHECK_LT(st, ed);
   std::vector<TRandState> per_thread_rand_state = ForkSeed(&self->rand_state_, self->num_threads_);
-  ffi::Array<ffi::Optional<MeasureCandidate>> per_task_result(ed - st, std::nullopt);
+  Array<Optional<MeasureCandidate>> per_task_result(ed - st, std::nullopt);
   ThreadedTraceApply pp(self->postprocs_);
   auto f_worker = [this, &per_thread_rand_state, &per_task_result, &pp](int thread_id,
                                                                         int task_id) -> void {
@@ -161,41 +157,40 @@ ReplayTraceNode::State::GenerateMeasureCandidates() {
       int design_space_index = tir::SampleInt(&rand_state, 0, design_spaces.size());
       tir::Trace trace = design_spaces[design_space_index];
       tir::Trace new_trace = tir::Trace(trace->insts, {});
-      if (ffi::Optional<tir::Schedule> opt_sch = pp.Apply(mod, new_trace, &rand_state)) {
+      if (Optional<tir::Schedule> opt_sch = pp.Apply(mod, new_trace, &rand_state)) {
         tir::Schedule sch = opt_sch.value();
-        ffi::Array<ArgInfo> args_info = ArgInfo::FromEntryFunc(sch->mod(), /*remove_preproc=*/true);
+        Array<ArgInfo> args_info = ArgInfo::FromEntryFunc(sch->mod(), /*remove_preproc=*/true);
         per_task_result.Set(task_id, MeasureCandidate(sch, args_info));
         break;
       }
     }
   };
   support::parallel_for_dynamic(0, ed - st, self->num_threads_, f_worker);
-  ffi::Array<MeasureCandidate> filtered;
+  Array<MeasureCandidate> filtered;
   filtered.reserve(ed - st);
-  for (ffi::Optional<MeasureCandidate> result : per_task_result)
+  for (Optional<MeasureCandidate> result : per_task_result)
     if (result.has_value()) {
       filtered.push_back(*std::move(result));
     }
   return filtered;
 }
 
-inline void ReplayTraceNode::State::NotifyRunnerResults(const ffi::Array<RunnerResult>& results) {
+inline void ReplayTraceNode::State::NotifyRunnerResults(const Array<RunnerResult>& results) {
   st += num_trials_per_iter;
   ed += num_trials_per_iter;
 }
 
 SearchStrategy SearchStrategy::ReplayTrace(int max_fail_count) {
-  ObjectPtr<ReplayTraceNode> n = ffi::make_object<ReplayTraceNode>();
+  ObjectPtr<ReplayTraceNode> n = make_object<ReplayTraceNode>();
   n->max_fail_count = max_fail_count;
   return SearchStrategy(n);
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() { ReplayTraceNode::RegisterReflection(); }
+TVM_FFI_STATIC_INIT_BLOCK({ ReplayTraceNode::RegisterReflection(); });
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("meta_schedule.SearchStrategyReplayTrace", SearchStrategy::ReplayTrace);
-}
+TVM_REGISTER_NODE_TYPE(ReplayTraceNode);
+TVM_FFI_REGISTER_GLOBAL("meta_schedule.SearchStrategyReplayTrace")
+    .set_body_typed(SearchStrategy::ReplayTrace);
 
 }  // namespace meta_schedule
 }  // namespace tvm

@@ -715,18 +715,14 @@ class ExportedProgramImporter(BaseFXGraphImporter):
                 if tensor_name == spec.target:
                     bind_name = spec.arg.name
                     break
-            try:
-                binding[bind_name] = tvm.runtime.from_dlpack(tensor_value.detach())
-            except RuntimeError:
-                tensor_cpu = tensor_value.detach().cpu().contiguous()
-                binding[bind_name] = tvm.runtime.tensor(tensor_cpu.numpy())
+            binding[bind_name] = tvm.nd.from_dlpack(tensor_value.detach())
 
         mod = self.block_builder.get()
         mod = relax.transform.BindParams("main", binding)(mod)
 
         if keep_params_as_input:
             parameters = dict(exported_program.named_parameters())
-            params = [tvm.runtime.from_dlpack(p.detach()) for p in parameters.values()]
+            params = [tvm.nd.from_dlpack(p.detach()) for p in parameters.values()]
             mod["main"] = mod["main"].with_attr("params", params)
 
         return mod

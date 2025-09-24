@@ -19,14 +19,12 @@
 #ifndef TVM_SCRIPT_IR_BUILDER_RELAX_FRAME_H_
 #define TVM_SCRIPT_IR_BUILDER_RELAX_FRAME_H_
 
-#include <tvm/ffi/reflection/registry.h>
+#include <tvm/ffi/reflection/reflection.h>
 #include <tvm/relax/block_builder.h>
 #include <tvm/relax/expr.h>
 #include <tvm/script/ir_builder/base.h>
 #include <tvm/script/ir_builder/ir/frame.h>
 #include <tvm/script/ir_builder/ir/ir.h>
-
-#include <utility>
 
 namespace tvm {
 namespace script {
@@ -40,17 +38,14 @@ class RelaxFrameNode : public IRBuilderFrameNode {
     namespace refl = tvm::ffi::reflection;
     refl::ObjectDef<RelaxFrameNode>();
   }
-  TVM_FFI_DECLARE_OBJECT_INFO("script.ir_builder.relax.RelaxFrame", RelaxFrameNode,
-                              IRBuilderFrameNode);
+
+  static constexpr const char* _type_key = "script.ir_builder.relax.RelaxFrame";
+  TVM_DECLARE_BASE_OBJECT_INFO(RelaxFrameNode, IRBuilderFrameNode);
 };
 
 class RelaxFrame : public IRBuilderFrame {
  public:
-  explicit RelaxFrame(ObjectPtr<RelaxFrameNode> data) : IRBuilderFrame(ffi::UnsafeInit{}) {
-    TVM_FFI_ICHECK(data != nullptr);
-    data_ = std::move(data);
-  }
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NOTNULLABLE(RelaxFrame, IRBuilderFrame, RelaxFrameNode);
+  TVM_DEFINE_MUTABLE_NOTNULLABLE_OBJECT_REF_METHODS(RelaxFrame, IRBuilderFrame, RelaxFrameNode);
 
  protected:
   RelaxFrame() = default;
@@ -62,9 +57,9 @@ class RelaxFrame : public IRBuilderFrame {
 class SeqExprFrameNode : public RelaxFrameNode {
  public:
   /*! \brief The binding blocks inside the frame. */
-  ffi::Array<tvm::relax::BindingBlock> binding_blocks;
+  Array<tvm::relax::BindingBlock> binding_blocks;
   /*! \brief The frame output expr. `std::nullopt` when undefined. */
-  ffi::Optional<tvm::relax::Expr> output;
+  Optional<tvm::relax::Expr> output;
 
   static void RegisterReflection() {
     namespace refl = tvm::ffi::reflection;
@@ -72,8 +67,9 @@ class SeqExprFrameNode : public RelaxFrameNode {
         .def_ro("binding_blocks", &SeqExprFrameNode::binding_blocks)
         .def_ro("output", &SeqExprFrameNode::output);
   }
-  TVM_FFI_DECLARE_OBJECT_INFO("script.ir_builder.relax.SeqExprFrame", SeqExprFrameNode,
-                              RelaxFrameNode);
+
+  static constexpr const char* _type_key = "script.ir_builder.relax.SeqExprFrame";
+  TVM_DECLARE_BASE_OBJECT_INFO(SeqExprFrameNode, RelaxFrameNode);
 
  public:
   void EnterWithScope() override;
@@ -82,10 +78,7 @@ class SeqExprFrameNode : public RelaxFrameNode {
 
 class SeqExprFrame : public RelaxFrame {
  public:
-  explicit SeqExprFrame(ObjectPtr<SeqExprFrameNode> data) : RelaxFrame(data) {
-    TVM_FFI_ICHECK(data != nullptr);
-  }
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NOTNULLABLE(SeqExprFrame, RelaxFrame, SeqExprFrameNode);
+  TVM_DEFINE_MUTABLE_NOTNULLABLE_OBJECT_REF_METHODS(SeqExprFrame, RelaxFrame, SeqExprFrameNode);
 };
 
 /*! \brief The ir_builder frame for the relax function. */
@@ -96,9 +89,9 @@ class FunctionFrameNode : public SeqExprFrameNode {
    * \note The name will not be specified in constructor, so it is "Optional",
    *       However, we must specify the name by `R.func_name` before exit this frame.
    */
-  ffi::Optional<ffi::String> name;
+  Optional<String> name;
   /*! \brief The function params. */
-  ffi::Array<tvm::relax::Var> params;
+  Array<tvm::relax::Var> params;
   /*!
    * \brief The function return struct info.
    * \note Usually the function return type can be deduced by the function body.
@@ -108,13 +101,13 @@ class FunctionFrameNode : public SeqExprFrameNode {
    *       if we ret_struct_info is base of body.struct_info. If not, we will
    *       take the specified `ret_struct_info`.
    */
-  ffi::Optional<tvm::relax::StructInfo> ret_struct_info;
+  Optional<tvm::relax::StructInfo> ret_struct_info;
   /*! \brief Whether the function is annotated as pure */
-  ffi::Optional<Bool> is_pure;
+  Optional<Bool> is_pure;
   /*! \brief Whether the function is annotated as private */
-  ffi::Optional<Bool> is_private;
+  Optional<Bool> is_private;
   /*! \brief The function attributes. */
-  ffi::Map<ffi::String, Any> attrs;
+  Map<String, Any> attrs;
   /*! \brief The block builder to create Relax function. */
   tvm::relax::BlockBuilder block_builder;
 
@@ -130,8 +123,9 @@ class FunctionFrameNode : public SeqExprFrameNode {
         .def_ro("output", &FunctionFrameNode::output);
     // `block_builder` is not registered as it's not visited.
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("script.ir_builder.relax.FunctionFrame", FunctionFrameNode,
-                                    SeqExprFrameNode);
+
+  static constexpr const char* _type_key = "script.ir_builder.relax.FunctionFrame";
+  TVM_DECLARE_FINAL_OBJECT_INFO(FunctionFrameNode, SeqExprFrameNode);
 
  public:
   void EnterWithScope() final;
@@ -140,10 +134,7 @@ class FunctionFrameNode : public SeqExprFrameNode {
 
 class FunctionFrame : public SeqExprFrame {
  public:
-  explicit FunctionFrame(ObjectPtr<FunctionFrameNode> data) : SeqExprFrame(data) {
-    TVM_FFI_ICHECK(data != nullptr);
-  }
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NOTNULLABLE(FunctionFrame, SeqExprFrame, FunctionFrameNode);
+  TVM_DEFINE_MUTABLE_NOTNULLABLE_OBJECT_REF_METHODS(FunctionFrame, SeqExprFrame, FunctionFrameNode);
 };
 
 /*! \brief The ir_builder frame for relax binding blocks. */
@@ -152,7 +143,7 @@ class BlockFrameNode : public RelaxFrameNode {
   /*! \brief The flag that indicates whether the block is a dataflow block. */
   bool is_dataflow;
   /*! \brief The variables emitted in this block. */
-  ffi::Array<tvm::relax::Var> emitted_vars;
+  Array<tvm::relax::Var> emitted_vars;
   /*!
    * \brief A boolean indicating if the dataflow block is ended of construction.
    * If it is true, any new binding trying to be emitted into this block will cause an error.
@@ -163,7 +154,7 @@ class BlockFrameNode : public RelaxFrameNode {
    * \brief The output vars of the dataflow block.
    * \note Only used for a dataflow block.
    */
-  ffi::Array<tvm::relax::Var> output_vars;
+  Array<tvm::relax::Var> output_vars;
 
   static void RegisterReflection() {
     namespace refl = tvm::ffi::reflection;
@@ -173,8 +164,9 @@ class BlockFrameNode : public RelaxFrameNode {
         .def_ro("output_vars", &BlockFrameNode::output_vars);
     // `block_ended` is not registered as it's not visited.
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("script.ir_builder.relax.BlockFrame", BlockFrameNode,
-                                    RelaxFrameNode);
+
+  static constexpr const char* _type_key = "script.ir_builder.relax.BlockFrame";
+  TVM_DECLARE_FINAL_OBJECT_INFO(BlockFrameNode, RelaxFrameNode);
 
  public:
   void EnterWithScope() final;
@@ -183,10 +175,7 @@ class BlockFrameNode : public RelaxFrameNode {
 
 class BlockFrame : public RelaxFrame {
  public:
-  explicit BlockFrame(ObjectPtr<BlockFrameNode> data) : RelaxFrame(data) {
-    TVM_FFI_ICHECK(data != nullptr);
-  }
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NOTNULLABLE(BlockFrame, RelaxFrame, BlockFrameNode);
+  TVM_DEFINE_MUTABLE_NOTNULLABLE_OBJECT_REF_METHODS(BlockFrame, RelaxFrame, BlockFrameNode);
 };
 
 /*!
@@ -199,13 +188,13 @@ class IfFrameNode : public RelaxFrameNode {
   /*! \brief The condition of the if statement. */
   tvm::relax::Expr condition;
   /*! \brief The Bindings in the true branch. */
-  ffi::Optional<tvm::relax::Expr> then_expr;
+  Optional<tvm::relax::Expr> then_expr;
   /*! \brief The Bindings in the false branch. */
-  ffi::Optional<tvm::relax::Expr> else_expr;
+  Optional<tvm::relax::Expr> else_expr;
   /*! \brief The Binding var. */
   tvm::relax::Var var;
   /*! \brief The binding var name. */
-  ffi::String var_name;
+  String var_name;
 
   static void RegisterReflection() {
     namespace refl = tvm::ffi::reflection;
@@ -216,7 +205,9 @@ class IfFrameNode : public RelaxFrameNode {
         .def_ro("var", &IfFrameNode::var)
         .def_ro("var_name", &IfFrameNode::var_name);
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("script.ir_builder.relax.IfFrame", IfFrameNode, RelaxFrameNode);
+
+  static constexpr const char* _type_key = "script.ir_builder.relax.IfFrame";
+  TVM_DECLARE_FINAL_OBJECT_INFO(IfFrameNode, RelaxFrameNode);
 
  public:
   /*!
@@ -238,10 +229,7 @@ class IfFrameNode : public RelaxFrameNode {
  */
 class IfFrame : public RelaxFrame {
  public:
-  explicit IfFrame(ObjectPtr<IfFrameNode> data) : RelaxFrame(data) {
-    TVM_FFI_ICHECK(data != nullptr);
-  }
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NOTNULLABLE(IfFrame, RelaxFrame, IfFrameNode);
+  TVM_DEFINE_MUTABLE_NOTNULLABLE_OBJECT_REF_METHODS(IfFrame, RelaxFrame, IfFrameNode);
 };
 
 /*!
@@ -255,8 +243,9 @@ class ThenFrameNode : public SeqExprFrameNode {
     namespace refl = tvm::ffi::reflection;
     refl::ObjectDef<ThenFrameNode>();
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("script.ir_builder.relax.ThenFrame", ThenFrameNode,
-                                    SeqExprFrameNode);
+
+  static constexpr const char* _type_key = "script.ir_builder.relax.ThenFrame";
+  TVM_DECLARE_FINAL_OBJECT_INFO(ThenFrameNode, SeqExprFrameNode);
 
  public:
   /*!
@@ -278,10 +267,7 @@ class ThenFrameNode : public SeqExprFrameNode {
  */
 class ThenFrame : public SeqExprFrame {
  public:
-  explicit ThenFrame(ObjectPtr<ThenFrameNode> data) : SeqExprFrame(data) {
-    TVM_FFI_ICHECK(data != nullptr);
-  }
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NOTNULLABLE(ThenFrame, SeqExprFrame, ThenFrameNode);
+  TVM_DEFINE_MUTABLE_NOTNULLABLE_OBJECT_REF_METHODS(ThenFrame, SeqExprFrame, ThenFrameNode);
 };
 
 /*!
@@ -295,8 +281,9 @@ class ElseFrameNode : public SeqExprFrameNode {
     namespace refl = tvm::ffi::reflection;
     refl::ObjectDef<ElseFrameNode>();
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("script.ir_builder.relax.ElseFrame", ElseFrameNode,
-                                    SeqExprFrameNode);
+
+  static constexpr const char* _type_key = "script.ir_builder.relax.ElseFrame";
+  TVM_DECLARE_FINAL_OBJECT_INFO(ElseFrameNode, SeqExprFrameNode);
 
  public:
   /*!
@@ -318,10 +305,7 @@ class ElseFrameNode : public SeqExprFrameNode {
  */
 class ElseFrame : public SeqExprFrame {
  public:
-  explicit ElseFrame(ObjectPtr<ElseFrameNode> data) : SeqExprFrame(data) {
-    TVM_FFI_ICHECK(data != nullptr);
-  }
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NOTNULLABLE(ElseFrame, SeqExprFrame, ElseFrameNode);
+  TVM_DEFINE_MUTABLE_NOTNULLABLE_OBJECT_REF_METHODS(ElseFrame, SeqExprFrame, ElseFrameNode);
 };
 
 }  // namespace relax

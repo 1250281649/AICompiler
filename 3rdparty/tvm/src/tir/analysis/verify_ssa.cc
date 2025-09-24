@@ -24,7 +24,6 @@
  * \file verify_ssa.cc
  */
 #include <tvm/ffi/function.h>
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/tir/analysis.h>
 #include <tvm/tir/expr.h>
 #include <tvm/tir/stmt_functor.h>
@@ -81,7 +80,7 @@ class SSAVerifier final : public StmtExprVisitor {
   }
 
   void VisitExpr_(const VarNode* node) final {
-    auto var = ffi::GetRef<Var>(node);
+    auto var = GetRef<Var>(node);
     if (match_scope_) {
       MarkDef(var, var, true);
     }
@@ -140,10 +139,7 @@ bool VerifySSA(const PrimFunc& func) {
   return visitor.is_ssa_;
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("tir.analysis.verify_ssa", VerifySSA);
-}
+TVM_FFI_REGISTER_GLOBAL("tir.analysis.verify_ssa").set_body_typed(VerifySSA);
 
 namespace transform {
 
@@ -159,10 +155,7 @@ Pass VerifySSA() {
   return tvm::transform::CreateModulePass(pass_func, 0, "tir.VerifySSA", {});
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("tir.transform.VerifySSA", VerifySSA);
-}
+TVM_FFI_REGISTER_GLOBAL("tir.transform.VerifySSA").set_body_typed(VerifySSA);
 
 }  // namespace transform
 

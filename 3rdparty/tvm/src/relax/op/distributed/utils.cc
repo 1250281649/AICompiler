@@ -24,16 +24,16 @@ namespace tvm {
 namespace relax {
 namespace distributed {
 
-ffi::Array<distributed::DTensorStructInfo> GetInputDTensorStructInfo(const Call& call,
-                                                                     const BlockBuilder& ctx) {
+Array<distributed::DTensorStructInfo> GetInputDTensorStructInfo(const Call& call,
+                                                                const BlockBuilder& ctx) {
   Op op = Downcast<Op>(call->op);
-  ffi::Array<Expr> args = GetCallArgs(call);
-  ffi::Array<distributed::DTensorStructInfo> input_tensor_sinfo;
+  Array<Expr> args = GetCallArgs(call);
+  Array<distributed::DTensorStructInfo> input_tensor_sinfo;
   input_tensor_sinfo.reserve(args.size());
   for (const Expr& arg : args) {
     const auto* sinfo = GetStructInfoAs<distributed::DTensorStructInfoNode>(arg);
     if (sinfo != nullptr) {
-      input_tensor_sinfo.push_back(ffi::GetRef<distributed::DTensorStructInfo>(sinfo));
+      input_tensor_sinfo.push_back(GetRef<distributed::DTensorStructInfo>(sinfo));
     }
   }
   return input_tensor_sinfo;
@@ -42,8 +42,7 @@ ffi::Array<distributed::DTensorStructInfo> GetInputDTensorStructInfo(const Call&
 StructInfo InferShardingSpec(const Call& call, const BlockBuilder& ctx,
                              const StructInfo& orig_output_sinfo,
                              distributed::FBuildAxisGraph f_build_graph) {
-  ffi::Array<distributed::DTensorStructInfo> input_dtensor_sinfos =
-      GetInputDTensorStructInfo(call, ctx);
+  Array<distributed::DTensorStructInfo> input_dtensor_sinfos = GetInputDTensorStructInfo(call, ctx);
   for (int i = 1; i < static_cast<int>(input_dtensor_sinfos.size()); i++) {
     ICHECK(StructuralEqual()(input_dtensor_sinfos[0]->device_mesh,
                              input_dtensor_sinfos[i]->device_mesh));
@@ -52,7 +51,7 @@ StructInfo InferShardingSpec(const Call& call, const BlockBuilder& ctx,
   Var output_var("output", orig_output_sinfo);
   distributed::AxisGroupGraph axis_group_graph;
   f_build_graph(output_var, call, &axis_group_graph);
-  ffi::Array<Expr> args = GetCallArgs(call);
+  Array<Expr> args = GetCallArgs(call);
   int n_input_var = input_dtensor_sinfos.size();
   for (int i = 0; i < n_input_var; i++) {
     distributed::DTensorStructInfo dtensor_sinfo = input_dtensor_sinfos[i];
@@ -67,9 +66,9 @@ StructInfo InferShardingSpec(const Call& call, const BlockBuilder& ctx,
     }
   }
   axis_group_graph.PropagateShardingSpec();
-  ffi::Array<TensorStructInfo> orig_output_tensor_sinfos;
+  Array<TensorStructInfo> orig_output_tensor_sinfos;
   if (const auto* tensor_sinfo = orig_output_sinfo.as<TensorStructInfoNode>()) {
-    orig_output_tensor_sinfos.push_back(ffi::GetRef<TensorStructInfo>(tensor_sinfo));
+    orig_output_tensor_sinfos.push_back(GetRef<TensorStructInfo>(tensor_sinfo));
   } else {
     const auto* tuple_sinfo = orig_output_sinfo.as<TupleStructInfoNode>();
     ICHECK(tuple_sinfo);
@@ -77,9 +76,9 @@ StructInfo InferShardingSpec(const Call& call, const BlockBuilder& ctx,
       orig_output_tensor_sinfos.push_back(Downcast<TensorStructInfo>(sinfo));
     }
   }
-  ffi::Array<StructInfo> new_output_dtensor_sinfos;
+  Array<StructInfo> new_output_dtensor_sinfos;
   for (int idx = 0; idx < static_cast<int>(orig_output_tensor_sinfos.size()); idx++) {
-    ffi::Array<distributed::PlacementSpec> output_placement_specs(
+    Array<distributed::PlacementSpec> output_placement_specs(
         std::vector<distributed::PlacementSpec>(device_mesh->shape.size(),
                                                 distributed::PlacementSpec::Replica()));
     for (int i = 0; i < orig_output_tensor_sinfos[idx]->ndim; i++) {

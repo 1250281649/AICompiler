@@ -22,7 +22,6 @@
  * \file node/container_printint.cc
  */
 #include <tvm/ffi/function.h>
-#include <tvm/node/cast.h>
 #include <tvm/node/functor.h>
 #include <tvm/node/repr_printer.h>
 
@@ -63,6 +62,6 @@ TVM_STATIC_IR_FUNCTOR(ReprPrinter, vtable)
 
 TVM_STATIC_IR_FUNCTOR(ReprPrinter, vtable)
     .set_dispatch<ffi::ShapeObj>([](const ObjectRef& node, ReprPrinter* p) {
-      p->stream << Downcast<ffi::Shape>(node);
+      p->stream << ffi::Downcast<ffi::Shape>(node);
     });
 }  // namespace tvm

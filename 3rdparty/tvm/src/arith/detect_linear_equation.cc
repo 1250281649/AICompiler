@@ -23,7 +23,6 @@
  */
 #include <tvm/arith/analyzer.h>
 #include <tvm/ffi/function.h>
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/tir/analysis.h>
 #include <tvm/tir/expr.h>
 #include <tvm/tir/expr_functor.h>
@@ -142,14 +141,14 @@ class LinearEqDetector : public ExprFunctor<LinearEqEntry(const PrimExpr&, const
   }
 };
 
-ffi::Array<PrimExpr> DetectLinearEquation(const PrimExpr& e, const ffi::Array<Var>& vars) {
+Array<PrimExpr> DetectLinearEquation(const PrimExpr& e, const Array<Var>& vars) {
   PrimExpr base = e;
-  ffi::Array<PrimExpr> coeff;
+  Array<PrimExpr> coeff;
 
   for (Var v : vars) {
     LinearEqEntry ret;
     if (!LinearEqDetector(v).Detect(base, &ret)) {
-      return ffi::Array<PrimExpr>();
+      return Array<PrimExpr>();
     }
     coeff.push_back(ret.coeff);
     base = std::move(ret.base);
@@ -162,7 +161,7 @@ ffi::Array<PrimExpr> DetectLinearEquation(const PrimExpr& e, const ffi::Array<Va
     vset.insert(vars[i - 1].get());
     // The previous coeff contains the variable
     if (UsesVar(coeff[i - 2], vset_contains)) {
-      return ffi::Array<PrimExpr>();
+      return Array<PrimExpr>();
     }
   }
   coeff.push_back(base);
@@ -218,8 +217,8 @@ bool DetectClipBound(const PrimExpr& cond,
   ret.coeff = analyzer.Simplify(ret.coeff);
   IntervalEntry& p = (*bmap)[var.get()];
 
-  ffi::Optional<PrimExpr> min_value;
-  ffi::Optional<PrimExpr> max_value;
+  Optional<PrimExpr> min_value;
+  Optional<PrimExpr> max_value;
   if (is_const_int(ret.coeff, 1)) {
     // var + shift >=0 -> var >= -shift
     min_value = -ret.base;
@@ -265,7 +264,7 @@ void SplitCommExpr(const PrimExpr& e, std::vector<PrimExpr>* ret) {
 
 // Detect the lower and upper bound from the expression.
 // e must be connected by and.
-ffi::Array<PrimExpr> DetectClipBound(const PrimExpr& e, const ffi::Array<Var>& vars) {
+Array<PrimExpr> DetectClipBound(const PrimExpr& e, const Array<Var>& vars) {
   std::vector<PrimExpr> splits;
   Analyzer analyzer;
   SplitCommExpr<tir::AndNode>(analyzer.Simplify(e), &splits);
@@ -274,9 +273,9 @@ ffi::Array<PrimExpr> DetectClipBound(const PrimExpr& e, const ffi::Array<Var>& v
     rmap[v.get()] = IntervalEntry();
   }
   for (PrimExpr cond : splits) {
-    if (!DetectClipBound(cond, &rmap)) return ffi::Array<PrimExpr>();
+    if (!DetectClipBound(cond, &rmap)) return Array<PrimExpr>();
   }
-  ffi::Array<PrimExpr> ret;
+  Array<PrimExpr> ret;
   for (Var v : vars) {
     IntervalEntry e = rmap[v.get()];
     if (e.min_value.defined()) {
@@ -291,12 +290,11 @@ ffi::Array<PrimExpr> DetectClipBound(const PrimExpr& e, const ffi::Array<Var>& v
   return ret;
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef()
-      .def("arith.DetectLinearEquation", DetectLinearEquation)
-      .def("arith.DetectClipBound",
-           [](const PrimExpr& e, const ffi::Array<Var>& vars) { return DetectClipBound(e, vars); });
-}
+TVM_FFI_REGISTER_GLOBAL("arith.DetectLinearEquation").set_body_typed(DetectLinearEquation);
+
+TVM_FFI_REGISTER_GLOBAL("arith.DetectClipBound")
+    .set_body_typed([](const PrimExpr& e, const Array<Var>& vars) {
+      return DetectClipBound(e, vars);
+    });
 }  // namespace arith
 }  // namespace tvm

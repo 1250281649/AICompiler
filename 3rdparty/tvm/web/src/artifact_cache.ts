@@ -17,7 +17,7 @@
  * under the License.
  */
 
-export interface TensorCacheEntry {
+export interface NDArrayCacheEntry {
   name: string;
   shape: Array<number>;
   dtype: string;
@@ -26,11 +26,11 @@ export interface TensorCacheEntry {
   nbytes: number;
 }
 
-export interface TensorShardEntry {
+export interface NDArrayShardEntry {
   dataPath: string;
   format: "raw-shard";
   nbytes: number;
-  records: Array<TensorCacheEntry>;
+  records: Array<NDArrayCacheEntry>;
 }
 
 /**
@@ -357,13 +357,13 @@ export class ArtifactIndexedDBCache implements ArtifactCacheTemplate {
 /**
  * Function to check if NDarray is in Cache or not
  *
- * @param tensorCacheUrl The cache url which links to the Tensor
+ * @param ndarrayCacheUrl The cache url which links to the NDArray
  * @param cacheScope The scope identifier of the cache
  * @param cacheType The type of the cache: "cache" or "indexedDB"
- * @returns the result if the cache has Tensor
+ * @returns the result if the cache has NDArray
  */
-export async function hasTensorInCache(
-  tensorCacheUrl: string,
+export async function hasNDArrayInCache(
+  ndarrayCacheUrl: string,
   cacheScope = "tvmjs",
   cacheType = "cache"
 ): Promise<boolean> {
@@ -376,25 +376,25 @@ export async function hasTensorInCache(
     console.error("Unsupported cacheType: " + cacheType + ", using default ArtifactCache.");
     artifactCache = new ArtifactCache(cacheScope);
   }
-  const jsonUrl = new URL("tensor-cache.json", tensorCacheUrl).href;
+  const jsonUrl = new URL("ndarray-cache.json", ndarrayCacheUrl).href;
   const hasJsonUrlInCache = await artifactCache.hasAllKeys([jsonUrl]);
   if (!hasJsonUrlInCache) {
     return false;
   }
   let list = await artifactCache.fetchWithCache(jsonUrl, "json");
-  list = list["records"] as Array<TensorShardEntry>;
-  return await artifactCache.hasAllKeys(list.map(key => new URL(key.dataPath, tensorCacheUrl).href));
+  list = list["records"] as Array<NDArrayShardEntry>;
+  return await artifactCache.hasAllKeys(list.map(key => new URL(key.dataPath, ndarrayCacheUrl).href));
 }
 
 
 /**
- * Given cacheUrl, search up items to delete based on cacheUrl/tensor-cache.json
+ * Given cacheUrl, search up items to delete based on cacheUrl/ndarray-cache.json
  *
  * @param cacheUrl The cacheUrl for the items
  * @param cacheScope The scope identifier of the cache
  * @param cacheType The type of the cache: "cache" or "indexedDB"
  */
-export async function deleteTensorCache(
+export async function deleteNDArrayCache(
   cacheUrl: string,
   cacheScope = "tvmjs",
   cacheType = "cache"
@@ -408,9 +408,9 @@ export async function deleteTensorCache(
     console.error("Unsupported cacheType: " + cacheType + ", using default ArtifactCache.");
     artifactCache = new ArtifactCache(cacheScope);
   }
-  const jsonUrl = new URL("tensor-cache.json", cacheUrl).href;
+  const jsonUrl = new URL("ndarray-cache.json", cacheUrl).href;
   const list = await artifactCache.fetchWithCache(jsonUrl, "json");
-  const arrayentry = list["records"] as Array<TensorShardEntry>;
+  const arrayentry = list["records"] as Array<NDArrayShardEntry>;
   const processShard = async (i: number) => {
     const dataUrl = new URL(arrayentry[i].dataPath, cacheUrl).href;
     await artifactCache.deleteInCache(dataUrl);

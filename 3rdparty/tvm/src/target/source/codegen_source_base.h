@@ -140,7 +140,7 @@ class CodeGenSourceBase {
  * \param code The code to be viewed.
  * \param fmt The code. format.
  */
-ffi::Module SourceModuleCreate(std::string code, std::string fmt);
+runtime::Module SourceModuleCreate(std::string code, std::string fmt);
 
 /*!
  * \brief Create a C source module for viewing and compiling GCC code.
@@ -150,9 +150,9 @@ ffi::Module SourceModuleCreate(std::string code, std::string fmt);
  * \param const_vars. The constant variables that the c source module needs.
  * \return The created module.
  */
-ffi::Module CSourceModuleCreate(const ffi::String& code, const ffi::String& fmt,
-                                const ffi::Array<ffi::String>& func_names,
-                                const ffi::Array<ffi::String>& const_vars = {});
+runtime::Module CSourceModuleCreate(const String& code, const String& fmt,
+                                    const Array<String>& func_names,
+                                    const Array<String>& const_vars = {});
 
 /*!
  * \brief Wrap the submodules in a metadata module.
@@ -163,9 +163,9 @@ ffi::Module CSourceModuleCreate(const ffi::String& code, const ffi::String& fmt,
  * \param target The target that all the modules are compiled for
  * \return The wrapped module.
  */
-ffi::Module CreateMetadataModule(const std::unordered_map<std::string, runtime::Tensor>& params,
-                                 ffi::Module target_module,
-                                 const ffi::Array<ffi::Module>& ext_modules, Target target);
+runtime::Module CreateMetadataModule(
+    const std::unordered_map<std::string, runtime::NDArray>& params, runtime::Module target_module,
+    const Array<runtime::Module>& ext_modules, Target target);
 
 /*!
  * \brief Create a source module for viewing and limited saving for device.
@@ -175,7 +175,7 @@ ffi::Module CreateMetadataModule(const std::unordered_map<std::string, runtime::
  * \param type_key The type_key of the runtime module of this source code
  * \param fget_source a closure to replace default get source behavior.
  */
-ffi::Module DeviceSourceModuleCreate(
+runtime::Module DeviceSourceModuleCreate(
     std::string data, std::string fmt, std::unordered_map<std::string, runtime::FunctionInfo> fmap,
     std::string type_key, std::function<std::string(const std::string&)> fget_source = nullptr);
 

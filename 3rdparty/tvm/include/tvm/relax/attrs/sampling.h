@@ -39,8 +39,9 @@ struct MultinomialFromUniformAttrs : public AttrsNodeReflAdapter<MultinomialFrom
         "dtype", &MultinomialFromUniformAttrs::dtype, "Data type of the output indices.",
         refl::DefaultValue(DataType::Int(64)));
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("relax.attrs.MultinomialFromUniformAttrs",
-                                    MultinomialFromUniformAttrs, BaseAttrsNode);
+
+  static constexpr const char* _type_key = "relax.attrs.MultinomialFromUniformAttrs";
+  TVM_FFI_DECLARE_FINAL_OBJECT_INFO(MultinomialFromUniformAttrs, BaseAttrsNode);
 };  // struct MultinomialFromUniformAttrs
 
 }  // namespace relax

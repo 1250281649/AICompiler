@@ -136,9 +136,9 @@ class UpdateWeightsHook(RunnerHook):
         self,
         runner: object,
         graphs: List[MSCGraph],
-        weights: Dict[str, tvm.runtime.Tensor],
+        weights: Dict[str, tvm.nd.array],
         weights_path: str,
-    ) -> Tuple[List[MSCGraph], Dict[str, tvm.runtime.Tensor]]:
+    ) -> Tuple[List[MSCGraph], Dict[str, tvm.nd.array]]:
         """Apply the default funcion
 
         Parameters
@@ -147,7 +147,7 @@ class UpdateWeightsHook(RunnerHook):
             The runner context.
         graphs: list<MSCGraph>
             The translated graphs
-        weights: dict<str, tvm.runtime.tensor>
+        weights: dict<str, tvm.nd.array>
             The translated weights.
         weights_path: str
             The weights path.
@@ -156,7 +156,7 @@ class UpdateWeightsHook(RunnerHook):
         -------
         graphs: list<MSCGraph>
             The updated graphs
-        weights: dict<str, tvm.runtime.tensor>
+        weights: dict<str, tvm.nd.array>
             The updated weights.
 
         """

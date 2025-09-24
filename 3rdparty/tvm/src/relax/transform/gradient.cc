@@ -25,7 +25,6 @@
  * with respect to the only return value of the function, which needs to be scalar.
  */
 
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/relax/analysis.h>
 #include <tvm/relax/attrs/op.h>
 #include <tvm/relax/expr_functor.h>
@@ -160,7 +159,7 @@ class CheckpointCollector : private ExprMutator {
       ICHECK(var) << "The first argument of relax.grad.start_checkpoint and "
                      "relax.grad.end_checkpoint should be a Var";
       // var might already be remapped. Find the original var
-      auto orig_var = Downcast<Var>(ExprMutator::VisitExpr(ffi::GetRef<Var>(var)));
+      auto orig_var = Downcast<Var>(ExprMutator::VisitExpr(GetRef<Var>(var)));
       // Add remapping from binding->var to new_var
       if (!binding->var.as<DataflowVarNode>() && var->IsInstance<DataflowVarNode>()) {
         // For output binding, emit a dummy binding
@@ -203,7 +202,7 @@ class CheckpointGenerator : private ExprMutator {
    * \param checkpoints The checkpointed vars. checkpoints being empty means all Vars are
    * checkpointed
    */
-  CheckpointGenerator(const BlockBuilder& builder, const ffi::Array<Var>& orig_params,
+  CheckpointGenerator(const BlockBuilder& builder, const Array<Var>& orig_params,
                       const DataflowBlock& forward_block, const VarIdSet& checkpoints)
       : builder_(builder) {
     // func params will always be checkpointed
@@ -238,10 +237,10 @@ class CheckpointGenerator : private ExprMutator {
   using ExprMutator::VisitExpr_;
 
   // Visit the use-site of a defined Var
-  Expr VisitExpr_(const VarNode* op) final { return VisitVar(ffi::GetRef<Var>(op)); }
+  Expr VisitExpr_(const VarNode* op) final { return VisitVar(GetRef<Var>(op)); }
 
   // Visit the use-site of a defined DataflowVar
-  Expr VisitExpr_(const DataflowVarNode* op) final { return VisitVar(ffi::GetRef<Var>(op)); }
+  Expr VisitExpr_(const DataflowVarNode* op) final { return VisitVar(GetRef<Var>(op)); }
 
   Expr VisitVar(const Var& var) {
     auto it = checkpoint_map_.find(var);
@@ -258,7 +257,7 @@ class CheckpointGenerator : private ExprMutator {
   Expr VisitExpr_(const CallNode* call_node) final {
     Expr new_op = this->VisitExpr(call_node->op);
 
-    tvm::ffi::Array<Expr> call_args;
+    tvm::Array<Expr> call_args;
     for (Expr arg : call_node->args) {
       Expr new_arg = this->VisitExpr(arg);
       call_args.push_back(new_arg);
@@ -268,9 +267,9 @@ class CheckpointGenerator : private ExprMutator {
 
   BlockBuilder builder_;
   // The mapping from the forward vars to the checkpoint vars.
-  ffi::Map<Var, Var> checkpoint_map_;
+  Map<Var, Var> checkpoint_map_;
   // The mapping from the forward vars to their bindings, used to generate checkpoint bindings
-  ffi::Map<Var, Expr> binding_map_;
+  Map<Var, Expr> binding_map_;
 };
 
 /*!
@@ -294,8 +293,8 @@ class BackwardBindingGenerator : private ExprVisitor {
    * \return The return expr of new adjoint function.
    */
   static Expr Generate(const BlockBuilder& builder, const DataflowBlock& forward_block,
-                       const ffi::Array<Var>& require_grads, const Var& target_var,
-                       const ffi::Array<Var>& orig_params, const Expr& orig_return_value,
+                       const Array<Var>& require_grads, const Var& target_var,
+                       const Array<Var>& orig_params, const Expr& orig_return_value,
                        const CheckpointCollector& cp_collector) {
     CheckpointGenerator checkpoint_generator(builder, orig_params, forward_block,
                                              cp_collector.checkpoints);
@@ -358,7 +357,7 @@ class BackwardBindingGenerator : private ExprVisitor {
 
     // Support for checkpointing
     auto [checkpoint_var, checkpoint_call] =
-        checkpoint_generator_.UpdateBinding(binding->var, ffi::GetRef<Call>(call));
+        checkpoint_generator_.UpdateBinding(binding->var, GetRef<Call>(call));
 
     if (call_op == Op::Get("relax.call_tir")) {
       LOG(FATAL) << "Differentiation of call_tir op without registering corresponding gradient "
@@ -384,7 +383,7 @@ class BackwardBindingGenerator : private ExprVisitor {
         }
       }
     } else {
-      const ffi::Array<Expr>& partials = gradient_op_map[call_op](
+      const Array<Expr>& partials = gradient_op_map[call_op](
           checkpoint_var, Downcast<Call>(checkpoint_call), adjoint_var, builder_);
       ICHECK(partials.size() == call->args.size()) << "partials number != inputs number";
       for (size_t i = 0; i < partials.size(); ++i) {
@@ -406,7 +405,7 @@ class BackwardBindingGenerator : private ExprVisitor {
   // b_adjoint += a_adjoint_var[0][0], c_adjoint += a_adjoint_var[0][1],
   // d_adjoint += a_adjoint_var[1]
   void VisitBinding_(const VarBindingNode* binding, const TupleNode* tuple) final {
-    UpdateAdjoint(ffi::GetRef<Tuple>(tuple), adjoint_var_map_[binding->var]);
+    UpdateAdjoint(GetRef<Tuple>(tuple), adjoint_var_map_[binding->var]);
   }
 
   // For TupleGetItem nodes, we do a partial update
@@ -422,7 +421,7 @@ class BackwardBindingGenerator : private ExprVisitor {
 
     const Var& tuple_var = Downcast<Var>(tuple_get_item->tuple);
     if (adjoint_var_map_.count(tuple_var) == 0) {
-      auto nested_zeros = Downcast<Tuple>(NestedZeros(ffi::GetRef<StructInfo>(tuple_sinfo)));
+      auto nested_zeros = Downcast<Tuple>(NestedZeros(GetRef<StructInfo>(tuple_sinfo)));
       auto tuple_fields = nested_zeros->fields;
       tuple_fields.Set(tuple_get_item->index, adjoint_var_map_[binding->var]);
       EmitAdjoint(tuple_var, Tuple(tuple_fields), false);
@@ -435,11 +434,11 @@ class BackwardBindingGenerator : private ExprVisitor {
 
   // For assign nodes, we add the adjoint of output to the adjoint of input
   void VisitBinding_(const VarBindingNode* binding, const DataflowVarNode* var) final {
-    UpdateAdjoint(ffi::GetRef<Var>(var), adjoint_var_map_[binding->var]);
+    UpdateAdjoint(GetRef<Var>(var), adjoint_var_map_[binding->var]);
   }
 
   void VisitBinding_(const VarBindingNode* binding, const VarNode* var) final {
-    UpdateAdjoint(ffi::GetRef<Var>(var), adjoint_var_map_[binding->var]);
+    UpdateAdjoint(GetRef<Var>(var), adjoint_var_map_[binding->var]);
   }
 
   // For constant nodes, we do not have to handle it because it does not contribute to the adjoint
@@ -479,9 +478,9 @@ class BackwardBindingGenerator : private ExprVisitor {
   // Returns the new return value, which would be like:
   // Tuple(original_return_value,
   //       Tuple(adjoint_of_require_grads_1, adjoint_of_require_grads_2, ...))
-  Expr Epilogue(const ffi::Array<Var>& require_grads, const Expr& orig_return_value) {
+  Expr Epilogue(const Array<Var>& require_grads, const Expr& orig_return_value) {
     // create adjoint variables for inputs, and then bind adjoints
-    ffi::Array<Expr> out_adjoints;
+    Array<Expr> out_adjoints;
 
     for (Var var : require_grads) {
       // var might be wrapped in start_checkpoint or end_checkpoint, so we should find the original
@@ -520,7 +519,7 @@ class BackwardBindingGenerator : private ExprVisitor {
   }
 
   static Expr AdjointMsgToExpr(AdjointMsg msg) {
-    return NestedMsgToExpr<Expr>(msg, [](ffi::Optional<Expr> leaf_expr) {
+    return NestedMsgToExpr<Expr>(msg, [](Optional<Expr> leaf_expr) {
       if (!leaf_expr.defined()) {
         LOG(FATAL) << "Null should not exist in AdjointMsg.";
       }
@@ -559,7 +558,7 @@ class BackwardBindingGenerator : private ExprVisitor {
           ICHECK(GetStructInfoAs<TensorStructInfoNode>(r_leaf))
               << "The leaf of adjoint should have StructInfo and be a Tensor.";
           Expr res = add(l_leaf, r_leaf);
-          UpdateStructInfo(res, ffi::GetRef<StructInfo>(sinfo));
+          UpdateStructInfo(res, GetRef<StructInfo>(sinfo));
           return res;
         });
     return AdjointMsgToExpr(res);
@@ -575,7 +574,7 @@ class BackwardBindingGenerator : private ExprVisitor {
     auto* sinfo = GetStructInfoAs<TupleStructInfoNode>(tuple);
     ICHECK(sinfo) << "The first argument of AddInTuple should have tuple struct info.";
     ICHECK(index >= 0 && index < static_cast<int>(sinfo->fields.size()));
-    ffi::Array<Expr> res;
+    Array<Expr> res;
     for (size_t i = 0; i < sinfo->fields.size(); ++i) {
       Expr field;
       if (const auto* expr_tuple = tuple.as<TupleNode>()) {
@@ -594,7 +593,7 @@ class BackwardBindingGenerator : private ExprVisitor {
   // The block builder of the corresponding GradientMutator, to emit bindings
   BlockBuilder builder_;
   // Forward Var to its adjoint Var
-  ffi::Map<Var, Var> adjoint_var_map_;
+  Map<Var, Var> adjoint_var_map_;
   // information collected by CheckpointCollector
   CheckpointCollector cp_collector_;
   // The generator for checkpoint bindings
@@ -603,13 +602,13 @@ class BackwardBindingGenerator : private ExprVisitor {
 
 class GradientMutator : private ExprMutator {
  public:
-  static IRModule Transform(IRModule mod, ffi::String func_name,
-                            ffi::Optional<ffi::Array<Var>> require_grads, int target_index) {
+  static IRModule Transform(IRModule mod, String func_name, Optional<Array<Var>> require_grads,
+                            int target_index) {
     // Step 1. Copy function
     auto* old_func = mod->Lookup(func_name).as<FunctionNode>();
     CHECK(old_func) << func_name << "is not a Relax Function";
     auto copier = FunctionCopier();
-    auto new_func = copier.Copy(ffi::GetRef<Function>(old_func));
+    auto new_func = copier.Copy(GetRef<Function>(old_func));
 
     // Step 2. Handle the checkpoints and eliminate start_checkpoint and end_checkpoint ops
     auto cp_collector = CheckpointCollector();
@@ -630,7 +629,7 @@ class GradientMutator : private ExprMutator {
   }
 
  private:
-  GradientMutator(const IRModule& module, const ffi::Array<Var>& require_grads, int target_index,
+  GradientMutator(const IRModule& module, const Array<Var>& require_grads, int target_index,
                   const CheckpointCollector& cp_collector)
       : ExprMutator(module),
         require_grads_(require_grads),
@@ -638,7 +637,7 @@ class GradientMutator : private ExprMutator {
         target_index_(target_index) {}
 
   // Add the adjoint function of func to the IRModule using BlockBuilder
-  IRModule AddAdjointFunction(const Function& func, const ffi::String& func_name,
+  IRModule AddAdjointFunction(const Function& func, const String& func_name,
                               bool remove_all_unused = true) {
     // Step 4.1 forward -> forward + backward
     auto new_func = Downcast<Function>(VisitExpr(func));
@@ -695,7 +694,7 @@ class GradientMutator : private ExprMutator {
     }
 
     // generate backward bindings and the return value
-    return_expr_ = BackwardBindingGenerator::Generate(builder_, ffi::GetRef<DataflowBlock>(block),
+    return_expr_ = BackwardBindingGenerator::Generate(builder_, GetRef<DataflowBlock>(block),
                                                       require_grads_, target_var_, orig_params_,
                                                       orig_return_expr_, cp_collector_);
 
@@ -715,7 +714,7 @@ class GradientMutator : private ExprMutator {
       CHECK_EQ(target_index, 0) << "When the function has only one return value, target_index can "
                                    "only be 0. But the target_index specified is "
                                 << target_index;
-      target_var_ = ffi::GetRef<Var>(var);
+      target_var_ = GetRef<Var>(var);
     } else if (auto* tuple = e.as<TupleNode>()) {
       CHECK(target_index >= 0 && target_index < static_cast<int>(tuple->fields.size()))
           << "target_index should be in the range of the number of return values of the "
@@ -725,7 +724,7 @@ class GradientMutator : private ExprMutator {
       auto* var = tuple->fields[target_index].as<VarNode>();
       CHECK(var) << "Target must be a Var, but the specified target is "
                  << tuple->fields[target_index];
-      target_var_ = ffi::GetRef<Var>(var);
+      target_var_ = GetRef<Var>(var);
     } else {
       LOG(FATAL) << "The return value of the function must be Var or Tuple. However, the return "
                     "value of the given function is "
@@ -742,11 +741,10 @@ class GradientMutator : private ExprMutator {
   // 1. there should be no duplicate var
   // 2. every var should be a parameter or a intermediate var in the function
   // 3. the type of the input var should be Tensor of floating point dtype, or Tuple of that
-  static ffi::Array<Var> CheckAndMapRequireGrads(const ffi::Array<Var>& require_grads,
-                                                 const ffi::Map<Var, Var>& var_map,
-                                                 const ffi::String& func_name) {
+  static Array<Var> CheckAndMapRequireGrads(const Array<Var>& require_grads,
+                                            const Map<Var, Var>& var_map, const String& func_name) {
     VarIdSet var_set;
-    ffi::Array<Var> mapped_vars;
+    Array<Var> mapped_vars;
     for (const auto& var : require_grads) {
       auto it = var_map.find(var);
       CHECK(it != var_map.end()) << "There is no Var named " << var->name_hint()
@@ -765,22 +763,21 @@ class GradientMutator : private ExprMutator {
   }
 
   // differentiation sources
-  ffi::Array<Var> require_grads_;
+  Array<Var> require_grads_;
   // information collected by CheckpointCollector
   CheckpointCollector cp_collector_;
   // the differentiation target
   int target_index_;
   Var target_var_;
   // the return value of the original function and the differentiated function
-  ffi::Array<Var> orig_params_;
+  Array<Var> orig_params_;
   Expr orig_return_expr_;
   Expr return_expr_;
 };
 
 namespace transform {
 
-Pass Gradient(ffi::String func_name, ffi::Optional<ffi::Array<Var>> require_grads,
-              int target_index) {
+Pass Gradient(String func_name, Optional<Array<Var>> require_grads, int target_index) {
   auto pass_func = [=](IRModule mod, PassContext pc) {
     return relax::GradientMutator::Transform(mod, func_name, require_grads, target_index);
   };
@@ -790,10 +787,7 @@ Pass Gradient(ffi::String func_name, ffi::Optional<ffi::Array<Var>> require_grad
                           /*required=*/{});
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("relax.transform.Gradient", Gradient);
-}
+TVM_FFI_REGISTER_GLOBAL("relax.transform.Gradient").set_body_typed(Gradient);
 
 }  // namespace transform
 

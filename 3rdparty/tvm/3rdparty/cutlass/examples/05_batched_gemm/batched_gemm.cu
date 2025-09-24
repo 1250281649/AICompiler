@@ -243,11 +243,10 @@ cudaError_t run_batched_gemm(bool use_array) {
   const char* gemm_desc = use_array ? "array" : "strided batched";
   std::cout << "Running " << gemm_desc << " gemm" << std::endl;
 
-  // Arbitrary matrix shape
+  // Arbitrary problem size
   int const m = 520;
   int const n = 219;
   int const k = 129;
-
   int const batch_count = 17;
 
   // A, B are non-transpose, column major

@@ -22,8 +22,6 @@
  */
 #include "torch_codegen.h"
 
-#include <tvm/ffi/reflection/registry.h>
-
 namespace tvm {
 namespace contrib {
 namespace msc {
@@ -153,7 +151,7 @@ void TorchPluginCodeGen::CodeGenOpDefine(const Plugin& plugin) {
     CodeGenMalloc(plugin, plugin->buffers, "buffer");
   }
   // do the compute
-  ffi::String device_cond = "";
+  String device_cond = "";
   for (size_t i = 0; i < plugin->inputs.size(); i++) {
     if (plugin->inputs[i]->device == "cuda" || plugin->inputs[i]->device == "default") {
       device_cond = device_cond + "input_tensors[" + std::to_string(i) + "].is_cuda()";
@@ -216,15 +214,15 @@ void TorchPluginCodeGen::CodeGenOpDefine(const Plugin& plugin) {
       .func_end();
 }
 
-void TorchPluginCodeGen::CodeGenCmake(const std::set<ffi::String>& devices) {
-  ffi::Map<ffi::String, ffi::String> flags;
+void TorchPluginCodeGen::CodeGenCmake(const std::set<String>& devices) {
+  Map<String, String> flags;
   flags.Set("PLUGIN_SUPPORT_TORCH", "");
   CodeGenPreCmake(devices, flags);
   stack_.line()
       .line("set(CMAKE_CXX_STANDARD 17)")
       .line("list(APPEND CMAKE_PREFIX_PATH \"" + config()->torch_prefix + "\")")
       .line("find_package(Torch REQUIRED)");
-  ffi::Array<ffi::String> includes, libs;
+  Array<String> includes, libs;
   libs.push_back("${TORCH_LIBRARIES}");
   CodeGenPostCmake(devices, includes, libs);
 }
@@ -366,14 +364,14 @@ void TorchPluginCodeGen::CodeGenConvertDepends() {
       .line();
 }
 
-const ffi::String TorchPluginCodeGen::CodeGenOpConvert(const Plugin& plugin) {
+const String TorchPluginCodeGen::CodeGenOpConvert(const Plugin& plugin) {
   stack_.func_def(ConverterName(plugin), "relax.Var")
       .func_arg("node", "fx.node.Node")
       .func_arg("ctx", "TorchFXImporter")
       .func_start()
       .func_call("retrieve_args", "args", "ctx")
       .call_arg("node");
-  ffi::Array<ffi::String> args;
+  Array<String> args;
   for (size_t i = 0; i < plugin->inputs.size(); i++) {
     const auto& tensor = plugin->inputs[i];
     stack_.assign(tensor->name, DocUtils::ToIndex("args", i + 1));
@@ -407,9 +405,9 @@ const ffi::String TorchPluginCodeGen::CodeGenOpConvert(const Plugin& plugin) {
       .call_arg("op")
       .call_arg("name");
   if (plugin->outputs.size() == 1) {
-    stack_.func_end(DocUtils::ToList(ffi::Array<ffi::String>{"var"}));
+    stack_.func_end(DocUtils::ToList(Array<String>{"var"}));
   } else {
-    ffi::Array<ffi::String> outputs;
+    Array<String> outputs;
     for (size_t i = 0; i < plugin->outputs.size(); i++) {
       const auto& tensor = plugin->outputs[i];
       stack_.func_call("relax.TupleGetItem", tensor->name).call_arg("var").call_arg(i);
@@ -420,10 +418,9 @@ const ffi::String TorchPluginCodeGen::CodeGenOpConvert(const Plugin& plugin) {
   return EntryName(plugin);
 }
 
-void TorchPluginCodeGen::CodeGenMalloc(const Plugin& plugin,
-                                       const ffi::Array<PluginTensor>& tensors,
-                                       const ffi::String& collect) {
-  ffi::Array<ffi::String> call_args{"input_metas", "meta_attr_", "true"};
+void TorchPluginCodeGen::CodeGenMalloc(const Plugin& plugin, const Array<PluginTensor>& tensors,
+                                       const String& collect) {
+  Array<String> call_args{"input_metas", "meta_attr_", "true"};
   stack_.line().comment("malloc " + collect).declare("std::vector<MetaTensor>", collect + "_metas");
   CodeGenSafeCall(plugin->externs["infer_" + collect], call_args, collect + "_metas");
   for (size_t i = 0; i < tensors.size(); i++) {
@@ -443,14 +440,13 @@ void TorchPluginCodeGen::CodeGenMalloc(const Plugin& plugin,
   }
 }
 
-void TorchPluginCodeGen::CodeGenCompute(const Plugin& plugin, const ffi::String& device) {
-  auto prepare_tensor = [this](const PluginTensor& tensor,
-                               const ffi::Map<ffi::String, ffi::String>& dtypes, size_t idx,
-                               const ffi::String& collect) {
-    const ffi::String& t_name = "d_" + tensor->name;
-    const ffi::String& t_dtype = dtypes.count(tensor->name) ? dtypes[tensor->name] : tensor->dtype;
-    const ffi::String& tensor_type = "DataTensor<" + t_dtype + ">";
-    const ffi::String& anno = collect == "input" ? "const " + tensor_type + "&" : tensor_type;
+void TorchPluginCodeGen::CodeGenCompute(const Plugin& plugin, const String& device) {
+  auto prepare_tensor = [this](const PluginTensor& tensor, const Map<String, String>& dtypes,
+                               size_t idx, const String& collect) {
+    const String& t_name = "d_" + tensor->name;
+    const String& t_dtype = dtypes.count(tensor->name) ? dtypes[tensor->name] : tensor->dtype;
+    const String& tensor_type = "DataTensor<" + t_dtype + ">";
+    const String& anno = collect == "input" ? "const " + tensor_type + "&" : tensor_type;
     stack_.func_call("TorchUtils::To" + tensor_type, DocUtils::ToDeclare(anno, t_name))
         .call_arg(DocUtils::ToIndex(collect + "_tensors", idx))
         .call_arg(DocUtils::ToIndex(collect + "_metas", idx))
@@ -461,8 +457,8 @@ void TorchPluginCodeGen::CodeGenCompute(const Plugin& plugin, const ffi::String&
   if (plugin->externs.count(device + "_compute")) {
     for (const auto& dtypes : GetDtypeMatrix(plugin)) {
       const auto& tensor_dtypes = GetTensorDtypes(plugin, dtypes);
-      ffi::Array<ffi::String> compute_args;
-      ffi::String dtype_cond = "";
+      Array<String> compute_args;
+      String dtype_cond = "";
       for (size_t i = 0; i < plugin->inputs.size(); i++) {
         dtype_cond = dtype_cond + "input_metas[" + std::to_string(i) +
                      "].data_type() == DataUtils::ToMetaType(\"" + dtypes.at(i) + "\")";
@@ -471,15 +467,15 @@ void TorchPluginCodeGen::CodeGenCompute(const Plugin& plugin, const ffi::String&
       // prepare compute datas
       stack_.cond_if(dtype_cond).comment("prepare compute datas");
       for (size_t i = 0; i < plugin->inputs.size(); i++) {
-        const ffi::String& t_name = prepare_tensor(plugin->inputs[i], tensor_dtypes, i, "input");
+        const String& t_name = prepare_tensor(plugin->inputs[i], tensor_dtypes, i, "input");
         compute_args.push_back(t_name);
       }
       for (size_t i = 0; i < plugin->outputs.size(); i++) {
-        const ffi::String& t_name = prepare_tensor(plugin->outputs[i], tensor_dtypes, i, "output");
+        const String& t_name = prepare_tensor(plugin->outputs[i], tensor_dtypes, i, "output");
         compute_args.push_back(t_name);
       }
       for (size_t i = 0; i < plugin->buffers.size(); i++) {
-        const ffi::String& t_name = prepare_tensor(plugin->buffers[i], tensor_dtypes, i, "buffer");
+        const String& t_name = prepare_tensor(plugin->buffers[i], tensor_dtypes, i, "buffer");
         compute_args.push_back(t_name);
       }
       compute_args.push_back("meta_attr_");
@@ -496,21 +492,18 @@ void TorchPluginCodeGen::CodeGenCompute(const Plugin& plugin, const ffi::String&
   }
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("msc.plugin.GetTorchPluginSources",
-                        [](const ffi::String& codegen_config, const ffi::String& print_config,
-                           const ffi::String& codegen_type) -> ffi::Map<ffi::String, ffi::String> {
-                          TorchPluginCodeGen codegen = TorchPluginCodeGen(codegen_config);
-                          if (codegen_type == "build") {
-                            return codegen.GetBuildSources(print_config);
-                          }
-                          if (codegen_type == "manager") {
-                            return codegen.GetManagerSources(print_config);
-                          }
-                          return ffi::Map<ffi::String, ffi::String>();
-                        });
-}
+TVM_FFI_REGISTER_GLOBAL("msc.plugin.GetTorchPluginSources")
+    .set_body_typed([](const String& codegen_config, const String& print_config,
+                       const String& codegen_type) -> Map<String, String> {
+      TorchPluginCodeGen codegen = TorchPluginCodeGen(codegen_config);
+      if (codegen_type == "build") {
+        return codegen.GetBuildSources(print_config);
+      }
+      if (codegen_type == "manager") {
+        return codegen.GetManagerSources(print_config);
+      }
+      return Map<String, String>();
+    });
 
 }  // namespace msc
 }  // namespace contrib

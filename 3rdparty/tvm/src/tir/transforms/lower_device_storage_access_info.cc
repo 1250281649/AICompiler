@@ -23,7 +23,6 @@
  */
 #include <tvm/arith/analyzer.h>
 #include <tvm/ffi/function.h>
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/target/target_info.h>
 #include <tvm/tir/buffer.h>
 #include <tvm/tir/builtin.h>
@@ -131,10 +130,8 @@ Pass LowerDeviceStorageAccessInfo() {
   return CreatePrimFuncPass(pass_func, 0, "tir.LowerDeviceStorageAccessInfo", {});
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("tir.transform.LowerDeviceStorageAccessInfo", LowerDeviceStorageAccessInfo);
-}
+TVM_FFI_REGISTER_GLOBAL("tir.transform.LowerDeviceStorageAccessInfo")
+    .set_body_typed(LowerDeviceStorageAccessInfo);
 
 }  // namespace transform
 }  // namespace tir

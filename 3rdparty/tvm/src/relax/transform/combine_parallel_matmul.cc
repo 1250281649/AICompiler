@@ -18,7 +18,6 @@
  */
 
 #include <tvm/arith/analyzer.h>
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/relax/analysis.h>
 #include <tvm/relax/dataflow_matcher.h>
 #include <tvm/relax/dataflow_pattern.h>
@@ -39,13 +38,13 @@
 namespace tvm {
 namespace relax {
 
-using FCheck = ffi::TypedFunction<bool(Var, ffi::Array<Var>, ffi::Array<Var>, ffi::Map<Var, Expr>)>;
+using FCheck = ffi::TypedFunction<bool(Var, Array<Var>, Array<Var>, Map<Var, Expr>)>;
 
 /*! \brief Group shapes of the RHS matrices by rank. Matrices in a group whose batch sizes
   are compatible are combined.
 */
 std::unordered_map<size_t, std::vector<size_t>> GroupShapes(
-    const std::vector<ffi::Array<PrimExpr>>& shapes) {
+    const std::vector<Array<PrimExpr>>& shapes) {
   std::unordered_map<size_t, std::vector<size_t>> indices_map;
   for (size_t i = 0; i < shapes.size(); ++i) {
     indices_map[shapes[i].size()].push_back(i);
@@ -77,7 +76,7 @@ struct Patterns {
 
 struct SplitInfo {
   Var rhs;
-  ffi::Optional<Var> bias;
+  Optional<Var> bias;
   PrimExpr split_size;
   DFPattern pattern_to_replace;
 };
@@ -116,10 +115,10 @@ Patterns CreatePatterns(const BranchInfo& branch_info) {
 }
 
 /*! \brief Create a rewriter for the given parallel matmul branches. */
-ffi::TypedFunction<ffi::Map<Var, Expr>(ffi::Map<DFPattern, Var>, ffi::Map<Var, Expr>)> GetRewriter(
+ffi::TypedFunction<Map<Var, Expr>(Map<DFPattern, Var>, Map<Var, Expr>)> GetRewriter(
     const Patterns& patterns, const BranchInfo& branch_info, FCheck check) {
   auto batch_dims_compatible = [](size_t rhs_dim, const std::vector<size_t>& indices,
-                                  const std::vector<ffi::Array<PrimExpr>>& rhs_shapes) {
+                                  const std::vector<Array<PrimExpr>>& rhs_shapes) {
     arith::Analyzer ana;
     for (auto ind : indices) {
       ICHECK_EQ(static_cast<int>(rhs_shapes[ind].size()), rhs_dim);
@@ -133,17 +132,17 @@ ffi::TypedFunction<ffi::Map<Var, Expr>(ffi::Map<DFPattern, Var>, ffi::Map<Var, E
     return true;
   };
 
-  return [=](ffi::Map<DFPattern, Var> matchings, ffi::Map<Var, Expr> bindings) {
-    std::vector<ffi::Array<PrimExpr>> rhs_shapes;
+  return [=](Map<DFPattern, Var> matchings, Map<Var, Expr> bindings) {
+    std::vector<Array<PrimExpr>> rhs_shapes;
     for (const auto& rhs_pat : patterns.rhs) {
       auto rhs_shape_opt = GetTensorSInfo(matchings[rhs_pat])->GetShape();
       if (!rhs_shape_opt) {
-        return ffi::Map<Var, Expr>{};
+        return Map<Var, Expr>{};
       }
       rhs_shapes.push_back(rhs_shape_opt.value());
     }
 
-    ffi::Map<Var, Expr> replacements;
+    Map<Var, Expr> replacements;
 
     for (const auto& [rhs_dim, indices] : GroupShapes(rhs_shapes)) {
       if (indices.size() == 1 || !batch_dims_compatible(rhs_dim, indices, rhs_shapes)) continue;
@@ -159,7 +158,7 @@ ffi::TypedFunction<ffi::Map<Var, Expr>(ffi::Map<DFPattern, Var>, ffi::Map<Var, E
       std::vector<SplitInfo> splits;
       for (auto index : indices) {
         Var rhs = matchings[patterns.rhs[index]];
-        ffi::Optional<Var> bias = std::nullopt;
+        Optional<Var> bias = std::nullopt;
         if (branch_info.bias_dim.has_value()) {
           bias = matchings[patterns.bias[index]];
         }
@@ -190,8 +189,8 @@ ffi::TypedFunction<ffi::Map<Var, Expr>(ffi::Map<DFPattern, Var>, ffi::Map<Var, E
         continue;
       }
 
-      ffi::Array<Var> rhs;
-      ffi::Array<Var> bias;
+      Array<Var> rhs;
+      Array<Var> bias;
       for (const auto& split : splits) {
         rhs.push_back(split.rhs);
         if (split.bias) {
@@ -228,7 +227,7 @@ ffi::TypedFunction<ffi::Map<Var, Expr>(ffi::Map<DFPattern, Var>, ffi::Map<Var, E
       }
 
       int split_index = 0;
-      ffi::Array<IntImm> sections;
+      Array<IntImm> sections;
       for (size_t i = 0; i + 1 < splits.size(); i++) {
         auto width = splits[i].split_size.as<IntImmNode>();
         ICHECK(width) << "InternalError: "
@@ -388,10 +387,8 @@ Pass CombineParallelMatmul(FCheck check) {
                             /*required=*/{});
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("relax.transform.CombineParallelMatmul", CombineParallelMatmul);
-}
+TVM_FFI_REGISTER_GLOBAL("relax.transform.CombineParallelMatmul")
+    .set_body_typed(CombineParallelMatmul);
 
 }  // namespace transform
 

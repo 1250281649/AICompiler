@@ -205,11 +205,12 @@ VulkanModuleNode::~VulkanModuleNode() {
   }
 }
 
-ffi::Optional<ffi::Function> VulkanModuleNode::GetFunction(const ffi::String& name) {
-  ObjectPtr<Object> sptr_to_self = ffi::GetObjectPtr<Object>(this);
+ffi::Function VulkanModuleNode::GetFunction(const String& name,
+                                            const ObjectPtr<Object>& sptr_to_self) {
   ICHECK_EQ(sptr_to_self.get(), this);
+  ICHECK_NE(name, symbol::tvm_module_main) << "Device function do not have main";
   auto it = fmap_.find(name);
-  if (it == fmap_.end()) return std::nullopt;
+  if (it == fmap_.end()) return ffi::Function();
   const FunctionInfo& info = it->second;
   VulkanWrappedFunc f;
   size_t num_buffer_args = NumBufferArgs(info.arg_types);
@@ -403,7 +404,7 @@ std::shared_ptr<VulkanPipeline> VulkanModuleNode::GetPipeline(size_t device_id,
   return pe;
 }
 
-void VulkanModuleNode::WriteToFile(const ffi::String& file_name, const ffi::String& format) const {
+void VulkanModuleNode::SaveToFile(const String& file_name, const String& format) {
   std::string fmt = GetFileFormat(file_name, format);
   ICHECK_EQ(fmt, fmt_) << "Can only save to customized format vulkan";
   std::string meta_file = GetMetaFilePath(file_name);
@@ -417,17 +418,13 @@ void VulkanModuleNode::WriteToFile(const ffi::String& file_name, const ffi::Stri
   SaveBinaryToFile(file_name, data_bin);
 }
 
-ffi::Bytes VulkanModuleNode::SaveToBytes() const {
-  std::string buffer;
-  dmlc::MemoryStringStream ms(&buffer);
-  dmlc::Stream* stream = &ms;
+void VulkanModuleNode::SaveToBinary(dmlc::Stream* stream) {
   stream->Write(fmt_);
   stream->Write(fmap_);
   stream->Write(smap_);
-  return ffi::Bytes(buffer);
 }
 
-ffi::String VulkanModuleNode::InspectSource(const ffi::String& format) const {
+String VulkanModuleNode::GetSource(const String& format) {
   // can only return disassembly code.
   return source_;
 }

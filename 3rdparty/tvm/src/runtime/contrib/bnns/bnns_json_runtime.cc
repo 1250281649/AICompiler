@@ -23,9 +23,8 @@
  */
 
 #include <tvm/ffi/function.h>
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/runtime/c_backend_api.h>
-#include <tvm/runtime/tensor.h>
+#include <tvm/runtime/ndarray.h>
 
 #include <cstddef>
 #include <string>
@@ -88,12 +87,12 @@ ThreadingConfig getDefaultThreadingConfig() {
 class BNNSJSONRuntime : public JSONRuntimeBase {
  public:
   BNNSJSONRuntime(const std::string& symbol_name, const std::string& graph_json,
-                  const ffi::Array<ffi::String> const_names)
+                  const Array<String> const_names)
       : JSONRuntimeBase(symbol_name, graph_json, const_names) {}
 
-  const char* kind() const override { return "bnns_json"; }
+  const char* type_key() const override { return "bnns_json"; }
 
-  void Init(const ffi::Array<Tensor>& consts) override {
+  void Init(const Array<NDArray>& consts) override {
     ICHECK_EQ(consts.size(), const_idx_.size())
         << "The number of input constants must match the number of required.";
 
@@ -367,7 +366,7 @@ class BNNSJSONRuntime : public JSONRuntimeBase {
                                                           dst_view.get_bnns_view()};
 
     // BNNS limitation: MatMul use reverse dims values. However strides are calculated correctly
-    //    based on BNNSTensorDescriptor::layout value.
+    //    based on BNNSNDArrayDescriptor::layout value.
     std::reverse(layerParameters.iA_desc.size, layerParameters.iA_desc.size + 3);
     std::reverse(layerParameters.iB_desc.size, layerParameters.iB_desc.size + 3);
     std::reverse(layerParameters.o_desc.size, layerParameters.o_desc.size + 3);
@@ -557,18 +556,16 @@ class BNNSJSONRuntime : public JSONRuntimeBase {
   std::vector<TensorPtr> tensors_eid_;
 };
 
-ffi::Module BNNSJSONRuntimeCreate(ffi::String symbol_name, ffi::String graph_json,
-                                  const ffi::Array<ffi::String>& const_names) {
-  auto n = ffi::make_object<BNNSJSONRuntime>(symbol_name, graph_json, const_names);
-  return ffi::Module(n);
+runtime::Module BNNSJSONRuntimeCreate(String symbol_name, String graph_json,
+                                      const Array<String>& const_names) {
+  auto n = make_object<BNNSJSONRuntime>(symbol_name, graph_json, const_names);
+  return runtime::Module(n);
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef()
-      .def("runtime.BNNSJSONRuntimeCreate", BNNSJSONRuntimeCreate)
-      .def("ffi.Module.load_from_bytes.bnns_json", JSONRuntimeBase::LoadFromBytes<BNNSJSONRuntime>);
-}
+TVM_FFI_REGISTER_GLOBAL("runtime.BNNSJSONRuntimeCreate").set_body_typed(BNNSJSONRuntimeCreate);
+
+TVM_FFI_REGISTER_GLOBAL("runtime.module.loadbinary_bnns_json")
+    .set_body_typed(BNNSJSONRuntime::LoadFromBinary<BNNSJSONRuntime>);
 
 }  // namespace contrib
 }  // namespace runtime

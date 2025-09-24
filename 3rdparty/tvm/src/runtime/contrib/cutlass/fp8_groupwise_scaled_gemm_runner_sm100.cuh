@@ -53,7 +53,7 @@
   }
 
 using namespace cute;
-using tvm::runtime::Tensor;
+using tvm::runtime::NDArray;
 
 template <typename TileShape, typename ClusterShape, typename ElementD>
 struct CutlassFP8ScaledGroupwiseGemmRunnerSM100 {

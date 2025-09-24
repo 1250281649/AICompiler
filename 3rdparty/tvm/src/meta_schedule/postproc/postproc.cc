@@ -16,8 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-#include <tvm/ffi/reflection/registry.h>
-
 #include "../utils.h"
 
 namespace tvm {
@@ -44,7 +42,7 @@ Postproc Postproc::PyPostproc(
     PyPostprocNode::FApply f_apply,                                             //
     PyPostprocNode::FClone f_clone,                                             //
     PyPostprocNode::FAsString f_as_string) {
-  ObjectPtr<PyPostprocNode> n = ffi::make_object<PyPostprocNode>();
+  ObjectPtr<PyPostprocNode> n = make_object<PyPostprocNode>();
   n->f_initialize_with_tune_context = std::move(f_initialize_with_tune_context);
   n->f_apply = std::move(f_apply);
   n->f_clone = std::move(f_clone);
@@ -52,8 +50,8 @@ Postproc Postproc::PyPostproc(
   return Postproc(n);
 }
 
-ffi::Array<Postproc> Postproc::DefaultLLVM() {
-  return ffi::Array<Postproc>{
+Array<Postproc> Postproc::DefaultLLVM() {
+  return Array<Postproc>{
       Postproc::DisallowDynamicLoop(),
       Postproc::RewriteParallelVectorizeUnroll(),
       Postproc::RewriteReductionBlock(),
@@ -61,24 +59,16 @@ ffi::Array<Postproc> Postproc::DefaultLLVM() {
   };
 }
 
-ffi::Array<Postproc> Postproc::DefaultCPUTensorization() {
-  return ffi::Array<Postproc>{
+Array<Postproc> Postproc::DefaultCPUTensorization() {
+  return Array<Postproc>{
       Postproc::DisallowDynamicLoop(),   Postproc::RewriteParallelVectorizeUnroll(),
       Postproc::RewriteReductionBlock(), Postproc::RewriteTensorize(/*vectorize_init_loop=*/true),
       Postproc::RewriteLayout(),
   };
 }
 
-ffi::Array<Postproc> Postproc::DefaultRISCV() {
-  return ffi::Array<Postproc>{
-      Postproc::DisallowDynamicLoop(),   Postproc::RewriteParallelVectorizeUnroll(),
-      Postproc::RewriteReductionBlock(), Postproc::RewriteTensorize(/*vectorize_init_loop=*/false),
-      Postproc::RewriteLayout(),
-  };
-}
-
-ffi::Array<Postproc> Postproc::DefaultCUDA() {
-  return ffi::Array<Postproc>{
+Array<Postproc> Postproc::DefaultCUDA() {
+  return Array<Postproc>{
       Postproc::DisallowDynamicLoop(),
       Postproc::RewriteCooperativeFetch(),
       Postproc::RewriteUnboundBlock(/*max_threadblocks=*/256),
@@ -88,8 +78,8 @@ ffi::Array<Postproc> Postproc::DefaultCUDA() {
   };
 }
 
-ffi::Array<Postproc> Postproc::DefaultCUDATensorCore() {
-  return ffi::Array<Postproc>{
+Array<Postproc> Postproc::DefaultCUDATensorCore() {
+  return Array<Postproc>{
       Postproc::DisallowDynamicLoop(),
       Postproc::RewriteCooperativeFetch(),
       Postproc::RewriteUnboundBlock(/*max_threadblocks=*/256),
@@ -102,8 +92,8 @@ ffi::Array<Postproc> Postproc::DefaultCUDATensorCore() {
   };
 }
 
-ffi::Array<Postproc> Postproc::DefaultHexagon() {
-  return ffi::Array<Postproc>{
+Array<Postproc> Postproc::DefaultHexagon() {
+  return Array<Postproc>{
       Postproc::DisallowDynamicLoop(),   Postproc::RewriteParallelVectorizeUnroll(),
       Postproc::RewriteReductionBlock(), Postproc::RewriteLayout(),
       Postproc::VerifyVTCMLimit(),
@@ -119,24 +109,25 @@ TVM_STATIC_IR_FUNCTOR(ReprPrinter, vtable)
       p->stream << f_as_string();
     });
 
-TVM_FFI_STATIC_INIT_BLOCK() {
+TVM_FFI_STATIC_INIT_BLOCK({
   PostprocNode::RegisterReflection();
   PyPostprocNode::RegisterReflection();
-}
+});
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef()
-      .def_method("meta_schedule.PostprocInitializeWithTuneContext",
-                  &PostprocNode::InitializeWithTuneContext)
-      .def_method("meta_schedule.PostprocApply", &PostprocNode::Apply)
-      .def_method("meta_schedule.PostprocClone", &PostprocNode::Clone)
-      .def("meta_schedule.PostprocPyPostproc", Postproc::PyPostproc)
-      .def("meta_schedule.PostprocDefaultLLVM", Postproc::DefaultLLVM)
-      .def("meta_schedule.PostprocDefaultCUDA", Postproc::DefaultCUDA)
-      .def("meta_schedule.PostprocDefaultCUDATensorCore", Postproc::DefaultCUDATensorCore)
-      .def("meta_schedule.PostprocDefaultHexagon", Postproc::DefaultHexagon);
-}
+TVM_REGISTER_OBJECT_TYPE(PostprocNode);
+TVM_REGISTER_NODE_TYPE(PyPostprocNode);
+
+TVM_FFI_REGISTER_GLOBAL("meta_schedule.PostprocInitializeWithTuneContext")
+    .set_body_method(&PostprocNode::InitializeWithTuneContext);
+TVM_FFI_REGISTER_GLOBAL("meta_schedule.PostprocApply").set_body_method(&PostprocNode::Apply);
+TVM_FFI_REGISTER_GLOBAL("meta_schedule.PostprocClone").set_body_method(&PostprocNode::Clone);
+TVM_FFI_REGISTER_GLOBAL("meta_schedule.PostprocPyPostproc").set_body_typed(Postproc::PyPostproc);
+TVM_FFI_REGISTER_GLOBAL("meta_schedule.PostprocDefaultLLVM").set_body_typed(Postproc::DefaultLLVM);
+TVM_FFI_REGISTER_GLOBAL("meta_schedule.PostprocDefaultCUDA").set_body_typed(Postproc::DefaultCUDA);
+TVM_FFI_REGISTER_GLOBAL("meta_schedule.PostprocDefaultCUDATensorCore")
+    .set_body_typed(Postproc::DefaultCUDATensorCore);
+TVM_FFI_REGISTER_GLOBAL("meta_schedule.PostprocDefaultHexagon")
+    .set_body_typed(Postproc::DefaultHexagon);
 
 }  // namespace meta_schedule
 }  // namespace tvm

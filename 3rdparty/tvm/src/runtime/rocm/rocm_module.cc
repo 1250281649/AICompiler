@@ -22,11 +22,8 @@
  */
 #include "rocm_module.h"
 
-#include <dmlc/memory_io.h>
 #include <hip/hip_runtime_api.h>
-#include <tvm/ffi/extra/c_env_api.h>
 #include <tvm/ffi/function.h>
-#include <tvm/ffi/reflection/registry.h>
 
 #include <array>
 #include <mutex>
@@ -47,7 +44,7 @@ namespace runtime {
 // hipModule_t is a per-GPU module
 // The runtime will contain a per-device module table
 // The modules will be lazily loaded
-class ROCMModuleNode : public ffi::ModuleObj {
+class ROCMModuleNode : public runtime::ModuleNode {
  public:
   explicit ROCMModuleNode(std::string data, std::string fmt,
                           std::unordered_map<std::string, FunctionInfo> fmap,
@@ -65,13 +62,13 @@ class ROCMModuleNode : public ffi::ModuleObj {
     }
   }
 
-  const char* kind() const final { return "hip"; }
+  const char* type_key() const final { return "hip"; }
   int GetPropertyMask() const final {
-    return ffi::Module::kBinarySerializable | ffi::Module::kRunnable;
+    return ModulePropertyMask::kBinarySerializable | ModulePropertyMask::kRunnable;
   }
-  ffi::Optional<ffi::Function> GetFunction(const ffi::String& name) final;
+  ffi::Function GetFunction(const String& name, const ObjectPtr<Object>& sptr_to_self) final;
 
-  void WriteToFile(const ffi::String& file_name, const ffi::String& format) const final {
+  void SaveToFile(const String& file_name, const String& format) final {
     std::string fmt = GetFileFormat(file_name, format);
     std::string meta_file = GetMetaFilePath(file_name);
     // note: llvm and asm formats are not laodable, so we don't save them
@@ -80,17 +77,13 @@ class ROCMModuleNode : public ffi::ModuleObj {
     SaveBinaryToFile(file_name, data_);
   }
 
-  ffi::Bytes SaveToBytes() const final {
-    std::string buffer;
-    dmlc::MemoryStringStream ms(&buffer);
-    dmlc::Stream* stream = &ms;
+  void SaveToBinary(dmlc::Stream* stream) final {
     stream->Write(fmt_);
     stream->Write(fmap_);
     stream->Write(data_);
-    return ffi::Bytes(buffer);
   }
 
-  ffi::String InspectSource(const ffi::String& format) const final {
+  String GetSource(const String& format) final {
     if (format == fmt_) {
       return data_;
     }
@@ -172,7 +165,7 @@ class ROCMWrappedFunc {
       fcache_[device_id] = m_->GetFunc(device_id, func_name_);
     }
 
-    hipStream_t strm = static_cast<hipStream_t>(TVMFFIEnvGetStream(kDLROCM, device_id));
+    hipStream_t strm = static_cast<hipStream_t>(ROCMThreadEntry::ThreadLocal()->stream);
 
     ThreadWorkLoad wl = launch_param_config_.Extract(args);
     void* config[] = {HIP_LAUNCH_PARAM_BUFFER_POINTER, packed_args, HIP_LAUNCH_PARAM_BUFFER_SIZE,
@@ -198,25 +191,26 @@ class ROCMWrappedFunc {
   LaunchParamConfig launch_param_config_;
 };
 
-ffi::Optional<ffi::Function> ROCMModuleNode::GetFunction(const ffi::String& name) {
-  ObjectPtr<Object> sptr_to_self = ffi::GetObjectPtr<Object>(this);
+ffi::Function ROCMModuleNode::GetFunction(const String& name,
+                                          const ObjectPtr<Object>& sptr_to_self) {
   ICHECK_EQ(sptr_to_self.get(), this);
+  ICHECK_NE(name, symbol::tvm_module_main) << "Device function do not have main";
   auto it = fmap_.find(name);
-  if (it == fmap_.end()) return std::nullopt;
+  if (it == fmap_.end()) return ffi::Function();
   const FunctionInfo& info = it->second;
   ROCMWrappedFunc f;
   f.Init(this, sptr_to_self, name, info.arg_types.size(), info.launch_param_tags);
   return PackFuncPackedArgAligned(f, info.arg_types);
 }
 
-ffi::Module ROCMModuleCreate(std::string data, std::string fmt,
-                             std::unordered_map<std::string, FunctionInfo> fmap,
-                             std::string hip_source, std::string assembly) {
-  auto n = ffi::make_object<ROCMModuleNode>(data, fmt, fmap, hip_source, assembly);
-  return ffi::Module(n);
+Module ROCMModuleCreate(std::string data, std::string fmt,
+                        std::unordered_map<std::string, FunctionInfo> fmap, std::string hip_source,
+                        std::string assembly) {
+  auto n = make_object<ROCMModuleNode>(data, fmt, fmap, hip_source, assembly);
+  return Module(n);
 }
 
-ffi::Module ROCMModuleLoadFile(const std::string& file_name, const std::string& format) {
+Module ROCMModuleLoadFile(const std::string& file_name, const std::string& format) {
   std::string data;
   std::unordered_map<std::string, FunctionInfo> fmap;
   std::string fmt = GetFileFormat(file_name, format);
@@ -226,9 +220,8 @@ ffi::Module ROCMModuleLoadFile(const std::string& file_name, const std::string& 
   return ROCMModuleCreate(data, fmt, fmap, std::string(), std::string());
 }
 
-ffi::Module ROCMModuleLoadFromBytes(const ffi::Bytes& bytes) {
-  dmlc::MemoryFixedSizeStream ms(const_cast<char*>(bytes.data()), bytes.size());
-  dmlc::Stream* stream = &ms;
+Module ROCMModuleLoadBinary(void* strm) {
+  dmlc::Stream* stream = static_cast<dmlc::Stream*>(strm);
   std::string data;
   std::unordered_map<std::string, FunctionInfo> fmap;
   std::string fmt;
@@ -238,13 +231,12 @@ ffi::Module ROCMModuleLoadFromBytes(const ffi::Bytes& bytes) {
   return ROCMModuleCreate(data, fmt, fmap, std::string(), std::string());
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef()
-      .def("ffi.Module.load_from_bytes.hsaco", ROCMModuleLoadFromBytes)
-      .def("ffi.Module.load_from_bytes.hip", ROCMModuleLoadFromBytes)
-      .def("ffi.Module.load_from_file.hsaco", ROCMModuleLoadFile)
-      .def("ffi.Module.load_from_file.hip", ROCMModuleLoadFile);
-}
+TVM_FFI_REGISTER_GLOBAL("runtime.module.loadbinary_hsaco").set_body_typed(ROCMModuleLoadBinary);
+
+TVM_FFI_REGISTER_GLOBAL("runtime.module.loadbinary_hip").set_body_typed(ROCMModuleLoadBinary);
+
+TVM_FFI_REGISTER_GLOBAL("runtime.module.loadfile_hsaco").set_body_typed(ROCMModuleLoadFile);
+
+TVM_FFI_REGISTER_GLOBAL("runtime.module.loadfile_hip").set_body_typed(ROCMModuleLoadFile);
 }  // namespace runtime
 }  // namespace tvm

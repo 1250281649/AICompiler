@@ -59,10 +59,10 @@ class TensorflowCodeGen : public PyCodeGen<TensorflowCodeGenConfig, TFV1CodeGenH
   void CodeGenInference() final;
 
   /*! \brief Get the docs for the op*/
-  const ffi::Array<Doc> GetOpCodes(const MSCJoint& node) final;
+  const Array<Doc> GetOpCodes(const MSCJoint& node) final;
 
   /*! \brief Get tensor type of the framework*/
-  const ffi::String TensorType() const final { return "tf_v1.Tensor"; }
+  const String TensorType() const final { return "tf_v1.Tensor"; }
 };
 
 }  // namespace msc

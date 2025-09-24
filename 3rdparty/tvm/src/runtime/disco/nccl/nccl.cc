@@ -17,8 +17,6 @@
  * under the License.
  */
 
-#include <tvm/ffi/reflection/registry.h>
-
 #include <cstring>
 #include <mutex>
 #include <sstream>
@@ -116,7 +114,7 @@ void InitCCLPerWorker(ffi::Shape device_ids, std::string unique_id_bytes) {
   }
 }
 
-void AllReduce(Tensor send, ReduceKind reduce_kind, bool in_group, Tensor recv) {
+void AllReduce(NDArray send, ReduceKind reduce_kind, bool in_group, NDArray recv) {
   CCLThreadLocalContext* ctx = CCLThreadLocalContext::Get();
   ffi::Shape shape = send.Shape();
   int64_t numel = shape->Product();
@@ -131,7 +129,7 @@ void AllReduce(Tensor send, ReduceKind reduce_kind, bool in_group, Tensor recv) 
                           in_group ? ctx->group_comm : ctx->global_comm, stream));
 }
 
-void AllGather(Tensor send, bool in_group, Tensor recv) {
+void AllGather(NDArray send, bool in_group, NDArray recv) {
   CCLThreadLocalContext* ctx = CCLThreadLocalContext::Get();
   ffi::Shape shape = send.Shape();
   int64_t numel = shape->Product();
@@ -141,7 +139,7 @@ void AllGather(Tensor send, bool in_group, Tensor recv) {
                           in_group ? ctx->group_comm : ctx->global_comm, stream));
 }
 
-void BroadcastFromWorker0(ffi::Optional<Tensor> send, bool in_group, Tensor recv) {
+void BroadcastFromWorker0(Optional<NDArray> send, bool in_group, NDArray recv) {
   CCLThreadLocalContext* ctx = CCLThreadLocalContext::Get();
   int worker_id = ctx->worker->worker_id;
   int group_size = ctx->worker->num_workers / ctx->worker->num_groups;
@@ -164,7 +162,7 @@ void BroadcastFromWorker0(ffi::Optional<Tensor> send, bool in_group, Tensor recv
                           /*root=*/0, in_group ? ctx->group_comm : ctx->global_comm, stream));
 }
 
-void ScatterFromWorker0(ffi::Optional<Tensor> send, bool in_group, Tensor recv) {
+void ScatterFromWorker0(Optional<NDArray> send, bool in_group, NDArray recv) {
   CHECK(recv.defined()) << "ValueError: buffer `recv` must not be None";
   CCLThreadLocalContext* ctx = CCLThreadLocalContext::Get();
   int worker_id = ctx->worker->worker_id;
@@ -175,7 +173,7 @@ void ScatterFromWorker0(ffi::Optional<Tensor> send, bool in_group, Tensor recv) 
   deviceStream_t stream = ctx->GetDefaultStream();
   if (is_sender) {
     CHECK(send.defined()) << "ValueError: buffer `send` must be provided when worker_id == 0.";
-    Tensor buffer = send.value();
+    NDArray buffer = send.value();
     int64_t numel = buffer.Shape()->Product();
     CHECK_EQ(numel % num_receiver, 0) << "ValueError: Scattering evenly requires that the number "
                                          "of elements in the buffer to be "
@@ -211,7 +209,7 @@ void ScatterFromWorker0(ffi::Optional<Tensor> send, bool in_group, Tensor recv) 
   NCCL_CALL(ncclGroupEnd());
 }
 
-void GatherToWorker0(Tensor send, bool in_group, ffi::Optional<Tensor> recv) {
+void GatherToWorker0(NDArray send, bool in_group, Optional<NDArray> recv) {
   CHECK(send.defined()) << "ValueError: buffer `send` must not be None";
   CCLThreadLocalContext* ctx = CCLThreadLocalContext::Get();
   int worker_id = ctx->worker->worker_id;
@@ -222,7 +220,7 @@ void GatherToWorker0(Tensor send, bool in_group, ffi::Optional<Tensor> recv) {
   deviceStream_t stream = ctx->GetDefaultStream();
   if (is_sender) {
     CHECK(recv.defined()) << "ValueError: buffer `recv` must be provided when worker_id == 0.";
-    Tensor buffer = recv.value();
+    NDArray buffer = recv.value();
     int64_t numel = buffer.Shape()->Product();
     CHECK_EQ(numel % num_receiver, 0) << "ValueError: Gathering evenly requires that the number "
                                          "of elements in the buffer to be "
@@ -258,7 +256,7 @@ void GatherToWorker0(Tensor send, bool in_group, ffi::Optional<Tensor> recv) {
   NCCL_CALL(ncclGroupEnd());
 }
 
-void RecvFromWorker0(Tensor buffer) {
+void RecvFromWorker0(NDArray buffer) {
   CCLThreadLocalContext* ctx = CCLThreadLocalContext::Get();
   deviceStream_t stream = ctx->GetDefaultStream();
   CHECK_NE(ctx->worker->worker_id, 0)
@@ -269,7 +267,7 @@ void RecvFromWorker0(Tensor buffer) {
   NCCL_CALL(ncclGroupEnd());
 }
 
-void SendToNextGroup(Tensor buffer) {
+void SendToNextGroup(NDArray buffer) {
   CCLThreadLocalContext* ctx = CCLThreadLocalContext::Get();
   deviceStream_t stream = ctx->GetDefaultStream();
   int worker_id = ctx->worker->worker_id;
@@ -283,7 +281,7 @@ void SendToNextGroup(Tensor buffer) {
   NCCL_CALL(ncclGroupEnd());
 }
 
-void RecvFromPrevGroup(Tensor buffer) {
+void RecvFromPrevGroup(NDArray buffer) {
   CCLThreadLocalContext* ctx = CCLThreadLocalContext::Get();
   deviceStream_t stream = ctx->GetDefaultStream();
   int worker_id = ctx->worker->worker_id;
@@ -297,7 +295,7 @@ void RecvFromPrevGroup(Tensor buffer) {
   NCCL_CALL(ncclGroupEnd());
 }
 
-void SendToWorker(Tensor buffer, int receiver_id) {
+void SendToWorker(NDArray buffer, int receiver_id) {
   CCLThreadLocalContext* ctx = CCLThreadLocalContext::Get();
   deviceStream_t stream = ctx->GetDefaultStream();
   int worker_id = ctx->worker->worker_id;
@@ -309,7 +307,7 @@ void SendToWorker(Tensor buffer, int receiver_id) {
                      receiver_id, ctx->global_comm, stream));
 }
 
-void RecvFromWorker(Tensor buffer, int sender_id) {
+void RecvFromWorker(NDArray buffer, int sender_id) {
   CCLThreadLocalContext* ctx = CCLThreadLocalContext::Get();
   deviceStream_t stream = ctx->GetDefaultStream();
   int worker_id = ctx->worker->worker_id;
@@ -327,52 +325,66 @@ void SyncWorker() {
   StreamSynchronize(stream);
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef()
-      .def("runtime.disco.compiled_ccl", []() -> ffi::String { return TVM_DISCO_CCL_NAME; })
-      .def("runtime.disco." TVM_DISCO_CCL_NAME ".init_ccl", InitCCL)
-      .def("runtime.disco." TVM_DISCO_CCL_NAME ".init_ccl_per_worker", InitCCLPerWorker)
-      .def("runtime.disco." TVM_DISCO_CCL_NAME ".allreduce",
-           [](Tensor send, int kind, bool in_group, Tensor recv) {
-             CHECK(0 <= kind && kind <= 4) << "ValueError: Unknown ReduceKind: " << kind;
-             nccl::AllReduce(send, static_cast<ReduceKind>(kind), in_group, recv);
-           })
-      .def("runtime.disco." TVM_DISCO_CCL_NAME ".allgather",
-           [](Tensor send, bool in_group, Tensor recv) { nccl::AllGather(send, in_group, recv); })
-      .def("runtime.disco." TVM_DISCO_CCL_NAME ".broadcast_from_worker0", BroadcastFromWorker0)
-      .def("runtime.disco." TVM_DISCO_CCL_NAME ".scatter_from_worker0", ScatterFromWorker0)
-      .def("runtime.disco." TVM_DISCO_CCL_NAME ".gather_to_worker0", GatherToWorker0)
-      .def("runtime.disco." TVM_DISCO_CCL_NAME ".recv_from_worker0", RecvFromWorker0)
-      .def("runtime.disco." TVM_DISCO_CCL_NAME ".send_to_next_group", SendToNextGroup)
-      .def("runtime.disco." TVM_DISCO_CCL_NAME ".recv_from_prev_group", RecvFromPrevGroup)
-      .def("runtime.disco." TVM_DISCO_CCL_NAME ".send_to_worker", SendToWorker)
-      .def("runtime.disco." TVM_DISCO_CCL_NAME ".recv_from_worker", RecvFromWorker)
-      .def("runtime.disco." TVM_DISCO_CCL_NAME ".sync_worker", SyncWorker)
-      .def("runtime.disco." TVM_DISCO_CCL_NAME ".test_send_to_next_group_recv_from_prev_group",
-           [](Tensor buffer) {
-             CCLThreadLocalContext* ctx = CCLThreadLocalContext::Get();
-             CHECK_EQ(ctx->worker->num_workers, 4) << "The test requires the world size to be 4.";
-             CHECK_EQ(ctx->worker->num_groups, 2) << "The test requires the group size to be 2.";
-             int group_size = ctx->worker->num_workers / ctx->worker->num_groups;
-             int group_id = ctx->worker->worker_id / group_size;
-             if (group_id == 0) {
-               tvm::runtime::nccl::SendToNextGroup(buffer);
-             } else {
-               tvm::runtime::nccl::RecvFromPrevGroup(buffer);
-             }
-           })
-      .def("runtime.disco." TVM_DISCO_CCL_NAME ".test_worker2_sends_to_worker0", [](Tensor buffer) {
-        CCLThreadLocalContext* ctx = CCLThreadLocalContext::Get();
-        CHECK_EQ(ctx->worker->num_workers, 4) << "The test requires the world size to be 4.";
-        CHECK_EQ(ctx->worker->num_groups, 2) << "The test requires the group size to be 2.";
-        if (ctx->worker->worker_id == 2) {
-          tvm::runtime::nccl::SendToWorker(buffer, 0);
-        } else if (ctx->worker->worker_id == 0) {
-          tvm::runtime::nccl::RecvFromWorker(buffer, 2);
-        }
-      });
-}
+TVM_FFI_REGISTER_GLOBAL("runtime.disco.compiled_ccl").set_body_typed([]() -> String {
+  return TVM_DISCO_CCL_NAME;
+});
+TVM_FFI_REGISTER_GLOBAL("runtime.disco." TVM_DISCO_CCL_NAME ".init_ccl").set_body_typed(InitCCL);
+TVM_FFI_REGISTER_GLOBAL("runtime.disco." TVM_DISCO_CCL_NAME ".init_ccl_per_worker")
+    .set_body_typed(InitCCLPerWorker);
+TVM_FFI_REGISTER_GLOBAL("runtime.disco." TVM_DISCO_CCL_NAME ".allreduce")
+    .set_body_typed([](NDArray send, int kind, bool in_group, NDArray recv) {
+      CHECK(0 <= kind && kind <= 4) << "ValueError: Unknown ReduceKind: " << kind;
+      nccl::AllReduce(send, static_cast<ReduceKind>(kind), in_group, recv);
+    });
+TVM_FFI_REGISTER_GLOBAL("runtime.disco." TVM_DISCO_CCL_NAME ".allgather")
+    .set_body_typed([](NDArray send, bool in_group, NDArray recv) {
+      nccl::AllGather(send, in_group, recv);
+    });
+TVM_FFI_REGISTER_GLOBAL("runtime.disco." TVM_DISCO_CCL_NAME ".broadcast_from_worker0")
+    .set_body_typed(BroadcastFromWorker0);
+TVM_FFI_REGISTER_GLOBAL("runtime.disco." TVM_DISCO_CCL_NAME ".scatter_from_worker0")
+    .set_body_typed(ScatterFromWorker0);
+TVM_FFI_REGISTER_GLOBAL("runtime.disco." TVM_DISCO_CCL_NAME ".gather_to_worker0")
+    .set_body_typed(GatherToWorker0);
+TVM_FFI_REGISTER_GLOBAL("runtime.disco." TVM_DISCO_CCL_NAME ".recv_from_worker0")
+    .set_body_typed(RecvFromWorker0);
+TVM_FFI_REGISTER_GLOBAL("runtime.disco." TVM_DISCO_CCL_NAME ".send_to_next_group")
+    .set_body_typed(SendToNextGroup);
+TVM_FFI_REGISTER_GLOBAL("runtime.disco." TVM_DISCO_CCL_NAME ".recv_from_prev_group")
+    .set_body_typed(RecvFromPrevGroup);
+TVM_FFI_REGISTER_GLOBAL("runtime.disco." TVM_DISCO_CCL_NAME ".send_to_worker")
+    .set_body_typed(SendToWorker);
+TVM_FFI_REGISTER_GLOBAL("runtime.disco." TVM_DISCO_CCL_NAME ".recv_from_worker")
+    .set_body_typed(RecvFromWorker);
+TVM_FFI_REGISTER_GLOBAL("runtime.disco." TVM_DISCO_CCL_NAME ".sync_worker")
+    .set_body_typed(SyncWorker);
+
+TVM_FFI_REGISTER_GLOBAL("runtime.disco." TVM_DISCO_CCL_NAME
+                        ".test_send_to_next_group_recv_from_prev_group")
+    .set_body_typed([](NDArray buffer) {
+      CCLThreadLocalContext* ctx = CCLThreadLocalContext::Get();
+      CHECK_EQ(ctx->worker->num_workers, 4) << "The test requires the world size to be 4.";
+      CHECK_EQ(ctx->worker->num_groups, 2) << "The test requires the group size to be 2.";
+      int group_size = ctx->worker->num_workers / ctx->worker->num_groups;
+      int group_id = ctx->worker->worker_id / group_size;
+      if (group_id == 0) {
+        tvm::runtime::nccl::SendToNextGroup(buffer);
+      } else {
+        tvm::runtime::nccl::RecvFromPrevGroup(buffer);
+      }
+    });
+
+TVM_FFI_REGISTER_GLOBAL("runtime.disco." TVM_DISCO_CCL_NAME ".test_worker2_sends_to_worker0")
+    .set_body_typed([](NDArray buffer) {
+      CCLThreadLocalContext* ctx = CCLThreadLocalContext::Get();
+      CHECK_EQ(ctx->worker->num_workers, 4) << "The test requires the world size to be 4.";
+      CHECK_EQ(ctx->worker->num_groups, 2) << "The test requires the group size to be 2.";
+      if (ctx->worker->worker_id == 2) {
+        tvm::runtime::nccl::SendToWorker(buffer, 0);
+      } else if (ctx->worker->worker_id == 0) {
+        tvm::runtime::nccl::RecvFromWorker(buffer, 2);
+      }
+    });
 
 }  // namespace nccl
 }  // namespace runtime

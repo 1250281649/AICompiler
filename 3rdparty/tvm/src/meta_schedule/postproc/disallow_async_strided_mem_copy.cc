@@ -16,8 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-#include <tvm/ffi/reflection/registry.h>
-
 #include "../utils.h"
 
 namespace tvm {
@@ -83,7 +81,7 @@ struct AsyncStridedMemCopyFinder : private StmtExprVisitor {
         }
 
         // map loop variable to zero for the store index & simplify
-        ffi::Array<PrimExpr> store_index = bufferstorenode->indices;
+        Array<PrimExpr> store_index = bufferstorenode->indices;
 
         // Use DetectIterMap to detect whether store index is non-contiguous.
         arith::Analyzer analyzer;
@@ -94,7 +92,7 @@ struct AsyncStridedMemCopyFinder : private StmtExprVisitor {
         }
 
         // map loop variable to zero for the load index & simplify
-        ffi::Array<PrimExpr> load_index = bufferloadnode->indices;
+        Array<PrimExpr> load_index = bufferloadnode->indices;
 
         // Use DetectIterMap to detect whether load index is non-contiguous.
         auto load_iter_map = DetectIterMap(load_index, input_iters, 1,
@@ -110,7 +108,7 @@ struct AsyncStridedMemCopyFinder : private StmtExprVisitor {
   }
 
   bool found_ = false;
-  ffi::Map<Var, Range> input_iters = ffi::Map<Var, Range>();
+  Map<Var, Range> input_iters = Map<Var, Range>();
 };
 
 }  // namespace tir
@@ -133,9 +131,9 @@ class DisallowAsyncStridedMemCopyNode : public PostprocNode {
       const GlobalVar& g_var = kv.first;
       const BaseFunc& base_func = kv.second;
       if (const auto* prim_func = base_func.as<tir::PrimFuncNode>()) {
-        IRModule lowered{ffi::UnsafeInit()};
+        IRModule lowered{nullptr};
         try {
-          auto pass_list = ffi::Array<tvm::transform::Pass>();
+          auto pass_list = Array<tvm::transform::Pass>();
           pass_list.push_back(tir::transform::BindTarget(this->target));
           pass_list.push_back(tir::transform::LowerInitBlock());
           pass_list.push_back(tir::transform::PlanAndUpdateBufferAllocationLocation());
@@ -152,10 +150,9 @@ class DisallowAsyncStridedMemCopyNode : public PostprocNode {
           pass_list.push_back(tir::transform::InjectDoubleBuffer());
           pass_list.push_back(tir::transform::VectorizeLoop(true));
           pass_list.push_back(tir::transform::StorageRewrite());
-          tir::PrimFunc f = WithAttr(ffi::GetRef<tir::PrimFunc>(prim_func), "global_symbol",
-                                     ffi::String(g_var->name_hint));
-          IRModule mod =
-              IRModule(ffi::Map<GlobalVar, BaseFunc>({{GlobalVar(g_var->name_hint), f}}));
+          tir::PrimFunc f =
+              WithAttr(GetRef<tir::PrimFunc>(prim_func), "global_symbol", String(g_var->name_hint));
+          IRModule mod = IRModule(Map<GlobalVar, BaseFunc>({{GlobalVar(g_var->name_hint), f}}));
           lowered = tvm::transform::Sequential(pass_list)(std::move(mod));
         } catch (const dmlc::Error& e) {
           return false;
@@ -170,27 +167,25 @@ class DisallowAsyncStridedMemCopyNode : public PostprocNode {
   // Inherited from PostprocNode
   Postproc Clone() const {
     ObjectPtr<DisallowAsyncStridedMemCopyNode> n =
-        ffi::make_object<DisallowAsyncStridedMemCopyNode>(*this);
+        make_object<DisallowAsyncStridedMemCopyNode>(*this);
     return Postproc(n);
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("meta_schedule.DisallowAsyncStridedMemCopy",
-                                    DisallowAsyncStridedMemCopyNode, PostprocNode);
+
+  static constexpr const char* _type_key = "meta_schedule.DisallowAsyncStridedMemCopy";
+  TVM_DECLARE_FINAL_OBJECT_INFO(DisallowAsyncStridedMemCopyNode, PostprocNode);
 
  private:
   tvm::Target target;
 };
 
 Postproc Postproc::DisallowAsyncStridedMemCopy() {
-  ObjectPtr<DisallowAsyncStridedMemCopyNode> n =
-      ffi::make_object<DisallowAsyncStridedMemCopyNode>();
+  ObjectPtr<DisallowAsyncStridedMemCopyNode> n = make_object<DisallowAsyncStridedMemCopyNode>();
   return Postproc(n);
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("meta_schedule.PostprocDisallowAsyncStridedMemCopy",
-                        Postproc::DisallowAsyncStridedMemCopy);
-}
+TVM_REGISTER_NODE_TYPE(DisallowAsyncStridedMemCopyNode);
+TVM_FFI_REGISTER_GLOBAL("meta_schedule.PostprocDisallowAsyncStridedMemCopy")
+    .set_body_typed(Postproc::DisallowAsyncStridedMemCopy);
 
 }  // namespace meta_schedule
 }  // namespace tvm

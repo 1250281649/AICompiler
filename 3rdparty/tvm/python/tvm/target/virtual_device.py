@@ -16,13 +16,14 @@
 # under the License.
 """Python bindings for creating VirtualDevices."""
 
-import tvm_ffi
+import tvm
+from tvm.runtime import Object
 
 from . import _ffi_api
 
 
-@tvm_ffi.register_object("target.VirtualDevice")
-class VirtualDevice(tvm_ffi.core.Object):
+@tvm.ffi.register_object("target.VirtualDevice")
+class VirtualDevice(Object):
     """A compile time representation for where data is to be stored at runtime,
     and how to compile code to compute it."""
 
@@ -34,5 +35,6 @@ class VirtualDevice(tvm_ffi.core.Object):
             _ffi_api.VirtualDevice_ForDeviceTargetAndMemoryScope, device, target, memory_scope
         )
 
-    def dlpack_device_type(self) -> int:
+    @property
+    def device_type(self) -> int:
         return self.device_type_int

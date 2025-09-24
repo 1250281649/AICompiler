@@ -22,7 +22,6 @@
  * \brief Specialize parameters of PrimFunc.
  */
 #include <tvm/ffi/function.h>
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/tir/analysis.h>
 #include <tvm/tir/function.h>
 #include <tvm/tir/op.h>
@@ -54,7 +53,7 @@ inline bool IsParam(const PrimFunc& func, const Var& param) {
     PrimExpr a = VisitExpr(op->a);                                  \
     PrimExpr b = VisitExpr(op->b);                                  \
     if (a.same_as(op->a) && b.same_as(op->b)) {                     \
-      return ffi::GetRef<PrimExpr>(op);                             \
+      return GetRef<PrimExpr>(op);                                  \
     } else {                                                        \
       return BinaryFunc(a, b);                                      \
     }                                                               \
@@ -63,7 +62,7 @@ inline bool IsParam(const PrimFunc& func, const Var& param) {
   PrimExpr VisitExpr_(const UnaryNode* op) final {               \
     PrimExpr a = VisitExpr(op->a);                               \
     if (a.same_as(op->a)) {                                      \
-      return ffi::GetRef<PrimExpr>(op);                          \
+      return GetRef<PrimExpr>(op);                               \
     } else {                                                     \
       return UnaryFunc(a);                                       \
     }                                                            \
@@ -77,7 +76,7 @@ class PrimFuncSpecializer : public StmtExprMutator {
   static PrimFunc Specialize(PrimFunc f, const VarMap& var_map) {
     PrimFuncSpecializer specializer(var_map);
     // Updating Buffer map
-    ffi::Map<Var, Buffer> buffer_map;
+    Map<Var, Buffer> buffer_map;
     bool buffer_map_updated = false;
     for (const auto& it : f->buffer_map) {
       const Var& var = it.first;
@@ -91,7 +90,7 @@ class PrimFuncSpecializer : public StmtExprMutator {
     }
 
     // Updating parmeters
-    ffi::Array<Var> params;
+    Array<Var> params;
     bool param_updated = false;
     for (const auto& var : f->params) {
       // Remove parmeters which has been specialized.
@@ -115,7 +114,7 @@ class PrimFuncSpecializer : public StmtExprMutator {
  private:
   Stmt VisitStmt_(const BlockNode* op) final {
     // Step.0. Define buffer mappings which is allocated inside the block
-    ffi::Array<Buffer> alloc_buffers =
+    Array<Buffer> alloc_buffers =
         op->alloc_buffers.Map([this](const auto& buf) { return MutateAllocBuffer(buf); });
 
     // Step.1. Recursively visit block body
@@ -123,14 +122,14 @@ class PrimFuncSpecializer : public StmtExprMutator {
     op = stmt.as<BlockNode>();
     ICHECK(op != nullptr);
 
-    ffi::Array<BufferRegion> reads =
+    Array<BufferRegion> reads =
         op->reads.Map([this](const auto& region) { return MutateBufferRegion(region); });
-    ffi::Array<BufferRegion> writes =
+    Array<BufferRegion> writes =
         op->writes.Map([this](const auto& region) { return MutateBufferRegion(region); });
 
     if (alloc_buffers.same_as(op->alloc_buffers) && reads.same_as(op->reads) &&
         writes.same_as(op->writes)) {
-      return ffi::GetRef<Block>(op);
+      return GetRef<Block>(op);
     } else {
       ObjectPtr<BlockNode> n = CopyOnWrite(op);
       n->alloc_buffers = std::move(alloc_buffers);
@@ -184,7 +183,7 @@ class PrimFuncSpecializer : public StmtExprMutator {
 
     auto new_buf = GetNewBuffer(op->buffer);
     if (new_buf.same_as(op->buffer)) {
-      return ffi::GetRef<BufferStore>(op);
+      return GetRef<BufferStore>(op);
     } else {
       auto n = CopyOnWrite(op);
       n->buffer = new_buf;
@@ -199,18 +198,18 @@ class PrimFuncSpecializer : public StmtExprMutator {
 
     auto new_buf = GetNewBuffer(op->buffer);
     if (new_buf.same_as(op->buffer)) {
-      return ffi::GetRef<BufferLoad>(op);
+      return GetRef<BufferLoad>(op);
     } else {
-      auto n = ffi::make_object<BufferLoadNode>(*op);
+      auto n = make_object<BufferLoadNode>(*op);
       n->buffer = new_buf;
       return PrimExpr(n);
     }
   }
 
   PrimExpr VisitExpr_(const VarNode* op) final {
-    auto it = var_map_.find(ffi::GetRef<Var>(op));
+    auto it = var_map_.find(GetRef<Var>(op));
     if (it == var_map_.end()) {
-      return ffi::GetRef<PrimExpr>(op);
+      return GetRef<PrimExpr>(op);
     } else {
       return it->second;
     }
@@ -242,9 +241,8 @@ class PrimFuncSpecializer : public StmtExprMutator {
     // of Var-to-PrimExpr remapping.
     Var data = VisitExpr(buffer->data).as<Var>().value_or(buffer->data);
 
-    ffi::Array<PrimExpr> shape =
-        buffer->shape.Map([this](const PrimExpr& e) { return VisitExpr(e); });
-    ffi::Array<PrimExpr> strides =
+    Array<PrimExpr> shape = buffer->shape.Map([this](const PrimExpr& e) { return VisitExpr(e); });
+    Array<PrimExpr> strides =
         buffer->strides.Map([this](const PrimExpr& e) { return VisitExpr(e); });
 
     PrimExpr elem_offset = VisitExpr(buffer->elem_offset);
@@ -253,7 +251,7 @@ class PrimFuncSpecializer : public StmtExprMutator {
         buffer->shape.same_as(shape) && buffer->strides.same_as(strides)) {
       return buffer;
     } else {
-      auto n = ffi::make_object<BufferNode>(*buffer.get());
+      auto n = make_object<BufferNode>(*buffer.get());
       n->data = std::move(data);
       n->elem_offset = std::move(elem_offset);
       n->shape = std::move(shape);
@@ -305,7 +303,7 @@ class PrimFuncSpecializer : public StmtExprMutator {
   BufferRegion MutateBufferRegion(const BufferRegion& buffer_region) {
     auto it = buffer_map_.find(buffer_region->buffer);
     const Buffer& buffer = it != buffer_map_.end() ? it->second : buffer_region->buffer;
-    ffi::Array<Range> region = buffer_region->region.Map(
+    Array<Range> region = buffer_region->region.Map(
         std::bind(&PrimFuncSpecializer::MutateRange, this, std::placeholders::_1));
     if (it == buffer_map_.end() && region.same_as(buffer_region->region)) {
       return buffer_region;
@@ -416,11 +414,11 @@ void UpdateSpecializeVarMap(const PrimFunc& func, const Var& param, const PrimEx
 
 /**************** Implementation ****************/
 
-PrimFunc Specialize(PrimFunc func, const ffi::Map<Var, ffi::Variant<Buffer, PrimExpr>>& param_map) {
+PrimFunc Specialize(PrimFunc func, const Map<Var, Variant<Buffer, PrimExpr>>& param_map) {
   VarMap var_map;
   for (const auto& kv : param_map) {
     const Var& param = kv.first;
-    const ffi::Variant<Buffer, PrimExpr>& instance = kv.second;
+    const Variant<Buffer, PrimExpr>& instance = kv.second;
     if (auto opt_buffer = instance.as<Buffer>()) {
       UpdateSpecializeVarMap(func, param, opt_buffer.value(), &var_map);
     } else if (auto opt_expr = instance.as<PrimExpr>()) {
@@ -434,10 +432,7 @@ PrimFunc Specialize(PrimFunc func, const ffi::Map<Var, ffi::Variant<Buffer, Prim
 
 /**************** FFI ****************/
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("tir.Specialize", Specialize);
-}
+TVM_FFI_REGISTER_GLOBAL("tir.Specialize").set_body_typed(Specialize);
 
 }  // namespace tir
 }  // namespace tvm

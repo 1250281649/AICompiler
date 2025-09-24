@@ -59,7 +59,7 @@ bool isEnabledForArch(int arch)
     {
         return isEnabled<TypeB, cutlass::arch::Sm75>();
     }
-    else if (arch >= 80 && arch <= 150)
+    else if (arch >= 80 && arch <= 120)
     {
         return isEnabled<TypeB, cutlass::arch::Sm80>();
     }

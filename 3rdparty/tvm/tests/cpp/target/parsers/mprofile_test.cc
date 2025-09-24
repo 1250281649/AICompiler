@@ -37,30 +37,30 @@ class MProfileParserMVECPUs : public testing::TestWithParam<const char*> {};
 class MProfileParserDSPCPUs : public testing::TestWithParam<const char*> {};
 class MProfileParserNoExtensions : public testing::TestWithParam<const char*> {};
 
-static TargetFeatures ParseTargetWithAttrs(ffi::String mcpu, ffi::Array<ffi::String> mattr) {
+static TargetFeatures ParseTargetWithAttrs(String mcpu, Array<String> mattr) {
   return ParseTarget({{"mcpu", mcpu}, {"mattr", mattr}});
 }
 
 TEST(MProfileParser, CheckIsNotArch) {
-  ffi::String mcpu = "cake";
+  String mcpu = "cake";
   TargetJSON fake_target = {{"mcpu", mcpu}};
   ASSERT_EQ(IsArch(fake_target), false);
 }
 
 TEST_P(MProfileParserMVECPUs, CheckIsArch) {
-  ffi::String mcpu = GetParam();
+  String mcpu = GetParam();
   TargetJSON fake_target = {{"mcpu", mcpu}};
   ASSERT_EQ(IsArch(fake_target), true);
 }
 
 TEST_P(MProfileParserDSPCPUs, CheckIsArch) {
-  ffi::String mcpu = GetParam();
+  String mcpu = GetParam();
   TargetJSON fake_target = {{"mcpu", mcpu}};
   ASSERT_EQ(IsArch(fake_target), true);
 }
 
 TEST_P(MProfileParserNoExtensions, CheckIsArch) {
-  ffi::String mcpu = GetParam();
+  String mcpu = GetParam();
   TargetJSON fake_target = {{"mcpu", mcpu}};
   ASSERT_EQ(IsArch(fake_target), true);
 }
@@ -68,7 +68,7 @@ TEST_P(MProfileParserNoExtensions, CheckIsArch) {
 TEST(MProfileParser, ParseTarget) {
   TargetJSON target = ParseTarget({});
   TargetFeatures features = Downcast<TargetFeatures>(target.at("features"));
-  ffi::Array<ffi::String> keys = Downcast<ffi::Array<ffi::String>>(target.at("keys"));
+  Array<String> keys = Downcast<Array<String>>(target.at("keys"));
   ASSERT_EQ(keys.size(), 2);
   ASSERT_EQ(keys[0], "arm_cpu");
   ASSERT_EQ(keys[1], "cpu");
@@ -79,10 +79,10 @@ TEST(MProfileParser, ParseTarget) {
 
 TEST(MProfileParser, ParseTargetWithExistingKeys) {
   TargetJSON target = ParseTarget({
-      {"keys", ffi::Array<ffi::String>{"cpu"}},
+      {"keys", Array<String>{"cpu"}},
   });
   TargetFeatures features = Downcast<TargetFeatures>(target.at("features"));
-  ffi::Array<ffi::String> keys = Downcast<ffi::Array<ffi::String>>(target.at("keys"));
+  Array<String> keys = Downcast<Array<String>>(target.at("keys"));
   ASSERT_EQ(keys.size(), 2);
   ASSERT_EQ(keys[0], "cpu");
   ASSERT_EQ(keys[1], "arm_cpu");
@@ -90,10 +90,10 @@ TEST(MProfileParser, ParseTargetWithExistingKeys) {
 
 TEST(MProfileParser, ParseTargetWithDuplicateKey) {
   TargetJSON target = ParseTarget({
-      {"keys", ffi::Array<ffi::String>{"cpu", "arm_cpu"}},
+      {"keys", Array<String>{"cpu", "arm_cpu"}},
   });
   TargetFeatures features = Downcast<TargetFeatures>(target.at("features"));
-  ffi::Array<ffi::String> keys = Downcast<ffi::Array<ffi::String>>(target.at("keys"));
+  Array<String> keys = Downcast<Array<String>>(target.at("keys"));
   ASSERT_EQ(keys.size(), 2);
   ASSERT_EQ(keys[0], "cpu");
   ASSERT_EQ(keys[1], "arm_cpu");

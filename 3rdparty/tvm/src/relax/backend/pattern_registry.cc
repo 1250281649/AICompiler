@@ -19,8 +19,6 @@
 
 #include "./pattern_registry.h"
 
-#include <tvm/ffi/reflection/registry.h>
-
 #include "../../support/utils.h"
 
 namespace tvm {
@@ -31,15 +29,15 @@ static std::vector<FusionPattern>* GetRegistryTable() {
   return &table;
 }
 
-void RegisterPatterns(ffi::Array<FusionPattern> entries) {
+void RegisterPatterns(Array<FusionPattern> entries) {
   auto* table = GetRegistryTable();
   for (const auto& entry : entries) {
     table->push_back(entry);
   }
 }
 
-void RemovePatterns(ffi::Array<ffi::String> names) {
-  std::unordered_set<ffi::String> name_set{names.begin(), names.end()};
+void RemovePatterns(Array<String> names) {
+  std::unordered_set<String> name_set{names.begin(), names.end()};
 
   auto* table = GetRegistryTable();
   table->erase(
@@ -48,9 +46,9 @@ void RemovePatterns(ffi::Array<ffi::String> names) {
       table->end());
 }
 
-ffi::Array<FusionPattern> GetPatternsWithPrefix(const ffi::String& prefix) {
+Array<FusionPattern> GetPatternsWithPrefix(const String& prefix) {
   auto* table = GetRegistryTable();
-  ffi::Array<FusionPattern> result;
+  Array<FusionPattern> result;
   for (auto it = table->rbegin(); it != table->rend(); ++it) {
     if (support::StartsWith((*it)->name, prefix.data())) {
       result.push_back(*it);
@@ -59,7 +57,7 @@ ffi::Array<FusionPattern> GetPatternsWithPrefix(const ffi::String& prefix) {
   return result;
 }
 
-ffi::Optional<FusionPattern> GetPattern(const ffi::String& pattern_name) {
+Optional<FusionPattern> GetPattern(const String& pattern_name) {
   auto* table = GetRegistryTable();
   for (auto it = table->rbegin(); it != table->rend(); ++it) {
     if ((*it)->name == pattern_name) {
@@ -69,14 +67,11 @@ ffi::Optional<FusionPattern> GetPattern(const ffi::String& pattern_name) {
   return std::nullopt;
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef()
-      .def("relax.backend.RegisterPatterns", RegisterPatterns)
-      .def("relax.backend.RemovePatterns", RemovePatterns)
-      .def("relax.backend.GetPatternsWithPrefix", GetPatternsWithPrefix)
-      .def("relax.backend.GetPattern", GetPattern);
-}
+TVM_FFI_REGISTER_GLOBAL("relax.backend.RegisterPatterns").set_body_typed(RegisterPatterns);
+TVM_FFI_REGISTER_GLOBAL("relax.backend.RemovePatterns").set_body_typed(RemovePatterns);
+TVM_FFI_REGISTER_GLOBAL("relax.backend.GetPatternsWithPrefix")
+    .set_body_typed(GetPatternsWithPrefix);
+TVM_FFI_REGISTER_GLOBAL("relax.backend.GetPattern").set_body_typed(GetPattern);
 
 }  // namespace backend
 }  // namespace relax

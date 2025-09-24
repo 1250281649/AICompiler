@@ -67,22 +67,22 @@ class TensorRTQuantizerFactory(object):
                 return super().setup()
 
             def _reset(
-                self, graphs: List[MSCGraph], weights: List[Dict[str, tvm.runtime.Tensor]]
-            ) -> Tuple[List[MSCGraph], List[Dict[str, tvm.runtime.Tensor]]]:
+                self, graphs: List[MSCGraph], weights: List[Dict[str, tvm.nd.array]]
+            ) -> Tuple[List[MSCGraph], List[Dict[str, tvm.nd.array]]]:
                 """Reset the tool
 
                 Parameters
                 ----------
                 graphs: list<MSCgraph>
                     The msc graphs.
-                weights: list<dict<str, tvm.runtime.tensor>>
+                weights: list<dict<str, tvm.nd.array>>
                     The weights
 
                 Returns
                 -------
                 graphs: list<MSCgraph>
                     The msc graphs.
-                weights: list<dict<str, tvm.runtime.tensor>>
+                weights: list<dict<str, tvm.nd.array>>
                     The weights
                 """
 

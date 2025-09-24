@@ -24,8 +24,6 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import List
 
-import tvm_ffi
-
 import tvm
 from tvm.target import Target
 
@@ -116,7 +114,7 @@ def _compile_flashinfer_kernels(
 
     # Determine compute version
     compute_version = "".join(tvm.contrib.nvcc.get_target_compute_version(target).split("."))
-    if compute_version in ["90", "100"]:
+    if compute_version in ["90"]:
         compute_version += "a"
     cuda_cflags += [
         "-gencode",
@@ -126,55 +124,16 @@ def _compile_flashinfer_kernels(
     # ------------------------------------------------------------------------
     # 2) Include paths
     # ------------------------------------------------------------------------
+    tvm_home = os.environ["TVM_SOURCE_DIR"]
     include_paths = [
         FLASHINFER_INCLUDE_DIR,
         FLASHINFER_CSRC_DIR,
         FLASHINFER_TVM_BINDING_DIR,
+        Path(tvm_home).resolve() / "include",
+        Path(tvm_home).resolve() / "ffi" / "include",
+        Path(tvm_home).resolve() / "3rdparty" / "dlpack" / "include",
+        Path(tvm_home).resolve() / "3rdparty" / "dmlc-core" / "include",
     ] + CUTLASS_INCLUDE_DIRS
-
-    if os.environ.get("TVM_SOURCE_DIR", None) or os.environ.get("TVM_HOME", None):
-        # Respect TVM_SOURCE_DIR and TVM_HOME if they are set
-        tvm_home = (
-            os.environ["TVM_SOURCE_DIR"]
-            if os.environ.get("TVM_SOURCE_DIR", None)
-            else os.environ["TVM_HOME"]
-        )
-        include_paths += [
-            Path(tvm_home).resolve() / "include",
-            Path(tvm_home).resolve() / "3rdparty" / "tvm-ffi" / "include",
-            Path(tvm_home).resolve() / "3rdparty" / "tvm-ffi" / "3rdparty" / "dlpack" / "include",
-            Path(tvm_home).resolve() / "3rdparty" / "dmlc-core" / "include",
-        ]
-    else:
-        # If TVM_SOURCE_DIR and TVM_HOME are not set, use the default TVM package path
-        tvm_package_path = Path(tvm.__file__).resolve().parent
-        if (tvm_package_path / "include").exists():
-            # The package is installed from pip.
-            tvm_ffi_package_path = Path(tvm_ffi.__file__).resolve().parent
-            include_paths += [
-                tvm_package_path / "include",
-                tvm_package_path / "3rdparty" / "dmlc-core" / "include",
-                tvm_ffi_package_path / "include",
-            ]
-        elif (tvm_package_path.parent.parent / "include").exists():
-            # The package is installed from source.
-            include_paths += [
-                tvm_package_path.parent.parent / "include",
-                tvm_package_path.parent.parent / "3rdparty" / "tvm-ffi" / "include",
-                tvm_package_path.parent.parent
-                / "3rdparty"
-                / "tvm-ffi"
-                / "3rdparty"
-                / "dlpack"
-                / "include",
-                tvm_package_path.parent.parent / "3rdparty" / "dmlc-core" / "include",
-            ]
-        else:
-            # warning: TVM is not installed in the system.
-            print(
-                "Warning: Include path for TVM cannot be found. "
-                "FlashInfer kernel compilation may fail due to missing headers."
-            )
 
     # ------------------------------------------------------------------------
     # 3) Function to compile a single source file
@@ -485,100 +444,6 @@ def gen_sampling_module(target: Target, num_threads: int = 8):
             "in https://docs.flashinfer.ai to install FlashInfer."
         )
     uri, source_paths = gen_sampling_tvm_binding(uri="sampling")
-    object_files = _compile_flashinfer_kernels(uri, source_paths, target, num_threads)
-    modules = _load_flashinfer_modules(object_files)
-    return modules
-
-
-def gen_grouped_gemm_module(
-    dtype_a: str,
-    dtype_b: str,
-    dtype_out: str,
-    scale_granularity_m: int,
-    scale_granularity_n: int,
-    scale_granularity_k: int,
-    scale_major_mode: str,
-    mma_sm: int,
-    target: Target,
-    num_threads: int = 8,
-) -> List[tvm.runtime.Module]:
-    """Generate a FlashInfer module for FP8 grouped GEMM.
-
-    Parameters
-    ----------
-    dtype_a : str
-        The data type of matrix A (e.g., "float8_e4m3fn").
-    dtype_b : str
-        The data type of matrix B (e.g., "float8_e4m3fn").
-    dtype_out : str
-        The data type of the output matrix (e.g., "bfloat16").
-    scale_granularity_m : int
-        The scaling granularity in the M dimension.
-    scale_granularity_n : int
-        The scaling granularity in the N dimension.
-    scale_granularity_k : int
-        The scaling granularity in the K dimension.
-    scale_major_mode : str
-        The scale storage mode ("K" or "MN").
-    mma_sm : int
-        The MMA scheduling mode (1 or 2).
-    target : Target
-        The target device to compile for.
-    num_threads : int
-        The number of threads to use for compilation.
-
-    Returns
-    -------
-    List[tvm.runtime.Module]
-        A list of compiled static library modules for FlashInfer FP8 grouped GEMM kernels.
-
-    Note
-    _____
-    when apply grouped gemm on A: (total_m, k), B: (batch_size, n, k), m_indptr: (batch_size, )
-    requires all m in m_indptr to be multiple of 4
-    """
-    try:
-        from flashinfer.jit import (  # pylint: disable=import-outside-toplevel
-            gen_grouped_gemm_fp8_tvm_binding,
-            get_grouped_gemm_fp8_uri,
-        )
-    except ImportError:
-        raise ImportError(
-            "FlashInfer is not installed. Please follow instructions "
-            "in https://docs.flashinfer.ai to install FlashInfer."
-        )
-    try:
-        import torch  # pylint: disable=import-outside-toplevel
-    except ImportError:
-        raise ImportError("PyTorch is not installed. Please install PyTorch to use FlashInfer.")
-
-    torch_dtype_a = getattr(torch, dtype_a)
-    torch_dtype_b = getattr(torch, dtype_b)
-    torch_dtype_out = getattr(torch, dtype_out)
-
-    uri = get_grouped_gemm_fp8_uri(
-        dtype_a=torch_dtype_a,
-        dtype_b=torch_dtype_b,
-        dtype_out=torch_dtype_out,
-        scale_granularity_m=scale_granularity_m,
-        scale_granularity_n=scale_granularity_n,
-        scale_granularity_k=scale_granularity_k,
-        scale_major_mode=scale_major_mode,
-        mma_sm=mma_sm,
-    )
-
-    uri, source_paths = gen_grouped_gemm_fp8_tvm_binding(
-        uri=uri,
-        dtype_a=torch_dtype_a,
-        dtype_b=torch_dtype_b,
-        dtype_out=torch_dtype_out,
-        scale_granularity_m=scale_granularity_m,
-        scale_granularity_n=scale_granularity_n,
-        scale_granularity_k=scale_granularity_k,
-        scale_major_mode=scale_major_mode,
-        mma_sm=mma_sm,
-    )
-
     object_files = _compile_flashinfer_kernels(uri, source_paths, target, num_threads)
     modules = _load_flashinfer_modules(object_files)
     return modules

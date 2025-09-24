@@ -18,10 +18,11 @@
 import os
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
-from tvm_ffi import register_object as _register_object
+from tvm.ffi import register_object as _register_object
 from tvm.runtime import Object
 
 from ...ir import Array, Map, save_json
+from ...runtime import String
 from ..expr import FloatImm, IntImm
 from ..function import IndexMap
 from . import _ffi_api
@@ -44,7 +45,7 @@ def _json_from_tvm(obj):
         return [_json_from_tvm(i) for i in obj]
     elif isinstance(obj, Map):
         return {_json_from_tvm(k): _json_from_tvm(v) for k, v in obj.items()}
-    elif isinstance(obj, str):
+    elif isinstance(obj, String):
         return str(obj)
     elif isinstance(obj, (IntImm, FloatImm)):
         return obj

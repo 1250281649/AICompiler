@@ -23,8 +23,6 @@
 
 #include "utils.h"
 
-#include <tvm/ffi/reflection/registry.h>
-
 #include <algorithm>
 #include <string>
 namespace tvm {
@@ -69,8 +67,8 @@ int CommonUtils::CompareVersion(const std::vector<size_t>& given_version,
   return 0;
 }
 
-int CommonUtils::CompareVersion(const ffi::Array<Integer>& given_version,
-                                const ffi::Array<Integer>& target_version) {
+int CommonUtils::CompareVersion(const Array<Integer>& given_version,
+                                const Array<Integer>& target_version) {
   std::vector<size_t> int_given_version;
   std::vector<size_t> int_target_version;
   for (const auto& v : given_version) {
@@ -82,7 +80,7 @@ int CommonUtils::CompareVersion(const ffi::Array<Integer>& given_version,
   return CompareVersion(int_given_version, int_target_version);
 }
 
-const ffi::String CommonUtils::ToAttrKey(const ffi::String& key) {
+const String CommonUtils::ToAttrKey(const String& key) {
   if (key == "name") {
     return msc_attr::kName;
   }
@@ -108,10 +106,9 @@ const ffi::String CommonUtils::ToAttrKey(const ffi::String& key) {
     return msc_attr::kConsumerType;
   }
   LOG_FATAL << "Unexpected key " << key;
-  TVM_FFI_UNREACHABLE();
 }
 
-bool StringUtils::Contains(const ffi::String& src_string, const ffi::String& sub_string) {
+bool StringUtils::Contains(const String& src_string, const String& sub_string) {
   if (src_string.size() == 0) {
     return false;
   }
@@ -125,7 +122,7 @@ bool StringUtils::Contains(const ffi::String& src_string, const ffi::String& sub
   return pos >= 0;
 }
 
-bool StringUtils::StartsWith(const ffi::String& src_string, const ffi::String& sub_string) {
+bool StringUtils::StartsWith(const String& src_string, const String& sub_string) {
   if (src_string.size() == 0) {
     return false;
   }
@@ -138,7 +135,7 @@ bool StringUtils::StartsWith(const ffi::String& src_string, const ffi::String& s
   return pos == 0;
 }
 
-bool StringUtils::EndsWith(const ffi::String& src_string, const ffi::String& sub_string) {
+bool StringUtils::EndsWith(const String& src_string, const String& sub_string) {
   if (src_string.size() == 0) {
     return false;
   }
@@ -154,9 +151,8 @@ bool StringUtils::EndsWith(const ffi::String& src_string, const ffi::String& sub
   return static_cast<size_t>(pos) == src_cstring.size() - sub_cstring.size();
 }
 
-const ffi::Array<ffi::String> StringUtils::Split(const ffi::String& src_string,
-                                                 const ffi::String& sep) {
-  ffi::Array<ffi::String> sub_strings;
+const Array<String> StringUtils::Split(const String& src_string, const String& sep) {
+  Array<String> sub_strings;
   if (src_string.size() == 0) {
     return sub_strings;
   }
@@ -176,27 +172,26 @@ const ffi::Array<ffi::String> StringUtils::Split(const ffi::String& src_string,
   return sub_strings;
 }
 
-const ffi::String StringUtils::Join(const ffi::Array<ffi::String>& sub_strings,
-                                    const ffi::String& joint) {
-  ffi::String join_str = "";
+const String StringUtils::Join(const Array<String>& sub_strings, const String& joint) {
+  String join_str = "";
   for (size_t i = 0; i < sub_strings.size(); i++) {
     join_str = join_str + sub_strings[i] + (i == sub_strings.size() - 1 ? "" : joint);
   }
   return join_str;
 }
 
-const ffi::String StringUtils::Join(const std::vector<std::string>& sub_strings,
-                                    const std::string& joint) {
-  ffi::Array<ffi::String> new_strings;
+const String StringUtils::Join(const std::vector<std::string>& sub_strings,
+                               const std::string& joint) {
+  Array<String> new_strings;
   for (const auto& s : sub_strings) {
     new_strings.push_back(s);
   }
   return Join(new_strings, joint);
 }
 
-const ffi::String StringUtils::Replace(const ffi::String& src_string, const ffi::String& old_str,
-                                       const ffi::String& new_str) {
-  ffi::String new_string;
+const String StringUtils::Replace(const String& src_string, const String& old_str,
+                                  const String& new_str) {
+  String new_string;
   const auto& sub_strings = Split(src_string, old_str);
   for (size_t i = 0; i < sub_strings.size(); i++) {
     new_string = new_string + sub_strings[i] + (i == sub_strings.size() - 1 ? "" : new_str);
@@ -204,11 +199,10 @@ const ffi::String StringUtils::Replace(const ffi::String& src_string, const ffi:
   return new_string;
 }
 
-const std::tuple<ffi::String, ffi::String> StringUtils::SplitOnce(const ffi::String& src_string,
-                                                                  const ffi::String& sep,
-                                                                  bool from_left) {
+const std::tuple<String, String> StringUtils::SplitOnce(const String& src_string, const String& sep,
+                                                        bool from_left) {
   if (src_string.size() == 0) {
-    return std::make_tuple(ffi::String(), ffi::String());
+    return std::make_tuple(String(), String());
   }
   std::string src_cstring = src_string;
   const std::string& csep = sep;
@@ -216,18 +210,17 @@ const std::tuple<ffi::String, ffi::String> StringUtils::SplitOnce(const ffi::Str
   if (pos >= 0) {
     return std::make_tuple(src_cstring.substr(0, pos), src_cstring.substr(pos + csep.size()));
   }
-  return std::make_tuple(src_string, ffi::String());
+  return std::make_tuple(src_string, String());
 }
 
-const ffi::Array<ffi::String> StringUtils::GetClosures(const ffi::String& src_string,
-                                                       const ffi::String& left,
-                                                       const ffi::String& right) {
-  ffi::Array<ffi::String> tokens;
+const Array<String> StringUtils::GetClosures(const String& src_string, const String& left,
+                                             const String& right) {
+  Array<String> tokens;
   if (src_string.size() == 0) {
     return tokens;
   }
-  ffi::String token = "start";
-  ffi::String left_str = src_string;
+  String token = "start";
+  String left_str = src_string;
   while (token.size() > 0) {
     std::tie(token, left_str) = StringUtils::SplitOnce(left_str, left);
     if (left_str.size() > 0) {
@@ -242,37 +235,36 @@ const ffi::Array<ffi::String> StringUtils::GetClosures(const ffi::String& src_st
   return tokens;
 }
 
-const ffi::String StringUtils::GetClosureOnce(const ffi::String& src_string,
-                                              const ffi::String& left, const ffi::String& right,
-                                              bool from_left) {
+const String StringUtils::GetClosureOnce(const String& src_string, const String& left,
+                                         const String& right, bool from_left) {
   if (src_string.size() == 0) {
     return "";
   }
-  ffi::String val = std::get<1>(SplitOnce(src_string, left, from_left));
+  String val = std::get<1>(SplitOnce(src_string, left, from_left));
   if (val.size() > 0) {
     val = std::get<0>(StringUtils::SplitOnce(val, right, from_left));
   }
   return val;
 }
 
-const ffi::String StringUtils::Upper(const ffi::String& src_string) {
+const String StringUtils::Upper(const String& src_string) {
   std::string str = std::string(src_string);
   std::transform(str.begin(), str.end(), str.begin(), ::toupper);
   return str;
 }
 
-const ffi::String StringUtils::Lower(const ffi::String& src_string) {
+const String StringUtils::Lower(const String& src_string) {
   std::string str = std::string(src_string);
   std::transform(str.begin(), str.end(), str.begin(), ::tolower);
   return str;
 }
 
-const ffi::String StringUtils::ToString(const ffi::Any& obj) {
-  ffi::String obj_string;
-  if (obj == nullptr) {
+const String StringUtils::ToString(const runtime::ObjectRef& obj) {
+  String obj_string;
+  if (!obj.defined()) {
     obj_string = "";
-  } else if (auto opt_str = obj.as<ffi::String>()) {
-    obj_string = *opt_str;
+  } else if (obj.as<ffi::StringObj>()) {
+    obj_string = Downcast<String>(obj);
   } else if (const auto* n = obj.as<IntImmNode>()) {
     obj_string = std::to_string(n->value);
   } else if (const auto* n = obj.as<FloatImmNode>()) {
@@ -296,8 +288,7 @@ const ffi::String StringUtils::ToString(const ffi::Any& obj) {
   return obj_string;
 }
 
-bool ArrayUtils::CompareArrays(const ffi::Array<ffi::String>& left,
-                               const ffi::Array<ffi::String>& right, int size) {
+bool ArrayUtils::CompareArrays(const Array<String>& left, const Array<String>& right, int size) {
   if (left.size() == right.size() && left.size() == 0) {
     return true;
   }
@@ -320,7 +311,7 @@ bool ArrayUtils::CompareArrays(const ffi::Array<ffi::String>& left,
   return true;
 }
 
-PrimExpr ArrayUtils::Accumulate(const ffi::Array<PrimExpr>& array, int pos) {
+PrimExpr ArrayUtils::Accumulate(const Array<PrimExpr>& array, int pos) {
   size_t t_pos = pos < 0 ? array.size() + pos + 1 : pos;
   PrimExpr accumulate = Integer(1);
   for (size_t i = 0; i < t_pos; i++) {
@@ -329,7 +320,7 @@ PrimExpr ArrayUtils::Accumulate(const ffi::Array<PrimExpr>& array, int pos) {
   return accumulate;
 }
 
-bool ArrayUtils::Broadcastable(const ffi::Array<PrimExpr>& lhs, const ffi::Array<PrimExpr>& rhs) {
+bool ArrayUtils::Broadcastable(const Array<PrimExpr>& lhs, const Array<PrimExpr>& rhs) {
   if (lhs.size() != rhs.size()) {
     return false;
   }
@@ -351,16 +342,16 @@ bool ArrayUtils::Broadcastable(const ffi::Array<PrimExpr>& lhs, const ffi::Array
   return true;
 }
 
-const Span SpanUtils::SetAttr(const Span& span, const ffi::String& key, const ffi::String& value) {
+const Span SpanUtils::SetAttr(const Span& span, const String& key, const String& value) {
   if (value.size() == 0) {
     return span;
   }
-  ffi::String new_source;
-  ffi::Array<ffi::String> tokens{"<" + key + ">", "</" + key + ">"};
+  String new_source;
+  Array<String> tokens{"<" + key + ">", "</" + key + ">"};
   if (span.defined() && span->source_name.defined()) {
-    const ffi::String& source_str = span->source_name->name;
-    ffi::String left = std::get<0>(StringUtils::SplitOnce(source_str, tokens[0]));
-    ffi::String right = std::get<1>(StringUtils::SplitOnce(source_str, tokens[1]));
+    const String& source_str = span->source_name->name;
+    String left = std::get<0>(StringUtils::SplitOnce(source_str, tokens[0]));
+    String right = std::get<1>(StringUtils::SplitOnce(source_str, tokens[1]));
     if (StringUtils::Contains(source_str, tokens[0]) &&
         StringUtils::Contains(source_str, tokens[1])) {
       new_source = left + tokens[0] + value + tokens[1] + right;
@@ -377,29 +368,29 @@ const Span SpanUtils::SetAttr(const Span& span, const ffi::String& key, const ff
   return Span(SourceName::Get(new_source), 0, 0, 0, 0);
 }
 
-ffi::String SpanUtils::GetAttr(const Span& span, const ffi::String& key) {
+const String SpanUtils::GetAttr(const Span& span, const String& key) {
   if (span.defined() && span->source_name.defined()) {
-    ffi::Array<ffi::String> tokens{"<" + key + ">", "</" + key + ">"};
+    Array<String> tokens{"<" + key + ">", "</" + key + ">"};
     return StringUtils::GetClosureOnce(span->source_name->name, tokens[0], tokens[1]);
   }
   return "";
 }
 
-const ffi::Map<ffi::String, ffi::String> SpanUtils::GetAttrs(const Span& span) {
-  ffi::Map<ffi::String, ffi::String> attrs;
+const Map<String, String> SpanUtils::GetAttrs(const Span& span) {
+  Map<String, String> attrs;
   for (const auto& key : StringUtils::GetClosures(span->source_name->name, "</", ">")) {
     attrs.Set(key, GetAttr(span, key));
   }
   return attrs;
 }
 
-const Span SpanUtils::CreateWithAttr(const ffi::String& key, const ffi::String& value) {
+const Span SpanUtils::CreateWithAttr(const String& key, const String& value) {
   return SetAttr(Span(), key, value);
 }
 
-const ffi::Array<ffi::String> ExprUtils::GetInputTypes(const ffi::String& optype, size_t inputs_num,
-                                                       bool as_relax) {
-  ffi::Array<ffi::String> input_types;
+const Array<String> ExprUtils::GetInputTypes(const String& optype, size_t inputs_num,
+                                             bool as_relax) {
+  Array<String> input_types;
   if (as_relax && (optype == "broadcast_to" || optype == "reshape")) {
     input_types.push_back("input");
     if (inputs_num > 1) {
@@ -496,12 +487,12 @@ const ffi::Array<ffi::String> ExprUtils::GetInputTypes(const ffi::String& optype
   return input_types;
 }
 
-const ffi::Array<ffi::String> ExprUtils::GetInputTypes(const Call& call) {
-  const ffi::String& optype = StringUtils::Replace(Downcast<Op>(call->op)->name, "relax.", "");
+const Array<String> ExprUtils::GetInputTypes(const Call& call) {
+  const String& optype = StringUtils::Replace(Downcast<Op>(call->op)->name, "relax.", "");
   return GetInputTypes(optype, call->args.size(), true);
 }
 
-const ffi::String ExprUtils::GetSpanName(const Expr& expr, const ffi::String& suffix) {
+const String ExprUtils::GetSpanName(const Expr& expr, const String& suffix) {
   const auto& name = SpanUtils::GetAttr(expr->span, msc_attr::kName);
   if (suffix.size() > 0) {
     return name + "_" + suffix;
@@ -509,13 +500,13 @@ const ffi::String ExprUtils::GetSpanName(const Expr& expr, const ffi::String& su
   return name;
 }
 
-const ffi::Array<PrimExpr> ExprUtils::GetShape(const TensorStructInfo& sinfo, bool as_int) {
+const Array<PrimExpr> ExprUtils::GetShape(const TensorStructInfo& sinfo, bool as_int) {
   const auto& shape_opt = sinfo->GetShape();
   if (!shape_opt.defined()) {
-    return ffi::Array<PrimExpr>();
+    return Array<PrimExpr>();
   }
   if (as_int) {
-    ffi::Array<PrimExpr> shape;
+    Array<PrimExpr> shape;
     for (const auto& s : shape_opt.value()) {
       shape.push_back(s->IsInstance<IntImmNode>() ? s : Integer(-1));
     }
@@ -524,7 +515,7 @@ const ffi::Array<PrimExpr> ExprUtils::GetShape(const TensorStructInfo& sinfo, bo
   return shape_opt.value();
 }
 
-const ffi::Array<PrimExpr> ExprUtils::GetShape(const Expr& expr, bool as_int) {
+const Array<PrimExpr> ExprUtils::GetShape(const Expr& expr, bool as_int) {
   return GetShape(Downcast<TensorStructInfo>(GetStructInfo(expr)), as_int);
 }
 
@@ -532,27 +523,29 @@ const DataType ExprUtils::GetDataType(const Expr& expr) {
   return Downcast<TensorStructInfo>(GetStructInfo(expr))->dtype;
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef()
-      .def("msc.core.SpanGetAttr", SpanUtils::GetAttr)
-      .def("msc.core.SpanGetAttrs", SpanUtils::GetAttrs)
-      .def("msc.core.SpanCreateWithAttr",
-           [](const ffi::String& key, const ffi::String& value) -> Span {
-             return SpanUtils::CreateWithAttr(key, value);
-           })
-      .def("msc.core.SpanSetAttr",
-           [](const Span& span, const ffi::String& key, const ffi::String& value) -> Span {
-             return SpanUtils::SetAttr(span, key, value);
-           })
-      .def("msc.core.CompareVersion",
-           [](const ffi::Array<Integer>& given_version,
-              const ffi::Array<Integer>& target_version) -> Integer {
-             return Integer(CommonUtils::CompareVersion(given_version, target_version));
-           })
-      .def("msc.core.ToAttrKey",
-           [](const ffi::String& key) -> ffi::String { return CommonUtils::ToAttrKey(key); });
-}
+TVM_FFI_REGISTER_GLOBAL("msc.core.SpanGetAttr").set_body_typed(SpanUtils::GetAttr);
+
+TVM_FFI_REGISTER_GLOBAL("msc.core.SpanGetAttrs").set_body_typed(SpanUtils::GetAttrs);
+
+TVM_FFI_REGISTER_GLOBAL("msc.core.SpanCreateWithAttr")
+    .set_body_typed([](const String& key, const String& value) -> Span {
+      return SpanUtils::CreateWithAttr(key, value);
+    });
+
+TVM_FFI_REGISTER_GLOBAL("msc.core.SpanSetAttr")
+    .set_body_typed([](const Span& span, const String& key, const String& value) -> Span {
+      return SpanUtils::SetAttr(span, key, value);
+    });
+
+TVM_FFI_REGISTER_GLOBAL("msc.core.CompareVersion")
+    .set_body_typed([](const Array<Integer>& given_version,
+                       const Array<Integer>& target_version) -> Integer {
+      return Integer(CommonUtils::CompareVersion(given_version, target_version));
+    });
+
+TVM_FFI_REGISTER_GLOBAL("msc.core.ToAttrKey").set_body_typed([](const String& key) -> String {
+  return CommonUtils::ToAttrKey(key);
+});
 
 }  // namespace msc
 }  // namespace contrib

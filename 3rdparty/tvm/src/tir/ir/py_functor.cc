@@ -23,7 +23,7 @@
  *        StmtExprVisitor/StmtExprMutator.
  */
 
-#include <tvm/ffi/reflection/registry.h>
+#include <tvm/ffi/reflection/reflection.h>
 #include <tvm/tir/expr_functor.h>
 #include <tvm/tir/stmt_functor.h>
 
@@ -218,8 +218,8 @@ class PyStmtExprVisitorNode : public Object, public StmtExprVisitor {
     // No fields to register as they are not visited
   }
 
-  static constexpr const bool _type_mutable = true;
-  TVM_FFI_DECLARE_OBJECT_INFO("tir.PyStmtExprVisitor", PyStmtExprVisitorNode, Object);
+  static constexpr const char* _type_key = "tir.PyStmtExprVisitor";
+  TVM_DECLARE_BASE_OBJECT_INFO(PyStmtExprVisitorNode, Object);
 
  private:
   // Statement functions
@@ -342,9 +342,6 @@ class PyStmtExprVisitorNode : public Object, public StmtExprVisitor {
  */
 class PyStmtExprVisitor : public ObjectRef {
  public:
-  explicit PyStmtExprVisitor(ObjectPtr<PyStmtExprVisitorNode> data) : ObjectRef(data) {
-    TVM_FFI_ICHECK(data != nullptr);
-  }
   TVM_DLL static PyStmtExprVisitor MakePyStmtExprVisitor(ffi::Function f_visit_stmt,            //
                                                          ffi::Function f_visit_expr,            //
                                                          ffi::Function f_visit_let_stmt,        //
@@ -395,7 +392,7 @@ class PyStmtExprVisitor : public ObjectRef {
                                                          ffi::Function f_visit_int_imm,         //
                                                          ffi::Function f_visit_float_imm,       //
                                                          ffi::Function f_visit_string_imm) {
-    ObjectPtr<PyStmtExprVisitorNode> n = ffi::make_object<PyStmtExprVisitorNode>();
+    ObjectPtr<PyStmtExprVisitorNode> n = make_object<PyStmtExprVisitorNode>();
     n->f_visit_stmt = std::move(f_visit_stmt);
     n->f_visit_expr = std::move(f_visit_expr);
     // Set statement functions
@@ -451,8 +448,8 @@ class PyStmtExprVisitor : public ObjectRef {
     return PyStmtExprVisitor(n);
   }
 
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NOTNULLABLE(PyStmtExprVisitor, ObjectRef,
-                                                PyStmtExprVisitorNode);
+  TVM_DEFINE_MUTABLE_NOTNULLABLE_OBJECT_REF_METHODS(PyStmtExprVisitor, ObjectRef,
+                                                    PyStmtExprVisitorNode);
 };
 
 /*! \brief The python interface of StmtExprMutator. */
@@ -584,8 +581,8 @@ class PyStmtExprMutatorNode : public Object, public StmtExprMutator {
     // No fields to register as they are not visited
   }
 
-  static constexpr const bool _type_mutable = true;
-  TVM_FFI_DECLARE_OBJECT_INFO("tir.PyStmtExprMutator", PyStmtExprMutatorNode, Object);
+  static constexpr const char* _type_key = "tir.PyStmtExprMutator";
+  TVM_DECLARE_BASE_OBJECT_INFO(PyStmtExprMutatorNode, Object);
 
  private:
   // Statement functions
@@ -705,9 +702,6 @@ class PyStmtExprMutatorNode : public Object, public StmtExprMutator {
 /*! \brief Managed reference to PyStmtExprMutatorNode. */
 class PyStmtExprMutator : public ObjectRef {
  public:
-  explicit PyStmtExprMutator(ObjectPtr<PyStmtExprMutatorNode> data) : ObjectRef(data) {
-    TVM_FFI_ICHECK(data != nullptr);
-  }
   /*!
    * \brief Create a PyStmtExprMutator with customized methods on the python-side.
    * \return The PyStmtExprMutator created.
@@ -762,7 +756,7 @@ class PyStmtExprMutator : public ObjectRef {
                                                          ffi::Function f_visit_int_imm,         //
                                                          ffi::Function f_visit_float_imm,       //
                                                          ffi::Function f_visit_string_imm) {
-    ObjectPtr<PyStmtExprMutatorNode> n = ffi::make_object<PyStmtExprMutatorNode>();
+    ObjectPtr<PyStmtExprMutatorNode> n = make_object<PyStmtExprMutatorNode>();
     n->f_visit_stmt = std::move(f_visit_stmt);
     n->f_visit_expr = std::move(f_visit_expr);
     // Statement functions
@@ -818,57 +812,60 @@ class PyStmtExprMutator : public ObjectRef {
     return PyStmtExprMutator(n);
   }
 
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NOTNULLABLE(PyStmtExprMutator, ObjectRef,
-                                                PyStmtExprMutatorNode);
+  TVM_DEFINE_MUTABLE_NOTNULLABLE_OBJECT_REF_METHODS(PyStmtExprMutator, ObjectRef,
+                                                    PyStmtExprMutatorNode);
 };
 
 // ================================================
 // TVM Register
 // ================================================
 
-TVM_FFI_STATIC_INIT_BLOCK() {
+TVM_FFI_STATIC_INIT_BLOCK({
   PyStmtExprVisitorNode::RegisterReflection();
   PyStmtExprMutatorNode::RegisterReflection();
-}
+});
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef()
-      .def("tir.MakePyStmtExprVisitor", PyStmtExprVisitor::MakePyStmtExprVisitor)
-      .def("tir.MakePyStmtExprMutator", PyStmtExprMutator::MakePyStmtExprMutator);
-}
+TVM_REGISTER_NODE_TYPE(PyStmtExprVisitorNode);
+TVM_REGISTER_NODE_TYPE(PyStmtExprMutatorNode);
+
+TVM_FFI_REGISTER_GLOBAL("tir.MakePyStmtExprVisitor")
+    .set_body_typed(PyStmtExprVisitor::MakePyStmtExprVisitor);
+TVM_FFI_REGISTER_GLOBAL("tir.MakePyStmtExprMutator")
+    .set_body_typed(PyStmtExprMutator::MakePyStmtExprMutator);
 
 // StmtExprVisitor
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef()
-      .def("tir.PyStmtExprVisitorDefaultVisitExpr",
-           [](PyStmtExprVisitor visitor, const PrimExpr& expr) { visitor->DefaultVisitExpr(expr); })
-      .def("tir.PyStmtExprVisitorDefaultVisitStmt",
-           [](PyStmtExprVisitor visitor, const Stmt& stmt) { visitor->DefaultVisitStmt(stmt); })
-      .def("tir.PyStmtExprVisitorVisitStmt",
-           [](PyStmtExprVisitor visitor, const Stmt& stmt) { visitor->VisitStmt(stmt); })
-      .def("tir.PyStmtExprVisitorVisitExpr",
-           [](PyStmtExprVisitor visitor, const PrimExpr& expr) { visitor->VisitExpr(expr); });
-}
+TVM_FFI_REGISTER_GLOBAL("tir.PyStmtExprVisitorDefaultVisitExpr")
+    .set_body_typed([](PyStmtExprVisitor visitor, const PrimExpr& expr) {
+      visitor->DefaultVisitExpr(expr);
+    });
+TVM_FFI_REGISTER_GLOBAL("tir.PyStmtExprVisitorDefaultVisitStmt")
+    .set_body_typed([](PyStmtExprVisitor visitor, const Stmt& stmt) {
+      visitor->DefaultVisitStmt(stmt);
+    });
+TVM_FFI_REGISTER_GLOBAL("tir.PyStmtExprVisitorVisitStmt")
+    .set_body_typed([](PyStmtExprVisitor visitor, const Stmt& stmt) { visitor->VisitStmt(stmt); });
+TVM_FFI_REGISTER_GLOBAL("tir.PyStmtExprVisitorVisitExpr")
+    .set_body_typed([](PyStmtExprVisitor visitor, const PrimExpr& expr) {
+      visitor->VisitExpr(expr);
+    });
 
 // StmtExprMutator
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef()
-      .def("tir.PyStmtExprMutatorDefaultVisitExpr",
-           [](PyStmtExprMutator mutator, const PrimExpr& expr) {
-             return mutator->DefaultVisitExpr(expr);
-           })
-      .def("tir.PyStmtExprMutatorDefaultVisitStmt",
-           [](PyStmtExprMutator mutator, const Stmt& stmt) {
-             return mutator->DefaultVisitStmt(stmt);
-           })
-      .def("tir.PyStmtExprMutatorVisitExpr",
-           [](PyStmtExprMutator mutator, const PrimExpr& expr) { return mutator->VisitExpr(expr); })
-      .def("tir.PyStmtExprMutatorVisitStmt",
-           [](PyStmtExprMutator mutator, const Stmt& stmt) { return mutator->VisitStmt(stmt); });
-}
+TVM_FFI_REGISTER_GLOBAL("tir.PyStmtExprMutatorDefaultVisitExpr")
+    .set_body_typed([](PyStmtExprMutator mutator, const PrimExpr& expr) {
+      return mutator->DefaultVisitExpr(expr);
+    });
+TVM_FFI_REGISTER_GLOBAL("tir.PyStmtExprMutatorDefaultVisitStmt")
+    .set_body_typed([](PyStmtExprMutator mutator, const Stmt& stmt) {
+      return mutator->DefaultVisitStmt(stmt);
+    });
+TVM_FFI_REGISTER_GLOBAL("tir.PyStmtExprMutatorVisitExpr")
+    .set_body_typed([](PyStmtExprMutator mutator, const PrimExpr& expr) {
+      return mutator->VisitExpr(expr);
+    });
+TVM_FFI_REGISTER_GLOBAL("tir.PyStmtExprMutatorVisitStmt")
+    .set_body_typed([](PyStmtExprMutator mutator, const Stmt& stmt) {
+      return mutator->VisitStmt(stmt);
+    });
 
 }  // namespace tir
 }  // namespace tvm

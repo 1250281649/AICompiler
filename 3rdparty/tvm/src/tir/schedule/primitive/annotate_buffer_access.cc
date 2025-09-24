@@ -33,7 +33,7 @@ class AnnotateRegionRewriter : public StmtExprMutator {
   Stmt VisitStmt_(const BlockNode* op) final {
     Block block = Downcast<Block>(StmtExprMutator::VisitStmt_(op));
 
-    ffi::Array<BufferRegion> regions =
+    Array<BufferRegion> regions =
         buffer_index_type_ == BufferIndexType::kWrite ? block->writes : block->reads;
     ICHECK_GE(buffer_index_, 0) << "Buffer index must be non-negative";
     ICHECK_LT(buffer_index_, static_cast<int>(regions.size())) << "Buffer index out of range";
@@ -47,13 +47,12 @@ class AnnotateRegionRewriter : public StmtExprMutator {
     }
 
     // Annotate the block with explicit_read_region or explicit_write_region
-    ffi::Map<ffi::String, ffi::Any> new_annotations = n->annotations;
-    ffi::String annotation_key = buffer_index_type_ == BufferIndexType::kWrite
-                                     ? attr::explicit_write_region
-                                     : attr::explicit_read_region;
+    Map<String, ffi::Any> new_annotations = n->annotations;
+    String annotation_key = buffer_index_type_ == BufferIndexType::kWrite
+                                ? attr::explicit_write_region
+                                : attr::explicit_read_region;
     if (new_annotations.count(annotation_key)) {
-      ffi::Array<Integer> buffer_indices =
-          Downcast<ffi::Array<Integer>>(new_annotations[annotation_key]);
+      Array<Integer> buffer_indices = Downcast<Array<Integer>>(new_annotations[annotation_key]);
       bool found = false;
       for (const Integer& index : buffer_indices) {
         if (index->value == buffer_index_) {
@@ -66,7 +65,7 @@ class AnnotateRegionRewriter : public StmtExprMutator {
         new_annotations.Set(annotation_key, buffer_indices);
       }
     } else {
-      new_annotations.Set(annotation_key, ffi::Array<Integer>{Integer(buffer_index_)});
+      new_annotations.Set(annotation_key, Array<Integer>{Integer(buffer_index_)});
     }
     n->annotations = std::move(new_annotations);
 
@@ -83,17 +82,16 @@ class AnnotateRegionRewriter : public StmtExprMutator {
 void AnnotateBufferAccess(ScheduleState self, const StmtSRef& block_sref, int buffer_index,
                           BufferIndexType buffer_index_type, const IndexMap& index_map) {
   const BlockNode* block = TVM_SREF_TO_BLOCK(block_sref);
-  Buffer buffer =
-      GetNthAccessBuffer(self, ffi::GetRef<Block>(block), buffer_index, buffer_index_type);
+  Buffer buffer = GetNthAccessBuffer(self, GetRef<Block>(block), buffer_index, buffer_index_type);
 
   arith::Analyzer analyzer;
-  ffi::Array<PrimExpr> block_iter_vars;
+  Array<PrimExpr> block_iter_vars;
   for (const IterVar& iter_var : block->iter_vars) {
     block_iter_vars.push_back(iter_var->var);
   }
-  ffi::Array<PrimExpr> new_indices = index_map->MapIndices(block_iter_vars, &analyzer);
+  Array<PrimExpr> new_indices = index_map->MapIndices(block_iter_vars, &analyzer);
   ICHECK_EQ(new_indices.size() % 2, 0) << "The size of new_indices should be even.";
-  ffi::Array<Range> new_ranges;
+  Array<Range> new_ranges;
   for (size_t i = 0; i < new_indices.size(); i += 2) {
     // (begin, end) represents a region
     new_ranges.push_back(Range::FromMinExtent(
@@ -103,9 +101,9 @@ void AnnotateBufferAccess(ScheduleState self, const StmtSRef& block_sref, int bu
   BufferRegion new_region(buffer, new_ranges);
 
   AnnotateRegionRewriter mutator(buffer, buffer_index, new_region, buffer_index_type);
-  Stmt new_stmt = mutator(ffi::GetRef<Stmt>(block_sref->stmt));
+  Stmt new_stmt = mutator(GetRef<Stmt>(block_sref->stmt));
 
-  self->Replace(block_sref, new_stmt, {{ffi::GetRef<Block>(block), Downcast<Block>(new_stmt)}});
+  self->Replace(block_sref, new_stmt, {{GetRef<Block>(block), Downcast<Block>(new_stmt)}});
 }
 
 struct AnnotateBufferAccessTraits : public UnpackedInstTraits<AnnotateBufferAccessTraits> {
@@ -124,7 +122,7 @@ struct AnnotateBufferAccessTraits : public UnpackedInstTraits<AnnotateBufferAcce
                                      index_map);
   }
 
-  static ffi::String IndexMap2GenNewRangesLambda(const IndexMap& index_map) {
+  static String IndexMap2GenNewRangesLambda(const IndexMap& index_map) {
     std::ostringstream oss;
     oss << "lambda ";
     for (size_t i = 0; i < index_map->initial_indices.size(); ++i) {
@@ -141,12 +139,11 @@ struct AnnotateBufferAccessTraits : public UnpackedInstTraits<AnnotateBufferAcce
       }
     }
     oss << "]";
-    return ffi::String(oss.str());
+    return String(oss.str());
   }
 
-  static ffi::String UnpackedAsPython(ffi::Array<ffi::String> outputs, ffi::String block,
-                                      Integer buffer_index, Integer buffer_index_type,
-                                      IndexMap index_map) {
+  static String UnpackedAsPython(Array<String> outputs, String block, Integer buffer_index,
+                                 Integer buffer_index_type, IndexMap index_map) {
     PythonAPICall py("annotate_buffer_access");
     py.Input("block", block);
     py.Input("buffer_index", buffer_index->value);
@@ -154,7 +151,7 @@ struct AnnotateBufferAccessTraits : public UnpackedInstTraits<AnnotateBufferAcce
     std::ostringstream os;
     os << "\"" << BufferIndexType2Str(static_cast<BufferIndexType>(buffer_index_type->value))
        << "\"";
-    py.Input("buf_type", ffi::String(os.str()));
+    py.Input("buf_type", String(os.str()));
 
     py.Input("gen_new_ranges", IndexMap2GenNewRangesLambda(index_map));
     return py.Str();

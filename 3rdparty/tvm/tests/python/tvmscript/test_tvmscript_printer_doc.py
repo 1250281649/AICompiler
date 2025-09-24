@@ -20,8 +20,9 @@ Doc objects, then access and modify their attributes correctly.
 """
 
 import pytest
+
 import tvm
-from tvm_ffi.access_path import AccessPath
+from tvm.runtime import ObjectPath
 from tvm.script.printer.doc import (
     AssertDoc,
     AssignDoc,
@@ -546,7 +547,7 @@ def test_doc_source_paths():
     doc = IdDoc("x")
     assert len(doc.source_paths) == 0
 
-    source_paths = [AccessPath.root(), AccessPath.root().attr("x")]
+    source_paths = [ObjectPath.root(), ObjectPath.root().attr("x")]
 
     doc.source_paths = source_paths
     # This should triggers the __getattr__ and gets a tvm.ir.container.Array

@@ -25,8 +25,8 @@
 #define TVM_IR_ENV_FUNC_H_
 
 #include <tvm/ffi/function.h>
-#include <tvm/ffi/reflection/registry.h>
-#include <tvm/node/node.h>
+#include <tvm/ffi/reflection/reflection.h>
+#include <tvm/node/reflection.h>
 
 #include <string>
 #include <utility>
@@ -43,7 +43,7 @@ namespace tvm {
 class EnvFuncNode : public Object {
  public:
   /*! \brief Unique name of the global function */
-  ffi::String name;
+  String name;
   /*! \brief The internal packed function */
   ffi::Function func;
   /*! \brief constructor */
@@ -51,14 +51,23 @@ class EnvFuncNode : public Object {
 
   static void RegisterReflection() {
     namespace refl = tvm::ffi::reflection;
-    // func do not participate in structural equal and hash.
-    refl::ObjectDef<EnvFuncNode>()
-        .def_ro("name", &EnvFuncNode::name)
-        .def_ro("func", &EnvFuncNode::func, refl::AttachFieldFlag::SEqHashIgnore());
+    refl::ObjectDef<EnvFuncNode>().def_ro("name", &EnvFuncNode::name);
   }
 
-  static constexpr TVMFFISEqHashKind _type_s_eq_hash_kind = kTVMFFISEqHashKindTreeNode;
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("ir.EnvFunc", EnvFuncNode, Object);
+  bool SEqualReduce(const EnvFuncNode* other, SEqualReducer equal) const {
+    // name uniquely identifies the env function.
+    return name == other->name;
+  }
+
+  void SHashReduce(SHashReducer hash_reduce) const {
+    // Name uniquely identifies the env function.
+    hash_reduce(name);
+  }
+
+  static constexpr const char* _type_key = "ir.EnvFunc";
+  static constexpr bool _type_has_method_sequal_reduce = true;
+  static constexpr bool _type_has_method_shash_reduce = true;
+  TVM_DECLARE_FINAL_OBJECT_INFO(EnvFuncNode, Object);
 };
 
 /*!
@@ -69,10 +78,6 @@ class EnvFunc : public ObjectRef {
  public:
   EnvFunc() {}
   explicit EnvFunc(ObjectPtr<Object> n) : ObjectRef(n) {}
-  /*!
-   * \brief constructor with UnsafeInit
-   */
-  explicit EnvFunc(ffi::UnsafeInit tag) : ObjectRef(tag) {}
   /*! \return The internal global function pointer */
   const EnvFuncNode* operator->() const { return static_cast<const EnvFuncNode*>(get()); }
   /*!
@@ -92,7 +97,7 @@ class EnvFunc : public ObjectRef {
    * \return The created global function.
    * \note The function can be unique
    */
-  TVM_DLL static EnvFunc Get(const ffi::String& name);
+  TVM_DLL static EnvFunc Get(const String& name);
   /*! \brief specify container node */
   using ContainerType = EnvFuncNode;
 };
@@ -119,10 +124,6 @@ class TypedEnvFunc<R(Args...)> : public ObjectRef {
   using TSelf = TypedEnvFunc<R(Args...)>;
   TypedEnvFunc() {}
   explicit TypedEnvFunc(ObjectPtr<Object> n) : ObjectRef(n) {}
-  /*!
-   * \brief constructor with UnsafeInit
-   */
-  explicit TypedEnvFunc(ffi::UnsafeInit tag) : ObjectRef(tag) {}
   /*!
    * \brief Assign global function to a TypedEnvFunc
    * \param other Another global function.

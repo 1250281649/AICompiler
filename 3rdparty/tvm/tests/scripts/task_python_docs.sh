@@ -47,8 +47,8 @@ sphinx_precheck() {
     clean_files
     echo "PreCheck sphinx doc generation WARNINGS.."
 
-    # setup tvm-ffi into python folder
-    python3 -m pip install  -v --target=python ./3rdparty/tvm-ffi/
+    # setup cython
+    cd python; python3 setup.py build_ext --inplace; cd ..
 
     pushd docs
     make clean
@@ -126,8 +126,8 @@ clean_files
 find . -type f -path "*.log" | xargs rm -f
 find . -type f -path "*.pyc" | xargs rm -f
 
-# setup tvm-ffi into python folder
-python3 -m pip install  -v --target=python ./3rdparty/tvm-ffi/
+# setup cython
+cd python; python3 setup.py build_ext --inplace; cd ..
 
 
 cd docs

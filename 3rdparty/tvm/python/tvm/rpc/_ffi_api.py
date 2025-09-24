@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 """FFI APIs for tvm.rpc"""
-import tvm_ffi
+import tvm.ffi
 
 
-tvm_ffi.init_ffi_api("rpc", __name__)
+tvm.ffi._init_api("rpc", __name__)

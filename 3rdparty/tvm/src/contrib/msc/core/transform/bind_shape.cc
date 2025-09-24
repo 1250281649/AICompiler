@@ -22,7 +22,6 @@
  * \brief Pass for fuse ShapeExpr.
  */
 
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/relax/expr.h>
 #include <tvm/relax/expr_functor.h>
 #include <tvm/relax/transform.h>
@@ -37,8 +36,7 @@ namespace relax {
  */
 class ShapeBinder : public ExprMutator {
  public:
-  explicit ShapeBinder(IRModule ctx_module, const ffi::String& entry_name)
-      : ExprMutator(ctx_module) {
+  explicit ShapeBinder(IRModule ctx_module, const String& entry_name) : ExprMutator(ctx_module) {
     mod_ = ctx_module;
     entry_name_ = entry_name;
   }
@@ -52,7 +50,7 @@ class ShapeBinder : public ExprMutator {
         continue;
       }
       if (func->IsInstance<FunctionNode>()) {
-        ffi::Array<Var> new_params;
+        Array<Var> new_params;
         for (const auto& p : Downcast<Function>(func)->params) {
           auto struct_info = GetStructInfo(p);
           if (struct_info->IsInstance<ShapeStructInfoNode>()) {
@@ -77,7 +75,7 @@ class ShapeBinder : public ExprMutator {
   }
 
   void VisitBinding_(const VarBindingNode* binding, const CallNode* call_node) final {
-    ffi::Array<Expr> new_args;
+    Array<Expr> new_args;
     for (const auto& a : call_node->args) {
       auto struct_info = GetStructInfo(a);
       if (a->IsInstance<VarNode>() && struct_info->IsInstance<ShapeStructInfoNode>()) {
@@ -93,7 +91,7 @@ class ShapeBinder : public ExprMutator {
     } else if (const auto* op_node = call_node->op.as<OpNode>()) {
       ICHECK(op_node->name == "relax.reshape" || op_node->name == "relax.image.resize2d")
           << "Expect ShapeExpr consumer as reshape or image.resize2d, get "
-          << ffi::GetRef<Call>(call_node);
+          << GetRef<Call>(call_node);
       const auto& opt_shape = Downcast<ShapeStructInfo>(GetStructInfo(call_node->args[1]))->values;
       ICHECK(opt_shape.defined()) << "Expected shape defined, get " << call_node->args[1];
       new_args.push_back(ShapeExpr(opt_shape.value()));
@@ -102,7 +100,7 @@ class ShapeBinder : public ExprMutator {
       ReEmitBinding(binding, builder_->Normalize(new_call));
     } else if (const auto* gv_node = call_node->op.as<GlobalVarNode>()) {
       const auto& func_info = Downcast<FuncStructInfo>(gv_node->struct_info_);
-      ffi::Array<StructInfo> params_info;
+      Array<StructInfo> params_info;
       for (const auto& a : new_args) {
         ICHECK(a->struct_info_.defined())
             << "Global func argument without defined struct info " << a;
@@ -114,30 +112,27 @@ class ShapeBinder : public ExprMutator {
           Call(call_node->op, new_args, call_node->attrs, call_node->sinfo_args, call_node->span);
       ReEmitBinding(binding, builder_->Normalize(new_call));
     } else {
-      LOG_FATAL << "Unexpected shape consumer " << ffi::GetRef<Call>(call_node);
+      LOG_FATAL << "Unexpected shape consumer " << GetRef<Call>(call_node);
     }
   }
 
  private:
   IRModule mod_;
-  ffi::String entry_name_;
+  String entry_name_;
 };
 
-IRModule BindShape(IRModule mod, const ffi::String& entry_name) {
+IRModule BindShape(IRModule mod, const String& entry_name) {
   return ShapeBinder(mod, entry_name).Bind();
 }
 
 namespace transform {
 
-Pass BindShape(const ffi::String& entry_name) {
+Pass BindShape(const String& entry_name) {
   auto pass_func = [=](IRModule m, PassContext pc) { return relax::BindShape(m, entry_name); };
   return CreateModulePass(pass_func, 0, "BindShape", {});
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("relax.transform.BindShape", BindShape);
-}
+TVM_FFI_REGISTER_GLOBAL("relax.transform.BindShape").set_body_typed(BindShape);
 
 }  // namespace transform
 }  // namespace relax

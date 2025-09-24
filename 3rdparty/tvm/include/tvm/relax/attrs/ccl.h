@@ -24,7 +24,7 @@
 #ifndef TVM_RELAX_ATTRS_CCL_H_
 #define TVM_RELAX_ATTRS_CCL_H_
 
-#include <tvm/ffi/reflection/registry.h>
+#include <tvm/ffi/reflection/reflection.h>
 #include <tvm/relax/expr.h>
 
 namespace tvm {
@@ -32,7 +32,7 @@ namespace relax {
 
 /*! \brief Attributes used in allreduce operators */
 struct AllReduceAttrs : public tvm::AttrsNodeReflAdapter<AllReduceAttrs> {
-  ffi::String op_type;
+  String op_type;
   bool in_group;
 
   static void RegisterReflection() {
@@ -45,7 +45,9 @@ struct AllReduceAttrs : public tvm::AttrsNodeReflAdapter<AllReduceAttrs> {
                 "Whether the reduction operation performs in group or globally or in group as "
                 "default.");
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("relax.attrs.AllReduceAttrs", AllReduceAttrs, BaseAttrsNode);
+
+  static constexpr const char* _type_key = "relax.attrs.AllReduceAttrs";
+  TVM_FFI_DECLARE_FINAL_OBJECT_INFO(AllReduceAttrs, BaseAttrsNode);
 };  // struct AllReduceAttrs
 
 /*! \brief Attributes used in allgather operators */
@@ -63,7 +65,9 @@ struct AllGatherAttrs : public tvm::AttrsNodeReflAdapter<AllGatherAttrs> {
                 "Whether the allgather operation performs in group or globally or in group as "
                 "default.");
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("relax.attrs.AllGatherAttrs", AllGatherAttrs, BaseAttrsNode);
+
+  static constexpr const char* _type_key = "relax.attrs.AllGatherAttrs";
+  TVM_FFI_DECLARE_FINAL_OBJECT_INFO(AllGatherAttrs, BaseAttrsNode);
 };  // struct AllGatherAttrs
 
 /*! \brief Attributes used in scatter operators */
@@ -81,8 +85,9 @@ struct ScatterCollectiveAttrs : public tvm::AttrsNodeReflAdapter<ScatterCollecti
                 "The axis of the tensor to be scattered. The tensor will be chunked along "
                 "this axis.");
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("relax.attrs.ScatterCollectiveAttrs", ScatterCollectiveAttrs,
-                                    BaseAttrsNode);
+
+  static constexpr const char* _type_key = "relax.attrs.ScatterCollectiveAttrs";
+  TVM_FFI_DECLARE_FINAL_OBJECT_INFO(ScatterCollectiveAttrs, BaseAttrsNode);
 };  // struct ScatterCollectiveAttrs
 
 }  // namespace relax

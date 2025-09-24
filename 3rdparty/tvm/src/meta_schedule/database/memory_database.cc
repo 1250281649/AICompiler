@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-#include <tvm/ffi/reflection/registry.h>
+#include <tvm/ffi/reflection/reflection.h>
 
 #include "../module_equality.h"
 #include "../utils.h"
@@ -26,10 +26,10 @@ namespace meta_schedule {
 
 class MemoryDatabaseNode : public DatabaseNode {
  public:
-  explicit MemoryDatabaseNode(ffi::String mod_eq_name = "structural") : DatabaseNode(mod_eq_name) {}
+  explicit MemoryDatabaseNode(String mod_eq_name = "structural") : DatabaseNode(mod_eq_name) {}
 
-  ffi::Array<TuningRecord> records;
-  ffi::Array<Workload> workloads;
+  Array<TuningRecord> records;
+  Array<Workload> workloads;
 
   static void RegisterReflection() {
     namespace refl = tvm::ffi::reflection;
@@ -37,8 +37,9 @@ class MemoryDatabaseNode : public DatabaseNode {
         .def_ro("records", &MemoryDatabaseNode::records)
         .def_ro("workloads", &MemoryDatabaseNode::workloads);
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("meta_schedule.MemoryDatabase", MemoryDatabaseNode,
-                                    DatabaseNode);
+
+  static constexpr const char* _type_key = "meta_schedule.MemoryDatabase";
+  TVM_DECLARE_FINAL_OBJECT_INFO(MemoryDatabaseNode, DatabaseNode);
 
  public:
   bool HasWorkload(const IRModule& mod) final {
@@ -63,7 +64,7 @@ class MemoryDatabaseNode : public DatabaseNode {
 
   void CommitTuningRecord(const TuningRecord& record) final { records.push_back(record); }
 
-  ffi::Array<TuningRecord> GetTopK(const Workload& workload, int top_k) final {
+  Array<TuningRecord> GetTopK(const Workload& workload, int top_k) final {
     CHECK_GE(top_k, 0) << "ValueError: top_k must be non-negative";
     if (top_k == 0) {
       return {};
@@ -87,24 +88,23 @@ class MemoryDatabaseNode : public DatabaseNode {
     }
   }
 
-  ffi::Array<TuningRecord> GetAllTuningRecords() final { return records; }
+  Array<TuningRecord> GetAllTuningRecords() final { return records; }
 
   int64_t Size() final { return records.size(); }
 };
 
-Database Database::MemoryDatabase(ffi::String mod_eq_name) {
-  ObjectPtr<MemoryDatabaseNode> n = ffi::make_object<MemoryDatabaseNode>(mod_eq_name);
+Database Database::MemoryDatabase(String mod_eq_name) {
+  ObjectPtr<MemoryDatabaseNode> n = make_object<MemoryDatabaseNode>(mod_eq_name);
   n->records.clear();
   n->workloads.clear();
   return Database(n);
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("meta_schedule.DatabaseMemoryDatabase", Database::MemoryDatabase);
-}
+TVM_REGISTER_NODE_TYPE(MemoryDatabaseNode);
+TVM_FFI_REGISTER_GLOBAL("meta_schedule.DatabaseMemoryDatabase")
+    .set_body_typed(Database::MemoryDatabase);
 
-TVM_FFI_STATIC_INIT_BLOCK() { MemoryDatabaseNode::RegisterReflection(); }
+TVM_FFI_STATIC_INIT_BLOCK({ MemoryDatabaseNode::RegisterReflection(); });
 
 }  // namespace meta_schedule
 }  // namespace tvm

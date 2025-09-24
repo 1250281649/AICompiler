@@ -23,7 +23,6 @@
  * \brief Run codegen for annotated relax functions.
  */
 
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/relax/analysis.h>
 #include <tvm/relax/expr_functor.h>
 #include <tvm/relax/transform.h>
@@ -37,12 +36,12 @@ namespace relax {
 
 class CodeGenRunner : ExprMutator {
  public:
-  using OptionMap = ffi::Map<ffi::String, ffi::Any>;
+  using OptionMap = Map<String, ffi::Any>;
 
   explicit CodeGenRunner(IRModule mod) : ExprMutator(mod) {}
 
-  IRModule Run(ffi::Optional<ffi::Map<ffi::String, OptionMap>> target_options,
-               ffi::Array<ffi::String> entry_function_names) {
+  IRModule Run(Optional<Map<String, OptionMap>> target_options,
+               Array<String> entry_function_names) {
     IRModule mod = builder_->GetContextIRModule();
 
     support::OrderedSet<GlobalVar, ObjectPtrHash, ObjectPtrEqual> entry_functions;
@@ -59,8 +58,7 @@ class CodeGenRunner : ExprMutator {
       std::vector<GlobalVar> attr_entry_functions;
       for (const auto& [gv, func] : mod->functions) {
         if (func->GetLinkageType() == LinkageType::kExternal &&
-            !func->GetAttr<ffi::String>(attr::kCodegen) &&
-            func->IsInstance<relax::FunctionNode>()) {
+            !func->GetAttr<String>(attr::kCodegen) && func->IsInstance<relax::FunctionNode>()) {
           attr_entry_functions.push_back(gv);
         }
       }
@@ -81,7 +79,7 @@ class CodeGenRunner : ExprMutator {
     auto out_mod = builder_->GetContextIRModule();
 
     if (ext_mods.size()) {
-      if (auto opt_old_ext_mods = mod->GetAttr<ffi::Array<ffi::Module>>(tvm::attr::kExternalMods)) {
+      if (auto opt_old_ext_mods = mod->GetAttr<Array<runtime::Module>>(tvm::attr::kExternalMods)) {
         auto old_ext_mods = opt_old_ext_mods.value();
         ext_mods.insert(ext_mods.begin(), old_ext_mods.begin(), old_ext_mods.end());
       }
@@ -90,7 +88,7 @@ class CodeGenRunner : ExprMutator {
 
     if (constant_names.size()) {
       // Some backends (e.g. TensorRT) expect constants to be passed when they are instantiated
-      ffi::Map<ffi::String, runtime::Tensor> constants;
+      Map<String, runtime::NDArray> constants;
       for (const auto& [constant, name] : constant_names) {
         ICHECK(!constants.count(name)) << "More than one constant with the name " << name;
         constants.Set(name, constant->data);
@@ -107,11 +105,11 @@ class CodeGenRunner : ExprMutator {
   Expr VisitExpr_(const CallNode* call_node) override {
     auto call = Downcast<Call>(ExprMutator::VisitExpr_(call_node));
     if (auto const* gvar_node = call_node->op.as<GlobalVarNode>()) {
-      const GlobalVar gvar = ffi::GetRef<GlobalVar>(gvar_node);
+      const GlobalVar gvar = GetRef<GlobalVar>(gvar_node);
 
       auto create_call_dps_packed = [call_node, this](Expr extern_func,
                                                       StructInfo ret_struct_info) {
-        ffi::Array<Expr> new_args({extern_func});
+        Array<Expr> new_args({extern_func});
         new_args.push_back(Tuple(call_node->args.Map([this](Expr arg) { return VisitExpr(arg); })));
 
         static const Op& call_op = Op::Get("relax.call_dps_packed");
@@ -140,7 +138,7 @@ class CodeGenRunner : ExprMutator {
         }
       }
     }
-    ffi::Array<Expr> new_args;
+    Array<Expr> new_args;
     for (const auto& arg : call_node->args) {
       new_args.push_back(VisitExpr(arg));
     }
@@ -149,8 +147,8 @@ class CodeGenRunner : ExprMutator {
   }
 
   Expr VisitExpr_(const FunctionNode* func_node) override {
-    Function func = ffi::GetRef<Function>(func_node);
-    auto opt_codegen = func->GetAttr<ffi::String>(attr::kCodegen);
+    Function func = GetRef<Function>(func_node);
+    auto opt_codegen = func->GetAttr<String>(attr::kCodegen);
     if (opt_codegen) {
       auto ext_symbol = GetExtSymbol(func);
       size_t count = 0;
@@ -169,9 +167,8 @@ class CodeGenRunner : ExprMutator {
   }
 
  private:
-  ffi::Array<ffi::Module> InvokeCodegen(IRModule mod,
-                                        ffi::Map<ffi::String, OptionMap> target_options) {
-    std::unordered_map<std::string, ffi::Array<Function>> target_functions;
+  Array<runtime::Module> InvokeCodegen(IRModule mod, Map<String, OptionMap> target_options) {
+    std::unordered_map<std::string, Array<Function>> target_functions;
 
     for (const auto& entry : mod->functions) {
       if (entry.second->IsInstance<tir::PrimFuncNode>()) {
@@ -180,26 +177,26 @@ class CodeGenRunner : ExprMutator {
       PostOrderVisit(entry.second, [&target_functions](Expr e) {
         if (e->IsInstance<FunctionNode>()) {
           auto f = Downcast<Function>(e);
-          if (auto target_opt = f->GetAttr<ffi::String>(attr::kCodegen)) {
-            ffi::String target = target_opt.value();
+          if (auto target_opt = f->GetAttr<String>(attr::kCodegen)) {
+            String target = target_opt.value();
             target_functions[target].push_back(f);
           }
         }
       });
     }
 
-    ffi::Array<ffi::Module> ext_mods;
+    Array<runtime::Module> ext_mods;
 
     for (const auto& [target, functions] : target_functions) {
       OptionMap options = target_options.Get(target).value_or(OptionMap());
       // Start the codegen process.
       // Get the codegen with its ffi key.
-      ffi::String codegen_name = "relax.ext." + target;
+      String codegen_name = "relax.ext." + target;
       const auto codegen = tvm::ffi::Function::GetGlobal(codegen_name);
       ICHECK(codegen.has_value()) << "Codegen is not found: " << codegen_name << "\n";
 
-      ffi::Array<ffi::Module> compiled_functions =
-          (*codegen)(functions, options, constant_names).cast<ffi::Array<ffi::Module>>();
+      Array<runtime::Module> compiled_functions =
+          (*codegen)(functions, options, constant_names).cast<Array<runtime::Module>>();
       ext_mods.insert(ext_mods.end(), compiled_functions.begin(), compiled_functions.end());
     }
 
@@ -207,7 +204,7 @@ class CodeGenRunner : ExprMutator {
   }
 
   /*! \brief The names of all constants in the original module. */
-  ffi::Map<Constant, ffi::String> constant_names;
+  Map<Constant, String> constant_names;
   /*! \brief Extern funcs for each global variable.  */
   std::unordered_map<const GlobalVarNode*, Expr> extern_funcs_;
 };
@@ -215,19 +212,15 @@ class CodeGenRunner : ExprMutator {
 }  // namespace relax
 
 namespace transform {
-Pass RunCodegen(
-    ffi::Optional<ffi::Map<ffi::String, ffi::Map<ffi::String, ffi::Any>>> target_options,
-    ffi::Array<ffi::String> entry_functions) {
+Pass RunCodegen(Optional<Map<String, Map<String, ffi::Any>>> target_options,
+                Array<String> entry_functions) {
   auto pass_func = [=](IRModule m, PassContext pc) {
     return relax::CodeGenRunner(m).Run(target_options, entry_functions);
   };
   return CreateModulePass(pass_func, 0, "RunCodegen", {});
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("relax.transform.RunCodegen", RunCodegen);
-}
+TVM_FFI_REGISTER_GLOBAL("relax.transform.RunCodegen").set_body_typed(RunCodegen);
 
 }  // namespace transform
 }  // namespace tvm

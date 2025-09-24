@@ -23,8 +23,7 @@ import subprocess
 import warnings
 from typing import Tuple
 
-import tvm_ffi
-import tvm
+import tvm.ffi
 from tvm.target import Target
 
 from ..base import py_str
@@ -58,13 +57,10 @@ def compile_cuda(code, target_format=None, arch=None, options=None, path_target=
     """
     # Check for NVSHMEM dependency
     nvshmem_include_path, nvshmem_lib_path = None, None
-    use_nvshmem = "#include <nvshmem.h>" in code or "#include <nvshmemx.h>" in code
+    use_nvshmem = (
+        tvm.get_global_func("runtime.nvshmem.cumodule_init", allow_missing=True) is not None
+    )
     if use_nvshmem:
-        # NOTE: we cannot check whether nvshmem is used based on whether
-        # the global function "runtime.nvshmem.cumodule_init" is defined.
-        # The reason is because that if the input code does not use any NVSHMEM functions
-        # while the global function is defined, using cubin to compile the
-        # code may cause a compilation error.
         target_format = "cubin"
         nvshmem_include_path, nvshmem_lib_path = find_nvshmem_paths()
 
@@ -89,7 +85,7 @@ def compile_cuda(code, target_format=None, arch=None, options=None, path_target=
     temp_code = temp.relpath(f"{file_name}.cu")
     temp_target = temp.relpath(f"{file_name}.{target_format}")
 
-    pass_context = tvm_ffi.get_global_func("transform.GetCurrentPassContext")()
+    pass_context = tvm.get_global_func("transform.GetCurrentPassContext")()
     kernels_output_dir = (
         pass_context.config["cuda.kernels_output_dir"]
         if "cuda.kernels_output_dir" in pass_context.config
@@ -251,10 +247,9 @@ def get_cuda_version(cuda_path=None):
 def find_nvshmem_paths() -> Tuple[str, str]:
     """
     Searches for the NVSHMEM include and library directories.
-
-    Returns
-    -------
-    A tuple containing the path to the include directory and the library directory.
+    Returns:
+        A tuple containing the path to the include directory and the library directory.
+        (include_path, lib_path)
     """
     candidate_roots = []
 
@@ -313,14 +308,14 @@ def find_nvshmem_paths() -> Tuple[str, str]:
     raise RuntimeError("\n".join(error_message))
 
 
-@tvm_ffi.register_global_func
+@tvm.ffi.register_func
 def tvm_callback_cuda_compile(code, target):  # pylint: disable=unused-argument
     """use nvcc to generate fatbin code for better optimization"""
     ptx = compile_cuda(code, target_format="fatbin")
     return ptx
 
 
-@tvm_ffi.register_global_func("tvm_callback_libdevice_path")
+@tvm.ffi.register_func("tvm_callback_libdevice_path")
 def find_libdevice_path(arch):
     """Utility function to find libdevice
 
@@ -385,7 +380,7 @@ def callback_libdevice_path(arch):
         return ""
 
 
-@tvm_ffi.register_global_func("tvm.contrib.nvcc.get_compute_version")
+@tvm.ffi.register_func("tvm.contrib.nvcc.get_compute_version")
 def get_target_compute_version(target=None):
     """Utility function to get compute capability of compilation target.
 
@@ -530,7 +525,7 @@ def have_cudagraph():
         return False
 
 
-@tvm_ffi.register_global_func("tvm.contrib.nvcc.supports_bf16")
+@tvm.ffi.register_func("tvm.contrib.nvcc.supports_bf16")
 def have_bf16(compute_version):
     """Either bf16 support is provided in the compute capability or not
 
@@ -546,7 +541,7 @@ def have_bf16(compute_version):
     return False
 
 
-@tvm_ffi.register_global_func("tvm.contrib.nvcc.supports_fp8")
+@tvm.ffi.register_func("tvm.contrib.nvcc.supports_fp8")
 def have_fp8(compute_version):
     """Whether fp8 support is provided in the specified compute capability or not
 
@@ -564,7 +559,7 @@ def have_fp8(compute_version):
     return False
 
 
-@tvm_ffi.register_global_func("tvm.contrib.nvcc.supports_fp4")
+@tvm.ffi.register_func("tvm.contrib.nvcc.supports_fp4")
 def have_fp4(compute_version):
     """Whether fp4 support is provided in the specified compute capability or not
 

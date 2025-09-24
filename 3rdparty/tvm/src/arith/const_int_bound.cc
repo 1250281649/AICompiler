@@ -22,7 +22,6 @@
  */
 #include <tvm/arith/analyzer.h>
 #include <tvm/ffi/function.h>
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/tir/builtin.h>
 #include <tvm/tir/expr_functor.h>
 
@@ -39,10 +38,12 @@ namespace arith {
 
 using namespace tir;
 
-TVM_FFI_STATIC_INIT_BLOCK() { ConstIntBoundNode::RegisterReflection(); }
+TVM_FFI_STATIC_INIT_BLOCK({ ConstIntBoundNode::RegisterReflection(); });
+
+TVM_REGISTER_NODE_TYPE(ConstIntBoundNode);
 
 ConstIntBound::ConstIntBound(int64_t min_value, int64_t max_value) {
-  auto node = ffi::make_object<ConstIntBoundNode>();
+  auto node = make_object<ConstIntBoundNode>();
   node->min_value = min_value;
   node->max_value = max_value;
   data_ = std::move(node);
@@ -52,10 +53,7 @@ ConstIntBound MakeConstIntBound(int64_t min_value, int64_t max_value) {
   return ConstIntBound(min_value, max_value);
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("arith.ConstIntBound", MakeConstIntBound);
-}
+TVM_FFI_REGISTER_GLOBAL("arith.ConstIntBound").set_body_typed(MakeConstIntBound);
 
 inline void PrintBoundValue(std::ostream& os, int64_t val) {
   if (val == ConstIntBound::kPosInf) {
@@ -387,7 +385,7 @@ class ConstIntBoundAnalyzer::Impl
   }
 
   Entry VisitExpr_(const VarNode* op) final {
-    Var v = ffi::GetRef<Var>(op);
+    Var v = GetRef<Var>(op);
     auto it = var_map_.find(v);
     if (it != var_map_.end()) {
       return it->second;
@@ -397,7 +395,7 @@ class ConstIntBoundAnalyzer::Impl
   }
 
   Entry VisitExpr_(const SizeVarNode* op) final {
-    SizeVar v = ffi::GetRef<SizeVar>(op);
+    SizeVar v = GetRef<SizeVar>(op);
     auto it = var_map_.find(v);
     if (it != var_map_.end()) {
       return it->second;
@@ -744,7 +742,7 @@ class ConstIntBoundAnalyzer::Impl
    * This expression is used as the implementation of
    * topi.math.ceil_log2, and can appear in iteration bounds.
    */
-  static ffi::Optional<PrimExpr> FindCeilLog2Arg(const CastNode* op) {
+  static Optional<PrimExpr> FindCeilLog2Arg(const CastNode* op) {
     if (op->dtype.is_int()) {
       if (auto as_call = op->value.as<CallNode>()) {
         if (as_call->op.same_as(Op::Get("tir.ceil"))) {

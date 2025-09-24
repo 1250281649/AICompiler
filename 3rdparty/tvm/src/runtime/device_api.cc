@@ -21,11 +21,9 @@
  * \file device_api.cc
  * \brief Device specific implementations
  */
-#include <tvm/ffi/container/tensor.h>
-#include <tvm/ffi/extra/c_env_api.h>
+#include <tvm/ffi/container/ndarray.h>
 #include <tvm/ffi/function.h>
 #include <tvm/ffi/optional.h>
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/ffi/rvalue_ref.h>
 #include <tvm/ffi/string.h>
 #include <tvm/runtime/base.h>
@@ -107,8 +105,8 @@ static size_t GetDataAlignment(const DLDataType dtype) {
   return align;
 }
 
-size_t DeviceAPI::GetDataSize(const DLTensor& arr, ffi::Optional<ffi::String> mem_scope) {
-  if (!mem_scope.has_value() || mem_scope.value().empty() || mem_scope.value() == "global") {
+size_t DeviceAPI::GetDataSize(const DLTensor& arr, Optional<String> mem_scope) {
+  if (!mem_scope.defined() || mem_scope.value().empty() || mem_scope.value() == "global") {
     size_t size = 1;
     for (int i = 0; i < arr.ndim; ++i) {
       size *= static_cast<size_t>(arr.shape[i]);
@@ -121,8 +119,8 @@ size_t DeviceAPI::GetDataSize(const DLTensor& arr, ffi::Optional<ffi::String> me
 }
 
 void* DeviceAPI::AllocDataSpace(Device dev, int ndim, const int64_t* shape, DLDataType dtype,
-                                ffi::Optional<ffi::String> mem_scope) {
-  if (!mem_scope.has_value() || mem_scope.value().empty() || mem_scope.value() == "global") {
+                                Optional<String> mem_scope) {
+  if (!mem_scope.defined() || mem_scope.value() == "" || mem_scope.value() == "global") {
     // by default, we can always redirect to the flat memory allocations
     DLTensor temp;
     temp.data = nullptr;
@@ -164,85 +162,82 @@ TVMStreamHandle DeviceAPI::CreateStream(Device dev) { return nullptr; }
 
 void DeviceAPI::FreeStream(Device dev, TVMStreamHandle stream) {}
 
-void DeviceAPI::SetStream(Device dev, TVMStreamHandle stream) {
-  TVM_FFI_CHECK_SAFE_CALL(TVMFFIEnvSetStream(dev.device_type, dev.device_id, stream, nullptr));
-}
-
-TVMStreamHandle DeviceAPI::GetCurrentStream(Device dev) {
-  return TVMFFIEnvGetStream(dev.device_type, dev.device_id);
-}
+TVMStreamHandle DeviceAPI::GetCurrentStream(Device dev) { return nullptr; }
 
 void DeviceAPI::SyncStreamFromTo(Device dev, TVMStreamHandle event_src, TVMStreamHandle event_dst) {
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef()
-      .def("runtime.Device_StreamCreate",
-           [](DLDevice dev) {
-             return reinterpret_cast<int64_t>(DeviceAPIManager::Get(dev)->CreateStream(dev));
-           })
-      .def("runtime.Device_StreamFree",
-           [](DLDevice dev, int64_t stream) {
-             DeviceAPIManager::Get(dev)->FreeStream(dev, reinterpret_cast<TVMStreamHandle>(stream));
-           })
-      .def("runtime.Device_SetStream",
-           [](DLDevice dev, int64_t stream) {
-             DeviceAPIManager::Get(dev)->SetStream(dev, reinterpret_cast<TVMStreamHandle>(stream));
-           })
-      .def("runtime.Device_StreamSync",
-           [](DLDevice dev, int64_t stream) {
-             DeviceAPIManager::Get(dev)->StreamSync(dev, reinterpret_cast<TVMStreamHandle>(stream));
-           })
-      .def("runtime.Device_StreamSyncFromTo", [](DLDevice dev, int64_t src, int64_t dst) {
-        DeviceAPIManager::Get(dev)->SyncStreamFromTo(dev, reinterpret_cast<TVMStreamHandle>(src),
-                                                     reinterpret_cast<TVMStreamHandle>(dst));
-      });
-}
+TVM_FFI_REGISTER_GLOBAL("runtime.Device_StreamCreate").set_body_typed([](DLDevice dev) {
+  return reinterpret_cast<int64_t>(DeviceAPIManager::Get(dev)->CreateStream(dev));
+});
+
+TVM_FFI_REGISTER_GLOBAL("runtime.Device_StreamFree")
+    .set_body_typed([](DLDevice dev, int64_t stream) {
+      DeviceAPIManager::Get(dev)->FreeStream(dev, reinterpret_cast<TVMStreamHandle>(stream));
+    });
+
+TVM_FFI_REGISTER_GLOBAL("runtime.Device_SetStream")
+    .set_body_typed([](DLDevice dev, int64_t stream) {
+      DeviceAPIManager::Get(dev)->SetStream(dev, reinterpret_cast<TVMStreamHandle>(stream));
+    });
+
+TVM_FFI_REGISTER_GLOBAL("runtime.Device_StreamSync")
+    .set_body_typed([](DLDevice dev, int64_t stream) {
+      DeviceAPIManager::Get(dev)->StreamSync(dev, reinterpret_cast<TVMStreamHandle>(stream));
+    });
+
+TVM_FFI_REGISTER_GLOBAL("runtime.Device_StreamSyncFromTo")
+    .set_body_typed([](DLDevice dev, int64_t src, int64_t dst) {
+      DeviceAPIManager::Get(dev)->SyncStreamFromTo(dev, reinterpret_cast<TVMStreamHandle>(src),
+                                                   reinterpret_cast<TVMStreamHandle>(dst));
+    });
 
 // set device api
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef()
-      .def_packed(tvm::runtime::symbol::tvm_set_device,
-                  [](tvm::ffi::PackedArgs args, tvm::ffi::Any* ret) {
-                    DLDevice dev;
-                    dev.device_type = static_cast<DLDeviceType>(args[0].cast<int>());
-                    dev.device_id = args[1].cast<int>();
-                    DeviceAPIManager::Get(dev)->SetDevice(dev);
-                  })
-      .def_packed("runtime.GetDeviceAttr",
-                  [](tvm::ffi::PackedArgs args, tvm::ffi::Any* ret) {
-                    DLDevice dev;
-                    dev.device_type = static_cast<DLDeviceType>(args[0].cast<int>());
-                    dev.device_id = args[1].cast<int>();
+TVM_FFI_REGISTER_GLOBAL(tvm::runtime::symbol::tvm_set_device)
+    .set_body_packed([](tvm::ffi::PackedArgs args, tvm::ffi::Any* ret) {
+      DLDevice dev;
+      dev.device_type = static_cast<DLDeviceType>(args[0].cast<int>());
+      dev.device_id = args[1].cast<int>();
+      DeviceAPIManager::Get(dev)->SetDevice(dev);
+    });
 
-                    DeviceAttrKind kind = static_cast<DeviceAttrKind>(args[2].cast<int>());
-                    if (kind == kExist) {
-                      DeviceAPI* api = DeviceAPIManager::Get(dev.device_type, true);
-                      if (api != nullptr) {
-                        api->GetAttr(dev, kind, ret);
-                      } else {
-                        *ret = 0;
-                      }
-                    } else {
-                      DeviceAPIManager::Get(dev)->GetAttr(dev, kind, ret);
-                    }
-                  })
-      .def("runtime.TVMSetStream", [](int device_type, int device_id, void* stream) {
-        Device dev;
-        dev.device_type = static_cast<DLDeviceType>(device_type);
-        dev.device_id = device_id;
-        DeviceAPIManager::Get(dev)->SetStream(dev, stream);
-      });
-}
+// set device api
+TVM_FFI_REGISTER_GLOBAL("runtime.GetDeviceAttr")
+    .set_body_packed([](tvm::ffi::PackedArgs args, tvm::ffi::Any* ret) {
+      DLDevice dev;
+      dev.device_type = static_cast<DLDeviceType>(args[0].cast<int>());
+      dev.device_id = args[1].cast<int>();
+
+      DeviceAttrKind kind = static_cast<DeviceAttrKind>(args[2].cast<int>());
+      if (kind == kExist) {
+        DeviceAPI* api = DeviceAPIManager::Get(dev.device_type, true);
+        if (api != nullptr) {
+          api->GetAttr(dev, kind, ret);
+        } else {
+          *ret = 0;
+        }
+      } else {
+        DeviceAPIManager::Get(dev)->GetAttr(dev, kind, ret);
+      }
+    });
+
+TVM_FFI_REGISTER_GLOBAL("runtime.TVMSetStream")
+    .set_body_typed([](int device_type, int device_id, void* stream) {
+      Device dev;
+      dev.device_type = static_cast<DLDeviceType>(device_type);
+      dev.device_id = device_id;
+      DeviceAPIManager::Get(dev)->SetStream(dev, stream);
+    });
 }  // namespace runtime
 }  // namespace tvm
 
 using namespace tvm::runtime;
 
 int TVMBackendGetFuncFromEnv(void* mod_node, const char* func_name, TVMFFIObjectHandle* func) {
-  return TVMFFIEnvModLookupFromImports(mod_node, func_name, func);
+  TVM_FFI_SAFE_CALL_BEGIN();
+  *func = const_cast<tvm::ffi::FunctionObj*>(
+      static_cast<ModuleNode*>(mod_node)->GetFuncFromEnv(func_name)->get());
+  TVM_FFI_SAFE_CALL_END();
 }
 
 void* TVMBackendAllocWorkspace(int device_type, int device_id, uint64_t size, int dtype_code_hint,

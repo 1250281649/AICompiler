@@ -56,8 +56,8 @@ using namespace topi::detail;
  *
  * \return the shape of the output.
  */
-ffi::Array<PrimExpr> InferEinsumShape(const std::string& subscripts,
-                                      const std::vector<ffi::Array<PrimExpr>>& operands);
+Array<PrimExpr> InferEinsumShape(const std::string& subscripts,
+                                 const std::vector<Array<PrimExpr>>& operands);
 
 /*!
  * \brief Evaluates the Einstein summation convention on the operands.
@@ -70,7 +70,7 @@ ffi::Array<PrimExpr> InferEinsumShape(const std::string& subscripts,
  *
  * \return The calculation based on the Einstein summation convention.
  */
-Tensor einsum(const std::string& subscripts_str, const ffi::Array<Tensor> inputs,
+Tensor einsum(const std::string& subscripts_str, const Array<Tensor> inputs,
               std::string name = "T_einsum", std::string tag = kEinsum);
 
 struct EinsumEquation {

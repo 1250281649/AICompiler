@@ -104,31 +104,31 @@ void CopyFile(const std::string& src_file_name, const std::string& dest_file_nam
  */
 void RemoveFile(const std::string& file_name);
 
-constexpr uint64_t kTVMTensorListMagic = 0xF7E58D4F05049CB7;
+constexpr uint64_t kTVMNDArrayListMagic = 0xF7E58D4F05049CB7;
 /*!
  * \brief Load parameters from a string.
  * \param param_blob Serialized string of parameters.
  * \return Map of parameter name to parameter value.
  */
-ffi::Map<ffi::String, Tensor> LoadParams(const std::string& param_blob);
+Map<String, NDArray> LoadParams(const std::string& param_blob);
 /*!
  * \brief Load parameters from a stream.
  * \param strm Stream to load parameters from.
  * \return Map of parameter name to parameter value.
  */
-ffi::Map<ffi::String, Tensor> LoadParams(dmlc::Stream* strm);
+Map<String, NDArray> LoadParams(dmlc::Stream* strm);
 /*!
  * \brief Serialize parameters to a byte array.
  * \param params Parameters to save.
- * \return ffi::String containing binary parameter data.
+ * \return String containing binary parameter data.
  */
-std::string SaveParams(const ffi::Map<ffi::String, Tensor>& params);
+std::string SaveParams(const Map<String, NDArray>& params);
 /*!
  * \brief Serialize parameters to a stream.
  * \param strm Stream to write to.
  * \param params Parameters to save.
  */
-void SaveParams(dmlc::Stream* strm, const ffi::Map<ffi::String, Tensor>& params);
+void SaveParams(dmlc::Stream* strm, const Map<String, NDArray>& params);
 
 /*!
  * \brief A dmlc stream which wraps standard file operations.

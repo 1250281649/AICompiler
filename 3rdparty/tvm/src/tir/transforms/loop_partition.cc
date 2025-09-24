@@ -23,7 +23,6 @@
 #include <tvm/arith/analyzer.h>
 #include <tvm/arith/bound.h>
 #include <tvm/ffi/function.h>
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/tir/analysis.h>
 #include <tvm/tir/builtin.h>
 #include <tvm/tir/expr.h>
@@ -59,18 +58,19 @@ struct LoopPartitionConfigNode : public AttrsNodeReflAdapter<LoopPartitionConfig
                 "Unroll loops with pragma_loop_partition_hint and no interval",
                 refl::DefaultValue(false));
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("tir.transform.LoopPartitionConfig", LoopPartitionConfigNode,
-                                    BaseAttrsNode);
+
+  static constexpr const char* _type_key = "tir.transform.LoopPartitionConfig";
+  TVM_FFI_DECLARE_FINAL_OBJECT_INFO(LoopPartitionConfigNode, BaseAttrsNode);
 };
 
-TVM_FFI_STATIC_INIT_BLOCK() { LoopPartitionConfigNode::RegisterReflection(); }
+TVM_FFI_STATIC_INIT_BLOCK({ LoopPartitionConfigNode::RegisterReflection(); });
 
 class LoopPartitionConfig : public Attrs {
  public:
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NOTNULLABLE(LoopPartitionConfig, Attrs,
-                                                LoopPartitionConfigNode);
+  TVM_DEFINE_NOTNULLABLE_OBJECT_REF_METHODS(LoopPartitionConfig, Attrs, LoopPartitionConfigNode);
 };
 
+TVM_REGISTER_NODE_TYPE(LoopPartitionConfigNode);
 TVM_REGISTER_PASS_CONFIG_OPTION("tir.LoopPartition", LoopPartitionConfig);
 
 using arith::DeduceBound;
@@ -113,7 +113,7 @@ class CandidateSelector final : public StmtExprVisitor {
     // always treat var with hint to be partitioned
     const VarNode* var = op->loop_var.get();
     if (partition_hint_vars.count(var)) {
-      candidates.insert(ffi::GetRef<Stmt>(op));
+      candidates.insert(GetRef<Stmt>(op));
       StmtExprVisitor::VisitStmt_(op);
       return;
     }
@@ -122,7 +122,7 @@ class CandidateSelector final : public StmtExprVisitor {
       record_.insert({var, false});
       StmtExprVisitor::VisitStmt_(op);
       if (record_.at(var) && !no_split_) {
-        candidates.insert(ffi::GetRef<Stmt>(op));
+        candidates.insert(GetRef<Stmt>(op));
       }
       record_.erase(var);
     } else {
@@ -137,7 +137,7 @@ class CandidateSelector final : public StmtExprVisitor {
       Var var = iv->var;
       // always treat var with hint to be partitioned
       if (partition_hint_vars.count(var.get())) {
-        candidates.insert(ffi::GetRef<Stmt>(op));
+        candidates.insert(GetRef<Stmt>(op));
         StmtExprVisitor::VisitStmt_(op);
         return;
       }
@@ -146,7 +146,7 @@ class CandidateSelector final : public StmtExprVisitor {
         record_.insert({var.get(), false});
         StmtExprVisitor::VisitStmt_(op);
         if (record_.at(var.get()) && !no_split_) {
-          candidates.insert(ffi::GetRef<Stmt>(op));
+          candidates.insert(GetRef<Stmt>(op));
         }
         record_.erase(var.get());
         return;
@@ -154,9 +154,9 @@ class CandidateSelector final : public StmtExprVisitor {
     } else if (op->attr_key == attr::pragma_loop_partition_hint) {
       if (analyzer_.CanProve(op->value)) {
         const VarNode* var = nullptr;
-        if (op->node.as<VarNode>()) {
+        if (op->node->IsInstance<VarNode>()) {
           var = op->node.as<VarNode>();
-        } else if (op->node.as<IterVarNode>()) {
+        } else if (op->node->IsInstance<IterVarNode>()) {
           var = op->node.as<IterVarNode>()->var.get();
         }
         ICHECK(var);
@@ -213,7 +213,7 @@ class CandidateSelector final : public StmtExprVisitor {
 #define DEFINE_PARTITION_FINDER_VISIT_CMP_OP(OpNodeT) \
   void VisitExpr_(const OpNodeT* op) final {          \
     if (has_partition_hint_) {                        \
-      DeduceCondition(ffi::GetRef<PrimExpr>(op));     \
+      DeduceCondition(GetRef<PrimExpr>(op));          \
       return;                                         \
     }                                                 \
     StmtExprVisitor::VisitExpr_(op);                  \
@@ -421,7 +421,7 @@ class LoopPartitioner : public StmtMutator {
 
   Stmt VisitStmt_(const ForNode* op) final {
     analyzer_.Bind(op->loop_var, Range::FromMinExtent(op->min, op->extent), true);
-    auto fs = ffi::GetRef<Stmt>(op);
+    auto fs = GetRef<Stmt>(op);
     if (selector.candidates.count(fs)) {
       Stmt s = TryPartition(fs, op->loop_var, op->min, op->min + op->extent - 1, op->body, false);
       if (s.defined()) return s;
@@ -443,7 +443,7 @@ class LoopPartitioner : public StmtMutator {
     const IterVarNode* iv = op->node.as<IterVarNode>();
     ICHECK(iv);
     Var var = iv->var;
-    auto as = ffi::GetRef<Stmt>(op);
+    auto as = GetRef<Stmt>(op);
     if (selector.candidates.count(as)) {
       Stmt s = TryPartition(as, var, 0, op->value - 1, op->body, true);
       if (s.defined()) return s;
@@ -489,7 +489,7 @@ class LoopPartitioner : public StmtMutator {
 std::pair<IntSet, ExpressionSet> LoopPartitioner::GetIntervalAndCondset(
     const Partition& partitions, const arith::IntervalSet& for_interval, bool cond_value,
     bool has_partition_hint) {
-  ffi::Array<IntSet> sets;
+  Array<IntSet> sets;
   ExpressionSet cond_set;
 
   for (const auto& kv : partitions) {
@@ -819,10 +819,7 @@ Pass LoopPartition() {
   return CreatePrimFuncPass(pass_func, 0, "tir.LoopPartition", {});
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("tir.transform.LoopPartition", LoopPartition);
-}
+TVM_FFI_REGISTER_GLOBAL("tir.transform.LoopPartition").set_body_typed(LoopPartition);
 
 }  // namespace transform
 

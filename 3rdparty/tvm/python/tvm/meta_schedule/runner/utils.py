@@ -17,9 +17,8 @@
 """Runner utility functions"""
 import itertools
 from typing import Any, Callable, Dict, List
-import tvm.runtime
 
-from ...runtime import Device, Module
+from ...runtime import Device, Module, ndarray
 from .config import EvaluatorConfig
 
 T_ARG_INFO_JSON_OBJ = List[Any]  # pylint: disable=invalid-name
@@ -53,8 +52,8 @@ def alloc_argument_common(
         The allocation args
     """
 
-    def alloc_tensor(_, dtype, shape) -> tvm.runtime.Tensor:
-        arg = tvm.runtime.empty(shape=shape, dtype=dtype, device=device)
+    def alloc_tensor(_, dtype, shape) -> ndarray.NDArray:
+        arg = ndarray.empty(shape=shape, dtype=dtype, device=device)
         f_random_fill(arg)
         return arg
 

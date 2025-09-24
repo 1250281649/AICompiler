@@ -27,7 +27,7 @@ import numpy as np
 import onnx
 import onnxruntime
 import pytest
-from onnx import ModelProto, TensorProto, helper
+from onnx import ModelProto, TensorProto, helper, mapping
 
 import tvm
 import tvm.testing
@@ -62,7 +62,7 @@ def generate_random_inputs(
 def generate_random_value(shape, elem_type) -> np.ndarray:
     # Extract datatype for the input.
     if elem_type:
-        dtype = str(helper.tensor_dtype_to_np_dtype(elem_type))
+        dtype = str(onnx.mapping.TENSOR_TYPE_TO_NP_TYPE[elem_type])
     else:
         dtype = "float32"
 
@@ -87,7 +87,6 @@ def check_correctness(
     opset: int = 14,
     rtol: float = 1e-7,
     atol: float = 1e-5,
-    check_dtypes: bool = False,
 ) -> None:
     """Run an onnx model in both onnxruntime and TVM through our importer
        confirm that the results match. Otherwise, an exception will be raised.
@@ -105,8 +104,6 @@ def check_correctness(
     atol: float
         Set the tolerance of correctness checking. Some ops may be show more
         arithmetic variance than others.
-    check_dtypes: bool
-        Check if data types are the same.
     """
     # Configure model format.
     if ir_version is not None:
@@ -155,35 +152,17 @@ def check_correctness(
         # while the ONNX output number is one, which is a list
         tvm_output = [tvm_output]
 
-    def _get_numpy_subdtype(narray):
-        if np.issubdtype(narray.dtype, np.integer):
-            return "integer"
-        elif np.issubdtype(narray.dtype, np.floating):
-            return "floating"
-        elif np.issubdtype(narray.dtype, np.bool_):
-            return "bool"
-        elif np.issubdtype(narray.dtype, np.complexfloating):
-            return "complexfloating"
-        else:
-            return "other"
-
     def _check_output(tvm_out, ort_out):
         if isinstance(tvm_out, tuple) and isinstance(ort_out, (tvm.runtime.ShapeTuple, list)):
             assert len(tvm_out) == len(ort_out), "Unequal number of outputs"
             for tvm_out_i, ort_out_i in zip(tvm_out, ort_out):
                 _check_output(tvm_out_i, ort_out_i)
-        elif isinstance(tvm_out, tvm.runtime.Tensor) and isinstance(ort_out, np.ndarray):
-            if check_dtypes:
-                assert tvm_out.numpy().dtype == ort_out.dtype
+        elif isinstance(tvm_out, tvm.nd.NDArray) and isinstance(ort_out, np.ndarray):
             tvm.testing.assert_allclose(tvm_out.numpy(), ort_out, rtol=rtol, atol=atol)
         elif isinstance(tvm_out, tvm.runtime.ShapeTuple) and isinstance(ort_out, np.ndarray):
-            shape_out = tvm.runtime.tensor([int(i) for i in tvm_out])
-            if check_dtypes:
-                assert _get_numpy_subdtype(shape_out.numpy()) == _get_numpy_subdtype(ort_out)
+            shape_out = tvm.nd.array([int(i) for i in tvm_out])
             tvm.testing.assert_allclose(shape_out.numpy(), ort_out, rtol=rtol, atol=atol)
         elif isinstance(tvm_out, (int, float, bool)) and isinstance(ort_out, np.ndarray):
-            if check_dtypes:
-                assert _get_numpy_subdtype(np.array(tvm_out)) == _get_numpy_subdtype(ort_out)
             tvm.testing.assert_allclose(np.array(tvm_out), ort_out, rtol=rtol, atol=atol)
         else:
             raise ValueError(f"Unsupported types: {type(tvm_out)}, {type(ort_out)}")
@@ -288,7 +267,7 @@ def verify_binary(
     )
 
     model = helper.make_model(graph, producer_name="binary_test")
-    check_correctness(model, opset=opset, check_dtypes=True)
+    check_correctness(model, opset=opset)
 
 
 def verify_binary_scalar(op_name, attrs={}, domain=None, dtype=TensorProto.INT32, opset=14):
@@ -303,7 +282,7 @@ def verify_binary_scalar(op_name, attrs={}, domain=None, dtype=TensorProto.INT32
     )
 
     model = helper.make_model(graph, producer_name="binary_test")
-    check_correctness(model, opset=opset, check_dtypes=True)
+    check_correctness(model, opset=opset)
 
 
 def verify_compare(op_name, shape, attrs={}, domain=None):
@@ -969,7 +948,7 @@ def test_mish():
 
 
 def test_prelu():
-    verify_binary("PRelu", [3, 32, 32], [1], [3, 32, 32])
+    verify_binary("PRelu", [3, 32, 32], [3, 32, 32], [3, 32, 32])
 
 
 def test_thresholded_relu():
@@ -1120,7 +1099,7 @@ def test_pow():
     verify_binary("Pow", [32, 32], [32, 32], [32, 32])
 
 
-@pytest.mark.parametrize("reverse", [True, False])
+@pytest.mark.parametrize("reverse", [False])
 @pytest.mark.parametrize("exclusive", [False])
 def test_cumsum(reverse, exclusive):
     cumsum_node = helper.make_node(
@@ -1303,20 +1282,18 @@ def test_mean_variance_norm():
 
 
 def test_layer_norm():
-    layer_norm_node = helper.make_node(
-        "LayerNormalization", ["input", "scale", "bias"], ["Y"], epsilon=1e-12
-    )
+    layer_norm_node = helper.make_node("LayerNormalization", ["a", "b", "c"], ["d"], epsilon=1e-12)
 
     graph = helper.make_graph(
         [layer_norm_node],
         "layer_norm_test",
         inputs=[
-            helper.make_tensor_value_info("input", TensorProto.FLOAT, [32, 32]),
-            helper.make_tensor_value_info("scale", TensorProto.FLOAT, [32]),
-            helper.make_tensor_value_info("bias", TensorProto.FLOAT, [32]),
+            helper.make_tensor_value_info("a", TensorProto.FLOAT, [32, 32]),
+            helper.make_tensor_value_info("b", TensorProto.FLOAT, [32]),
+            helper.make_tensor_value_info("c", TensorProto.FLOAT, [32]),
         ],
         outputs=[
-            helper.make_tensor_value_info("Y", TensorProto.FLOAT, [32, 32]),
+            helper.make_tensor_value_info("d", TensorProto.FLOAT, [32, 32]),
         ],
     )
 
@@ -1324,65 +1301,21 @@ def test_layer_norm():
     check_correctness(model)
 
     # Test case with no bias that is an optional input
-    layer_norm_node = helper.make_node(
-        "LayerNormalization", ["input", "scale"], ["Y"], epsilon=1e-12
-    )
+    layer_norm_node = helper.make_node("LayerNormalization", ["a", "b"], ["d"], epsilon=1e-12)
 
     graph = helper.make_graph(
         [layer_norm_node],
         "layer_norm_test",
         inputs=[
-            helper.make_tensor_value_info("input", TensorProto.FLOAT, [32, 32]),
-            helper.make_tensor_value_info("scale", TensorProto.FLOAT, [32]),
+            helper.make_tensor_value_info("a", TensorProto.FLOAT, [32, 32]),
+            helper.make_tensor_value_info("b", TensorProto.FLOAT, [32]),
         ],
         outputs=[
-            helper.make_tensor_value_info("Y", TensorProto.FLOAT, [32, 32]),
+            helper.make_tensor_value_info("d", TensorProto.FLOAT, [32, 32]),
         ],
     )
 
     model = helper.make_model(graph, producer_name="layer_norm_test")
-    check_correctness(model)
-
-
-def test_layer_norm_with_nd_gamma_beta():
-    layer_norm_node = helper.make_node(
-        "LayerNormalization", ["input", "scale", "bias"], ["Y"], axis=1, epsilon=1e-12
-    )
-
-    graph = helper.make_graph(
-        [layer_norm_node],
-        "layer_norm_with_nd_gamma_beta_test",
-        inputs=[
-            helper.make_tensor_value_info("input", TensorProto.FLOAT, [1, 3, 4, 4]),
-            helper.make_tensor_value_info("scale", TensorProto.FLOAT, [3, 4, 4]),
-            helper.make_tensor_value_info("bias", TensorProto.FLOAT, [3, 4, 4]),
-        ],
-        outputs=[
-            helper.make_tensor_value_info("Y", TensorProto.FLOAT, [1, 3, 4, 4]),
-        ],
-    )
-
-    model = helper.make_model(graph, producer_name="layer_norm_with_nd_gamma_beta_test")
-    check_correctness(model)
-
-    # Test case with no bias that is an optional input
-    layer_norm_node = helper.make_node(
-        "LayerNormalization", ["input", "scale"], ["Y"], axis=1, epsilon=1e-12
-    )
-
-    graph = helper.make_graph(
-        [layer_norm_node],
-        "layer_norm_with_nd_gamma_beta_test",
-        inputs=[
-            helper.make_tensor_value_info("input", TensorProto.FLOAT, [32, 32]),
-            helper.make_tensor_value_info("scale", TensorProto.FLOAT, [32]),
-        ],
-        outputs=[
-            helper.make_tensor_value_info("Y", TensorProto.FLOAT, [32, 32]),
-        ],
-    )
-
-    model = helper.make_model(graph, producer_name="layer_norm_with_nd_gamma_beta_test")
     check_correctness(model)
 
 
@@ -1909,106 +1842,6 @@ def test_expand(dynamic):
         _test_expand_dynamic_shapeexpr("expand_with_dynamic_dim", data, shape_data, shape, ref_data)
 
 
-def test_expand_incompatible_broadcasting():
-    """
-    This test case reproduces the error where input tensor shape at dim 1 is 25
-    and target shape at dim 3 is 56, which violates ONNX broadcasting rules
-    """
-
-    def _test_expand_error_case(name, data_shape, target_shape_vals):
-        data = np.random.uniform(size=data_shape).astype(np.float32)
-
-        shape_array = np.array(target_shape_vals, dtype=np.int64)
-        shape_node = onnx.helper.make_node(
-            "Constant",
-            inputs=[],
-            outputs=["shape"],
-            value=onnx.helper.make_tensor(
-                name="const_tensor",
-                data_type=onnx.TensorProto.INT64,
-                dims=shape_array.shape,
-                vals=shape_array.flatten(),
-            ),
-        )
-
-        expand_node = helper.make_node("Expand", ["in", "shape"], ["out"])
-
-        graph = helper.make_graph(
-            [shape_node, expand_node],
-            "expand_error_test",
-            inputs=[helper.make_tensor_value_info("in", TensorProto.FLOAT, list(data.shape))],
-            outputs=[helper.make_tensor_value_info("out", TensorProto.FLOAT, target_shape_vals)],
-        )
-
-        model = helper.make_model(graph, producer_name=name)
-
-        with pytest.raises(ValueError) as exc_info:
-            from_onnx(model, keep_params_in_input=True)
-
-        error_msg = str(exc_info.value)
-        assert (
-            "broadcast" in error_msg.lower() or "incompatible" in error_msg.lower()
-        ), f"Expected broadcasting error, but got: {error_msg}"
-
-    # Test case 1: Reproduce the exact error from the issue-17769
-    # Input shape: (25,), target shape: (1, 1, 1, 56)
-    # This should faill because input dim 1 (25) != target dim 3 (56) and neither is 1
-    _test_expand_error_case(
-        "expand_incompatible_25_to_56",
-        data_shape=(25,),
-        target_shape_vals=(1, 1, 1, 56),
-    )
-
-    # Test case 2: Another incompatible case
-    # Input shape: (1, 25), target shape: (1, 1, 1, 56)
-    # After right-alignment, input (1, 1, 1, 25) vs. target (1, 1, 1, 56)
-    # This should fail because 25 != 56 and neither is 1
-    _test_expand_error_case(
-        "expand_incompatible_aligned_25_to_56",
-        data_shape=(1, 25),
-        target_shape_vals=(1, 1, 1, 56),
-    )
-
-    # Test case 3: Valid case for comparison - should not raise error
-    def _test_expand_valid_case():
-        """Test a valid expand case to ensure our fix doesn't break valid operations"""
-        data_shape = (1, 25)
-        target_shape_vals = [2, 25]  # Valid: input (1, 25) can broadcast to (2, 25)
-
-        data = np.random.uniform(size=data_shape).astype(np.float32)
-        shape_array = np.array(target_shape_vals, dtype=np.int64)
-
-        shape_node = onnx.helper.make_node(
-            "Constant",
-            inputs=[],
-            outputs=["shape"],
-            value=onnx.helper.make_tensor(
-                name="const_tensor",
-                data_type=onnx.TensorProto.INT64,
-                dims=shape_array.shape,
-                vals=shape_array.flatten(),
-            ),
-        )
-
-        expand_node = helper.make_node("Expand", ["in", "shape"], ["out"])
-
-        graph = helper.make_graph(
-            [shape_node, expand_node],
-            "expand_valid_test",
-            inputs=[helper.make_tensor_value_info("in", TensorProto.FLOAT, list(data.shape))],
-            outputs=[helper.make_tensor_value_info("out", TensorProto.FLOAT, target_shape_vals)],
-        )
-
-        model = helper.make_model(graph, producer_name="expand_valid_test_case")
-
-        try:
-            tvm_model = from_onnx(model, keep_params_in_input=True)
-        except Exception as e:
-            pytest.fail(f"Valid expand case should not fail, but got error: {e}")
-
-    _test_expand_valid_case()
-
-
 # TODO(jwfromm) Current approach to dynamic expand is technically not well formed. Reenable once fixed.
 @pytest.mark.skip("Produces ill-formed IR")
 def test_constantofshape():
@@ -2018,7 +1851,7 @@ def test_constantofshape():
             ["input"],
             ["output"],
             value=helper.make_tensor(
-                "value", helper.np_dtype_to_tensor_dtype(np.dtype(dtype)), (1,), (value,)
+                "value", mapping.NP_TYPE_TO_TENSOR_TYPE[np.dtype(dtype)], (1,), (value,)
             ),
         )
 
@@ -2038,7 +1871,7 @@ def test_constantofshape():
             ],
             outputs=[
                 helper.make_tensor_value_info(
-                    "output", helper.np_dtype_to_tensor_dtype(np.dtype(dtype)), input_dim
+                    "output", mapping.NP_TYPE_TO_TENSOR_TYPE[np.dtype(dtype)], input_dim
                 )
             ],
         )
@@ -2420,7 +2253,7 @@ def test_split(fp_arith, dynamic):
 
         inputs = [
             helper.make_tensor_value_info(
-                "input", helper.np_dtype_to_tensor_dtype(indata.dtype), indata_shape
+                "input", mapping.NP_TYPE_TO_TENSOR_TYPE[indata.dtype], indata_shape
             )
         ]
 
@@ -2454,7 +2287,7 @@ def test_split(fp_arith, dynamic):
             outputs=[
                 helper.make_tensor_value_info(
                     f"output_{i}",
-                    helper.np_dtype_to_tensor_dtype(indata.dtype),
+                    mapping.NP_TYPE_TO_TENSOR_TYPE[indata.dtype],
                     list(outdata_shapes[i]),
                 )
                 for i in range(len(split_index))
@@ -2526,34 +2359,8 @@ def test_tile(dynamic):
     verify_tile(x.shape, repeats, z_array.shape)
 
 
-def _generate_roi_cases():
-    # Base case when with_roi is False
-    roi_list = [
-        pytest.param(False, None, id="no_roi"),
-    ]
-
-    # Valid when with_roi is True
-    roi_cases = [
-        [0.0, 0.0, 0.0, 0.0],
-        [0.0, 0.0, 1.0, 1.0],
-        [0.1, 0.1, 0.9, 0.9],
-        [0.2, 0.2, 0.8, 0.8],
-        [0.3, 0.3, 0.7, 0.7],
-        [0.4, 0.4, 0.6, 0.6],
-        [0.5, 0.5, 0.5, 0.5],
-        [0.1, 0.2, 0.9, 0.8],
-    ]
-    for roi in roi_cases:
-        roi_list.append(pytest.param(True, roi, id=f"roi_{'_'.join(str(x) for x in roi)}"))
-
-    return roi_list
-
-
-@pytest.mark.parametrize("with_roi, roi_list", _generate_roi_cases())
-def test_resize(with_roi, roi_list):
-    resize_node = helper.make_node(
-        "Resize", ["X", "roi" if with_roi else "", "scales"], ["Y"], mode="cubic"
-    )
+def test_resize():
+    resize_node = helper.make_node("Resize", ["X", "", "scales"], ["Y"], mode="cubic")
 
     graph = helper.make_graph(
         [resize_node],
@@ -2563,7 +2370,6 @@ def test_resize(with_roi, roi_list):
         ],
         initializer=[
             helper.make_tensor("scales", TensorProto.FLOAT, [4], [1.0, 1.0, 2.0, 2.0]),
-            *([helper.make_tensor("roi", TensorProto.FLOAT, [4], roi_list)] if with_roi else []),
         ],
         outputs=[
             helper.make_tensor_value_info("Y", TensorProto.FLOAT, [1, 3, 64, 64]),

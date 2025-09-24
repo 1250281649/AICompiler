@@ -446,7 +446,7 @@ def split(ary, indices_or_sections, axis=0):
     return cpp.split(ary, indices_or_sections, axis)
 
 
-def take(a, indices, axis=None, batch_dims=0, mode="fast"):
+def take(a, indices, axis=None, batch_dims=0, mode="clip"):
     """Take elements from an array along an axis.
 
     Parameters
@@ -465,11 +465,10 @@ def take(a, indices, axis=None, batch_dims=0, mode="fast"):
         The number of batch dimensions. By default is 0.
 
     mode : str, optional
-        Specifies how out-of-bounds indices will behave.
-        - fast (default): extra indices lead to seg fault (user must make sure indices are in-bound)
-        - nan: produce NaNs for out-of-bounds indices
-        - wrap: wrap around the indices
-        - clip: clip to the range
+        Specifies how out-of-bound indices will behave.
+        clip - clip to the range (default)
+        wrap - wrap around the indices
+        fast - no clip or wrap around (user must make sure indices are in-bound)
 
     Returns
     -------
@@ -736,7 +735,7 @@ def sequence_mask(data, valid_length, mask_value=0, axis=0):
     return cpp.sequence_mask(data, valid_length, mask_value, axis)
 
 
-def tensor_size(array, dtype="int32"):
+def ndarray_size(array, dtype="int32"):
     """Get the number of elements of input array
 
     Parameters
@@ -752,7 +751,7 @@ def tensor_size(array, dtype="int32"):
     result : tvm.te.Tensor
         The resulting tensor.
     """
-    return cpp.tensor_size(array, dtype)
+    return cpp.ndarray_size(array, dtype)
 
 
 def where(condition, x, y):

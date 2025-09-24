@@ -55,7 +55,3 @@ cutlass_example_add_executable(
   tiled_copy.cu
 )
 
-cutlass_example_add_executable(
-  cute_tutorial_tiled_copy_if
-  tiled_copy_if.cu
-)

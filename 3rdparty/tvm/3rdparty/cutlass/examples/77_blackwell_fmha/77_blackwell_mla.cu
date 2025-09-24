@@ -59,7 +59,7 @@ using namespace cutlass::fmha::kernel;
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 enum class InitStyle {
-  kOne, kLinearStride128, kLinearStride1, kRandom, kRandomLarge, kNone
+  kOne, kLinearStride128, kLinearStride1, kRandom, kNone
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -80,7 +80,6 @@ struct Options {
   int iterations = 3;
   bool verify = false;
   bool verbose = false;
-  bool is_fused_reduction = false;
 
   int sm_count = 0;
 
@@ -98,9 +97,6 @@ struct Options {
     else {
       if (s == "r") {
         dst = InitStyle::kRandom;
-      }
-      else if (s == "l") {
-        dst = InitStyle::kRandomLarge;
       }
       else if (s == "1") {
         dst = InitStyle::kOne;
@@ -140,22 +136,15 @@ struct Options {
     if (b == 0) b = 1;
 
     cmd.get_cmd_line_argument("split_kv", split_kv, defaults.split_kv);
-    if (split_kv == 0) {
-      split_kv = 1;
-    }
     cmd.get_cmd_line_argument("page", page, defaults.page);
     cmd.get_cmd_line_argument("spread", spread, defaults.spread);
-    is_var_split_kv = cmd.check_cmd_line_flag("var_split_kv");
+    cmd.get_cmd_line_argument("is_var_split_kv", is_var_split_kv, false);
     if (page == -1) {
       is_var_split_kv = false;
     }
     cmd.get_cmd_line_argument("max_split_kv", max_split_kv, defaults.max_split_kv);
     if (is_var_split_kv == true) {
       split_kv = max_split_kv;
-    }
-    is_fused_reduction = cmd.check_cmd_line_flag("fuse_reduction");
-    if (split_kv == 1) {
-      is_fused_reduction = false;
     }
     cmd.get_cmd_line_argument("iterations", iterations, defaults.iterations);
     verify = cmd.check_cmd_line_flag("verify");
@@ -184,8 +173,6 @@ struct Options {
       << "  --iterations=<int>          Benchmarking iterations\n"
       << "  --spread=<float>            Relative spread away from K for paging\n"
       << "  --split_kv=<int>            Split KV factor\n"
-      << "  --fused_reduction           Fuse the reduction operation\n"
-      << "  --var_split_kv              Use varying split KV factor\n"
       << "  --verify                    Verify results\n"
       << "  --verbose                   Print smem and execution time per kernel\n"
       << " --sm-count                   Sets SM count rather than querying it\n"
@@ -214,11 +201,6 @@ void initialize_block(
     case InitStyle::kRandom: {
       cutlass::reference::device::BlockFillRandomGaussian(
         block.get(), block.size(), seed, (Element) -1, (Element) 1);
-      break;
-    }
-    case InitStyle::kRandomLarge: {
-      cutlass::reference::device::BlockFillRandomGaussian(
-        block.get(), block.size(), seed, (Element) -1, (Element) 100);
       break;
     }
     case InitStyle::kLinearStride1: {
@@ -401,7 +383,11 @@ struct Runner {
     // Check if output from CUTLASS kernel and reference kernel are equal or not
     double max_diff = 0;
     double mean_diff = 0;
+#ifdef B2B
+    reference_rel_diff(block_O, block_ref_O, max_diff, mean_diff);
+#else
     reference_abs_diff(block_O, block_ref_O, max_diff, mean_diff);
+#endif
 
     bool passed_O = (max_diff < kMaxDiffThresh) && (mean_diff < kMeanDiffThresh);
     if (! passed_O) {
@@ -410,6 +396,7 @@ struct Runner {
     }
 
     bool passed_LSE = true;
+#ifndef B2B
     reference_abs_diff(block_LSE, block_ref_LSE, max_diff, mean_diff);
 
     passed_LSE = (max_diff < kMaxDiffThresh) && (mean_diff < kMeanDiffThresh);
@@ -417,6 +404,7 @@ struct Runner {
       std::cerr << "failed LSE: max diff " << max_diff 
                 << " mean " << mean_diff << std::endl;
     }
+#endif
 
     return passed_O && passed_LSE;
   }
@@ -524,8 +512,7 @@ struct Runner {
         stride_LSE}, 
       hw_info,
       options.split_kv,
-      options.is_var_split_kv ? block_split_kv.get() : nullptr,
-      options.is_fused_reduction
+      options.is_var_split_kv ? block_split_kv.get() : nullptr
     };
     if (options.split_kv < 0 && !options.is_var_split_kv) {
       Operation::set_split_kv(arguments);
@@ -683,18 +670,11 @@ struct Runner {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-int main_result = 0;
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-
 /// Helper to print a description of the example run and its result
 void print_result(const std::string& description, ExampleResult result, bool verbose) {
   std::ios fmt(nullptr);
   fmt.copyfmt(std::cout);
   std::cout << (result.passed ? (result.verified ? " [OK]  " : " [--] ") : "[FAIL] ");
-  if (! result.passed) {
-    main_result = -1;
-  }
   std::cout << std::setw(32) << std::left << description;
   std::cout.copyfmt(fmt);
   std::cout << " : " << result.tflops_tc_s << " TFLOPS/s " << result.tbytes_s << " TB/s" << std::endl;
@@ -735,17 +715,13 @@ void run_mla(Options const & options, cutlass::KernelHardwareInfo const& hw_info
   // Persistent Tile Scheduler
   run(Shape<NumHeads, Blocking, HeadDim>{}, (name + persistent).c_str(), IsPersistent<true>{});
   // Individual Tile Scheduler
-  if (!options.is_fused_reduction || options.split_kv == 1) {
-    run(Shape<NumHeads, Blocking, HeadDim>{}, (name + individual).c_str(), IsPersistent<false>{});
-  }
+  run(Shape<NumHeads, Blocking, HeadDim>{}, (name + individual).c_str(), IsPersistent<false>{});
 #elif FP16
   name += " fp16";
   // Persistent Tile Scheduler
   run(Shape<NumHeads, Blocking, HeadDim>{}, (name + persistent).c_str(), IsPersistent<true>{});
   // Individual Tile Scheduler
-  if (!options.is_fused_reduction || options.split_kv == 1) {
-    run(Shape<NumHeads, Blocking, HeadDim>{}, (name + individual).c_str(), IsPersistent<false>{});
-  }
+  run(Shape<NumHeads, Blocking, HeadDim>{}, (name + individual).c_str(), IsPersistent<false>{});
 #endif
 }
 
@@ -822,6 +798,8 @@ int main_single(int argc, char const **args) {
 int main(int argc, char const **args) {
   std::vector<std::string> full_arguments(args, args + argc);
 
+  int result = 0;
+
   bool recursed = false;
   for (size_t i = 1; i < full_arguments.size(); i++) {
     if (full_arguments[i].find(',') != std::string::npos) {
@@ -848,7 +826,7 @@ int main(int argc, char const **args) {
     main_single(argc, args);
   }
 
-  return main_result;
+  return result;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////

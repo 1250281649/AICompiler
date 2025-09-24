@@ -43,7 +43,9 @@ struct QuantizeAttrs : public AttrsNodeReflAdapter<QuantizeAttrs> {
                 "Default value is -1, which corresponds to the last axis.",
                 refl::DefaultValue(-1));
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("relax.attrs.QuantizeAttrs", QuantizeAttrs, BaseAttrsNode);
+
+  static constexpr const char* _type_key = "relax.attrs.QuantizeAttrs";
+  TVM_FFI_DECLARE_FINAL_OBJECT_INFO(QuantizeAttrs, BaseAttrsNode);
 };  // QuantizeAttrs
 
 }  // namespace relax

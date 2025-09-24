@@ -26,13 +26,10 @@
 
 #ifdef TVM_LLVM_VERSION
 
-#include <llvm/IR/Intrinsics.h>
 #include <tvm/ffi/function.h>
 #include <tvm/target/codegen.h>
 #include <tvm/tir/builtin.h>
 #include <tvm/tir/expr.h>
-
-#include "llvm_instance.h"
 
 namespace tvm {
 namespace codegen {
@@ -41,12 +38,10 @@ template <unsigned id, int num_signature>
 inline PrimExpr DispatchLLVMPureIntrin(const PrimExpr& e) {
   const tir::CallNode* call = e.as<tir::CallNode>();
   ICHECK(call != nullptr);
-  ffi::Array<PrimExpr> cargs;
+  Array<PrimExpr> cargs;
   // intrin id.
   cargs.push_back(IntImm(DataType::UInt(32), id));
-  ICHECK_EQ(call->args.size(), num_signature)
-      << "llvm.call_llvm_intrin" << llvmGetIntrinName(id) << "expects " << num_signature
-      << " arguments, but got " << call->args.size();
+  cargs.push_back(IntImm(DataType::UInt(32), num_signature));
 
   for (PrimExpr arg : call->args) {
     cargs.push_back(arg);
@@ -58,12 +53,10 @@ template <unsigned id, int num_signature>
 inline PrimExpr DispatchLLVMIntrin(const PrimExpr& e) {
   const tir::CallNode* call = e.as<tir::CallNode>();
   ICHECK(call != nullptr);
-  ffi::Array<PrimExpr> cargs;
+  Array<PrimExpr> cargs;
   // intrin id.
   cargs.push_back(IntImm(DataType::UInt(32), id));
-  ICHECK_EQ(call->args.size(), num_signature)
-      << "llvm.call_llvm_intrin" << llvmGetIntrinName(id) << "expects " << num_signature
-      << " arguments, but got " << call->args.size();
+  cargs.push_back(IntImm(DataType::UInt(32), num_signature));
   for (PrimExpr arg : call->args) {
     cargs.push_back(arg);
   }

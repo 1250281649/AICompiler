@@ -22,7 +22,6 @@
  * \file lower_intrin.cc
  */
 #include <tvm/ffi/function.h>
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/target/target.h>
 #include <tvm/tir/expr.h>
 #include <tvm/tir/op.h>
@@ -68,9 +67,9 @@ class IntrinInjecter : public tvm::arith::IRMutatorWithAnalyzer {
   PrimExpr VisitExpr_(const CallNode* op) final {
     if (auto* ptr_op = op->op.as<OpNode>()) {
       for (const auto& f_attr_map : attr_maps_) {
-        FLowerGeneral f = f_attr_map.get(ffi::GetRef<Op>(ptr_op), nullptr);
+        FLowerGeneral f = f_attr_map.get(GetRef<Op>(ptr_op), nullptr);
         if (f != nullptr) {
-          PrimExpr e = ffi::GetRef<PrimExpr>(op);
+          PrimExpr e = GetRef<PrimExpr>(op);
           PrimExpr r = f(e);
           ICHECK(r.defined()) << "intrinsic rule must always return valid Expr";
           if (!r.same_as(e)) {
@@ -97,7 +96,7 @@ class IntrinInjecter : public tvm::arith::IRMutatorWithAnalyzer {
   // We use floordiv for integer analysis,
   // but will need to lower them to native truncdiv instructions
   PrimExpr VisitExpr_(const FloorDivNode* op) final {
-    auto e = ffi::GetRef<PrimExpr>(op);
+    auto e = GetRef<PrimExpr>(op);
     PrimExpr ret = IRMutatorWithAnalyzer::VisitExpr_(op);
     op = ret.as<FloorDivNode>();
     if (op == nullptr) return ret;
@@ -290,7 +289,7 @@ class IntrinInjecter : public tvm::arith::IRMutatorWithAnalyzer {
     using namespace arith;
     PVar<PrimExpr> x, y;
     PVar<IntImm> c;
-    auto e = ffi::GetRef<PrimExpr>(op);
+    auto e = GetRef<PrimExpr>(op);
     if (max(floordiv(x, y), c).Match(e) && c.Eval()->value >= 0 &&
         analyzer_->CanProveGreaterEqual(y.Eval(), 0)) {
       return max(VisitExpr(truncdiv(x, y).Eval()), c.Eval());
@@ -301,7 +300,7 @@ class IntrinInjecter : public tvm::arith::IRMutatorWithAnalyzer {
   PrimExpr VisitExpr_(const EQNode* op) final {
     using namespace arith;
     PVar<PrimExpr> x, y;
-    auto e = ffi::GetRef<PrimExpr>(op);
+    auto e = GetRef<PrimExpr>(op);
     if ((floormod(x, y) == 0).Match(e)) {
       return VisitExpr((truncmod(x, y) == 0).Eval());
     }
@@ -311,7 +310,7 @@ class IntrinInjecter : public tvm::arith::IRMutatorWithAnalyzer {
   PrimExpr VisitExpr_(const NENode* op) final {
     using namespace arith;
     PVar<PrimExpr> x, y;
-    auto e = ffi::GetRef<PrimExpr>(op);
+    auto e = GetRef<PrimExpr>(op);
     if ((floormod(x, y) != 0).Match(e)) {
       return VisitExpr((truncmod(x, y) != 0).Eval());
     }
@@ -387,7 +386,7 @@ Pass LowerIntrin() {
     auto target = f->GetAttr<Target>(tvm::attr::kTarget);
     ICHECK(target.defined()) << "LowerIntrin: Require the target attribute";
     arith::Analyzer analyzer;
-    auto mtriple = target.value()->GetAttr<ffi::String>("mtriple", "");
+    auto mtriple = target.value()->GetAttr<String>("mtriple", "");
     n->body =
         IntrinInjecter(&analyzer, target.value()->kind->name, mtriple.value())(std::move(n->body));
     return f;
@@ -395,10 +394,7 @@ Pass LowerIntrin() {
   return CreatePrimFuncPass(pass_func, 0, "tir.LowerIntrin", {});
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("tir.transform.LowerIntrin", LowerIntrin);
-}
+TVM_FFI_REGISTER_GLOBAL("tir.transform.LowerIntrin").set_body_typed(LowerIntrin);
 
 }  // namespace transform
 

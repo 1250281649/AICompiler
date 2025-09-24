@@ -20,10 +20,10 @@
 import re
 from typing import TypeVar
 
-import tvm_ffi
+import tvm.ffi
 
 
-@tvm_ffi.register_global_func("tvm.runtime.regex_match")
+@tvm.ffi.register_func("tvm.runtime.regex_match")
 def _regex_match(regex_pattern: str, match_against: str) -> bool:
     """Check if a pattern matches a regular expression
 

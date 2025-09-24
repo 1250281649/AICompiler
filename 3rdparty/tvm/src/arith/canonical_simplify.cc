@@ -52,8 +52,9 @@ class CanonicalExprNode : public PrimExprNode {
    */
   virtual PrimExpr Normalize() const = 0;
 
+  static constexpr const char* _type_key = "arith.CanonicalExpr";
   static constexpr const uint32_t _type_child_slots = 2;
-  TVM_FFI_DECLARE_OBJECT_INFO("arith.CanonicalExpr", CanonicalExprNode, PrimExprNode);
+  TVM_DECLARE_BASE_OBJECT_INFO(CanonicalExprNode, PrimExprNode);
 };
 
 inline PrimExpr ModImpl(PrimExpr a, PrimExpr b, DivMode mode) {
@@ -203,12 +204,13 @@ class SplitExprNode : public CanonicalExprNode {
 
   /*! \brief positive infty */
   static const constexpr int64_t kPosInf = ConstIntBoundNode::kPosInf;
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("arith.SplitExpr", SplitExprNode, CanonicalExprNode);
+  static constexpr const char* _type_key = "arith.SplitExpr";
+  TVM_DECLARE_FINAL_OBJECT_INFO(SplitExprNode, CanonicalExprNode);
 };
 
 class SplitExpr : public PrimExpr {
  public:
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(SplitExpr, PrimExpr, SplitExprNode);
+  TVM_DEFINE_OBJECT_REF_METHODS(SplitExpr, PrimExpr, SplitExprNode);
   TVM_DEFINE_OBJECT_REF_COW_METHOD(SplitExprNode);
 };
 
@@ -388,7 +390,9 @@ class SumExprNode : public CanonicalExprNode {
     }
     this->dtype = dtype;
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("arith.SumExpr", SumExprNode, CanonicalExprNode);
+
+  static constexpr const char* _type_key = "arith.SumExpr";
+  TVM_DECLARE_FINAL_OBJECT_INFO(SumExprNode, CanonicalExprNode);
 
  private:
   /*!
@@ -520,7 +524,7 @@ class SumExprNode : public CanonicalExprNode {
 
 class SumExpr : public PrimExpr {
  public:
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(SumExpr, PrimExpr, SumExprNode);
+  TVM_DEFINE_OBJECT_REF_METHODS(SumExpr, PrimExpr, SumExprNode);
   TVM_DEFINE_OBJECT_REF_COW_METHOD(SumExprNode);
 };
 
@@ -676,7 +680,7 @@ class CanonicalSimplifier::Impl : public RewriteSimplifier::Impl {
     if (const auto* op = expr.as<CanonicalExprNode>()) {
       expr = op->Normalize();
     }
-    ObjectPtr<SplitExprNode> n = ffi::make_object<SplitExprNode>();
+    ObjectPtr<SplitExprNode> n = make_object<SplitExprNode>();
     n->dtype = expr.dtype();
     n->index = std::move(expr);
     n->div_mode = kTruncDiv;
@@ -713,7 +717,7 @@ class CanonicalSimplifier::Impl : public RewriteSimplifier::Impl {
     if (auto op = expr.as<SumExpr>()) {
       return op.value();
     }
-    ObjectPtr<SumExprNode> n = ffi::make_object<SumExprNode>();
+    ObjectPtr<SumExprNode> n = make_object<SumExprNode>();
     n->dtype = expr.dtype();
     if (const auto* op = expr.as<IntImmNode>()) {
       n->base = op->value;
@@ -812,7 +816,7 @@ PrimExpr CanonicalSimplifier::Impl::VisitExpr_(const MulNode* op) {
   const MulNode* mul = ret.as<MulNode>();
 
   if (mul && mul->a.same_as(op->a) && mul->b.same_as(op->b)) {
-    return ffi::GetRef<PrimExpr>(op);
+    return GetRef<PrimExpr>(op);
   } else {
     return ret;
   }
@@ -821,8 +825,8 @@ PrimExpr CanonicalSimplifier::Impl::VisitExpr_(const MulNode* op) {
 void CanonicalSimplifier::Impl::SeparateDivisibleParts(const SumExprNode* psum, int64_t coeff,
                                                        SumExpr* out_divisible,
                                                        SumExpr* out_non_divisible) {
-  auto divisible = ffi::make_object<SumExprNode>();
-  auto non_divisible = ffi::make_object<SumExprNode>();
+  auto divisible = make_object<SumExprNode>();
+  auto non_divisible = make_object<SumExprNode>();
   divisible->dtype = psum->dtype;
   non_divisible->dtype = psum->dtype;
 
@@ -890,7 +894,7 @@ bool CanonicalSimplifier::Impl::ProdDivSimplify(PrimExpr* plhs, PrimExpr* prhs,
   // we just skip to save the time
   if (prhs->as<IntImmNode>()) return false;
   // collect lhs products and try to eliminate by matching them to prod in rhs
-  ffi::Array<ffi::Optional<PrimExpr>> lhs_prods;
+  Array<Optional<PrimExpr>> lhs_prods;
   PrimExpr new_rhs = make_const(prhs->dtype(), 1);
   PrimExpr new_common_scale = make_const(prhs->dtype(), 1);
   int64_t lhs_cscale = 1, rhs_cscale = 1;
@@ -935,7 +939,7 @@ bool CanonicalSimplifier::Impl::ProdDivSimplify(PrimExpr* plhs, PrimExpr* prhs,
 
   // construct prod via canonical form
   PrimExpr new_lhs = make_const(plhs->dtype(), 1);
-  for (ffi::Optional<PrimExpr> val : lhs_prods) {
+  for (Optional<PrimExpr> val : lhs_prods) {
     if (val.defined()) new_lhs = new_lhs * val.value();
   }
   *plhs = new_lhs * make_const(plhs->dtype(), lhs_cscale);
@@ -1002,7 +1006,7 @@ PrimExpr CanonicalSimplifier::Impl::VisitExpr_(const DivNode* op) {
     return truncdiv(a, b);
   }
   if (op->a.same_as(a) && op->b.same_as(b)) {
-    return ffi::GetRef<PrimExpr>(op);
+    return GetRef<PrimExpr>(op);
   } else {
     return Div(a, b);
   }
@@ -1062,7 +1066,7 @@ PrimExpr CanonicalSimplifier::Impl::VisitExpr_(const FloorDivNode* op) {
     return floordiv(a, b);
   }
   if (op->a.same_as(a) && op->b.same_as(b)) {
-    return ffi::GetRef<PrimExpr>(op);
+    return GetRef<PrimExpr>(op);
   } else {
     return FloorDiv(a, b);
   }
@@ -1190,7 +1194,7 @@ PrimExpr CanonicalSimplifier::Impl::VisitExpr_(const ModNode* op) {
   }
 
   if (op->a.same_as(a) && op->b.same_as(b)) {
-    return ffi::GetRef<PrimExpr>(op);
+    return GetRef<PrimExpr>(op);
   } else {
     return Mod(a, b);
   }
@@ -1255,7 +1259,7 @@ PrimExpr CanonicalSimplifier::Impl::VisitExpr_(const FloorModNode* op) {
   }
 
   if (op->a.same_as(a) && op->b.same_as(b)) {
-    return ffi::GetRef<PrimExpr>(op);
+    return GetRef<PrimExpr>(op);
   } else {
     return FloorMod(a, b);
   }
@@ -1264,7 +1268,7 @@ PrimExpr CanonicalSimplifier::Impl::VisitExpr_(const FloorModNode* op) {
 // Simplify reduce expression.
 PrimExpr CanonicalSimplifier::Impl::SimplifyReduceCombiner(const ReduceNode* op) {
   // First simplify the results
-  ffi::Array<PrimExpr> simplified_result;
+  Array<PrimExpr> simplified_result;
   for (const auto& res : op->combiner->result) {
     PrimExpr new_res = this->VisitExpr(res);
     simplified_result.push_back(new_res);
@@ -1307,12 +1311,12 @@ PrimExpr CanonicalSimplifier::Impl::SimplifyReduceCombiner(const ReduceNode* op)
   }
 
   int new_value_index = op->value_index;
-  ffi::Array<PrimExpr> new_result;
-  ffi::Array<PrimExpr> new_identity;
-  ffi::Array<Var> new_lhs;
-  ffi::Array<Var> new_rhs;
-  ffi::Array<PrimExpr> new_source;
-  ffi::Array<PrimExpr> new_init;
+  Array<PrimExpr> new_result;
+  Array<PrimExpr> new_identity;
+  Array<Var> new_lhs;
+  Array<Var> new_rhs;
+  Array<PrimExpr> new_source;
+  Array<PrimExpr> new_init;
 
   // new stuff is old stuff which is used
   for (size_t i = 0; i < used.size(); ++i) {

@@ -31,33 +31,33 @@ NType NTypeFrom(const StructInfo& sinfo, DataType dtype) {
     else
       return NType(DLDataTypeToString(dtype));
   };
-  return MapToNestedMsg<ffi::String>(sinfo, fmapleaf);
+  return MapToNestedMsg<String>(sinfo, fmapleaf);
 }
 
 NType NTypeFrom(const Expr& expr, DataType dtype) { return NTypeFrom(GetStructInfo(expr), dtype); }
 
 NType NTypeMerge(const NType& a, const NType& b) {
-  auto fcombine = [&](const ffi::String& a_str, const ffi::String& b_str) -> ffi::String {
+  auto fcombine = [&](const String& a_str, const String& b_str) -> String {
     if (a_str == "") {
       return b_str;
     } else if (b_str == "") {
       return a_str;
     }
 
-    DataType a = DataType(ffi::StringToDLDataType(a_str));
-    DataType b = DataType(ffi::StringToDLDataType(b_str));
+    DataType a = DataType(StringToDLDataType(a_str));
+    DataType b = DataType(StringToDLDataType(b_str));
     ICHECK_EQ(a.code(), b.code());
     ICHECK_EQ(a.lanes(), b.lanes());
     return a.bits() > b.bits() ? a_str : b_str;
   };
-  return CombineNestedMsg<ffi::String>(a, b, fcombine);
+  return CombineNestedMsg<String>(a, b, fcombine);
 }
 
-ffi::Array<ObjectRef> InferMixedPrecisionFollow(const Call& call, const DataType& out_dtype) {
+Array<ObjectRef> InferMixedPrecisionFollow(const Call& call, const DataType& out_dtype) {
   return {Integer(MixedPrecisionPolicyKind::kFollow), call};
 }
 
-ffi::Array<ObjectRef> InferMixedPrecisionNever(const Call& call, const DataType& out_dtype) {
+Array<ObjectRef> InferMixedPrecisionNever(const Call& call, const DataType& out_dtype) {
   return {Integer(MixedPrecisionPolicyKind::kNever), call};
 }
 

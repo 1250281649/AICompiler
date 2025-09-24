@@ -41,7 +41,7 @@ using namespace tvm::te;
  * function. The function expects two arguments: an array of Buffers holding the input
  * tensor values, and a pre-allocated array of Buffers to be filled with the outputs.
  */
-using FExtern = std::function<PrimExpr(ffi::Array<Buffer>, ffi::Array<Buffer>)>;
+using FExtern = std::function<PrimExpr(Array<Buffer>, Array<Buffer>)>;
 
 /*!
  * \brief Create tensors representing the result of invoking an external function.
@@ -60,19 +60,18 @@ using FExtern = std::function<PrimExpr(ffi::Array<Buffer>, ffi::Array<Buffer>)>;
  * be one output Tensor for each element of out_shapes, with dtype equal to the corresponding
  * element of out_types.
  */
-inline ffi::Array<Tensor> make_extern(const ffi::Array<ffi::Array<PrimExpr>>& out_shapes,
-                                      const std::vector<DataType>& out_types,
-                                      const ffi::Array<Tensor>& inputs, FExtern fextern,
-                                      std::string name, std::string tag,
-                                      ::tvm::ffi::Map<ffi::String, ffi::Any> attrs) {
+inline Array<Tensor> make_extern(const Array<Array<PrimExpr>>& out_shapes,
+                                 const std::vector<DataType>& out_types,
+                                 const Array<Tensor>& inputs, FExtern fextern, std::string name,
+                                 std::string tag, ::tvm::Map<String, ffi::Any> attrs) {
   ICHECK_EQ(out_shapes.size(), out_types.size())
       << "make_extern: out_shapes and out_types must have equal size";
 
-  ffi::Array<Buffer> input_placeholders;
+  Array<Buffer> input_placeholders;
   for (auto t : inputs) {
     input_placeholders.push_back(tvm::tir::decl_buffer(t->shape, t->dtype, t->op->name));
   }
-  ffi::Array<Buffer> output_placeholders;
+  Array<Buffer> output_placeholders;
   for (size_t i = 0; i < out_shapes.size(); ++i) {
     output_placeholders.push_back(tvm::tir::decl_buffer(out_shapes[i], out_types[i], name));
   }
@@ -82,7 +81,7 @@ inline ffi::Array<Tensor> make_extern(const ffi::Array<ffi::Array<PrimExpr>>& ou
 
   auto op = ExternOp(name, tag, attrs, inputs, input_placeholders, output_placeholders, body_stmt);
 
-  ffi::Array<Tensor> outputs;
+  Array<Tensor> outputs;
   for (size_t i = 0; i < output_placeholders.size(); ++i) {
     outputs.push_back(op.output(i));
   }
@@ -108,13 +107,12 @@ inline PrimExpr pack_buffer(Buffer buf) {
   } else {
     strides = 0;
   }
-  ffi::Array<PrimExpr> pack_args{
-      buf->data,
-      shape,
-      strides,
-      make_const(DataType::Int(32), static_cast<int64_t>(buf->shape.size())),
-      make_const(buf->dtype, 0),
-      buf->elem_offset};
+  Array<PrimExpr> pack_args{buf->data,
+                            shape,
+                            strides,
+                            make_const(DataType::Int(32), static_cast<int64_t>(buf->shape.size())),
+                            make_const(buf->dtype, 0),
+                            buf->elem_offset};
   return tvm::tir::Call(DataType::Handle(), tvm::tir::builtin::tvm_stack_make_array(), pack_args);
 }
 
@@ -127,7 +125,7 @@ inline PrimExpr pack_buffer(Buffer buf) {
  *
  * \return An expression representing the invocation
  */
-inline PrimExpr call_packed(ffi::Array<PrimExpr> args) {
+inline PrimExpr call_packed(Array<PrimExpr> args) {
   return tvm::tir::Call(DataType::Int(32), tvm::tir::builtin::tvm_call_packed(), args);
 }
 

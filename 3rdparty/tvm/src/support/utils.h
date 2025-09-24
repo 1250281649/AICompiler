@@ -139,14 +139,13 @@ inline std::vector<std::string> Split(const std::string& str, char delim) {
  * \return Whether the prefix matched.
  */
 inline bool StartsWith(const ffi::String& str, const char* prefix) {
-  const char* data = str.data();
-  const char* data_end = data + str.size();
-  for (; data != data_end; ++data, ++prefix) {
-    if (*prefix == '\0') return true;
-    if (*data != *prefix) return false;
+  size_t n = str.length();
+  for (size_t i = 0; i < n; i++) {
+    if (prefix[i] == '\0') return true;
+    if (str.data()[i] != prefix[i]) return false;
   }
   // return true if the str is equal to the prefix
-  return *prefix == '\0';
+  return prefix[n] == '\0';
 }
 
 /*!

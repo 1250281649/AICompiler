@@ -16,7 +16,7 @@
 # under the License.
 """Developer API of IR node builder make function."""
 import tvm
-from tvm.runtime import ObjectConvertible, const
+from tvm.runtime import ObjectGeneric, const
 from tvm.ir import container as _container
 
 from . import stmt as _stmt
@@ -39,7 +39,7 @@ class WithScope(object):
         self._exit_cb()
 
 
-class BufferVar(ObjectConvertible):
+class BufferVar(ObjectGeneric):
     """Buffer variable with content type, makes load store easily.
 
     Do not create it directly, create use IRBuilder.

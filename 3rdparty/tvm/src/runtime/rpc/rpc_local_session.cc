@@ -24,9 +24,8 @@
 #include "rpc_local_session.h"
 
 #include <tvm/ffi/function.h>
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/runtime/device_api.h>
-#include <tvm/runtime/tensor.h>
+#include <tvm/runtime/ndarray.h>
 
 #include <memory>
 #include <vector>
@@ -54,25 +53,24 @@ void LocalSession::EncodeReturn(ffi::Any rv, const FEncodeReturn& encode_return)
   if (rv == nullptr) {
     packed_args[1] = rv;
     encode_return(ffi::PackedArgs(packed_args, 2));
-  } else if (rv.as<Tensor>()) {
-    // We follow a special protocol to return Tensor to client side
-    // The first pack value is the Tensor handle as DLTensor
-    // The second pack value is a customized deleter that deletes the Tensor.
+  } else if (rv.as<NDArray>()) {
+    // We follow a special protocol to return NDArray to client side
+    // The first pack value is the NDArray handle as DLTensor
+    // The second pack value is a customized deleter that deletes the NDArray.
     TVMFFIAny ret_any = ffi::details::AnyUnsafe::MoveAnyToTVMFFIAny(std::move(rv));
     void* opaque_handle = ret_any.v_obj;
-    packed_args[1] = TVMFFITensorGetDLTensorPtr(opaque_handle);
+    packed_args[1] = TVMFFINDArrayGetDLTensorPtr(opaque_handle);
     packed_args[2] = opaque_handle;
     encode_return(ffi::PackedArgs(packed_args, 3));
-  } else if (const auto opt_bytes = rv.as<ffi::Bytes>()) {
+  } else if (const auto* bytes = rv.as<ffi::BytesObj>()) {
     // always pass bytes as byte array
     TVMFFIByteArray byte_arr;
-    byte_arr.data = (*opt_bytes).data();
-    byte_arr.size = (*opt_bytes).size();
+    byte_arr.data = bytes->data;
+    byte_arr.size = bytes->size;
     packed_args[1] = &byte_arr;
     encode_return(ffi::PackedArgs(packed_args, 2));
-  } else if (auto opt_str = rv.as<ffi::String>()) {
-    // encode string as c_str
-    packed_args[1] = (*opt_str).data();
+  } else if (const auto* str = rv.as<ffi::StringObj>()) {
+    packed_args[1] = str->data;
     encode_return(ffi::PackedArgs(packed_args, 2));
   } else if (rv.as<ffi::ObjectRef>()) {
     TVMFFIAny ret_any = ffi::details::AnyUnsafe::MoveAnyToTVMFFIAny(std::move(rv));
@@ -149,11 +147,9 @@ DeviceAPI* LocalSession::GetDeviceAPI(Device dev, bool allow_missing) {
   return DeviceAPI::Get(dev, allow_missing);
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("rpc.LocalSession",
-                        []() { return CreateRPCSessionModule(std::make_shared<LocalSession>()); });
-}
+TVM_FFI_REGISTER_GLOBAL("rpc.LocalSession").set_body_typed([]() {
+  return CreateRPCSessionModule(std::make_shared<LocalSession>());
+});
 
 }  // namespace runtime
 }  // namespace tvm

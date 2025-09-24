@@ -186,7 +186,7 @@ class BufferState {
    * the original expression is returned.
    */
   PrimExpr SubstituteKnownBufferValues(PrimExpr expr,
-                                       const ffi::Map<Buffer, ffi::Array<Var>>& axis_var_lookup,
+                                       const Map<Buffer, Array<Var>>& axis_var_lookup,
                                        arith::Analyzer* analyzer) const;
 
   /*! \brief Apply a condition to all known constraints
@@ -205,7 +205,7 @@ class BufferState {
    *
    * \param var_remap The variable remapping to apply.
    */
-  void Substitute(const ffi::Map<Var, PrimExpr>& var_remap, arith::Analyzer* analyzer);
+  void Substitute(const Map<Var, PrimExpr>& var_remap, arith::Analyzer* analyzer);
 
   /*! \brief Simplify the predicate of all constraints
    *
@@ -226,7 +226,7 @@ class BufferState {
    *
    * \param analyzer The analyzer to use for simplifications
    */
-  void ApplyTouches(const ffi::Map<Buffer, ffi::Array<Var>>& axis_var_lookup,
+  void ApplyTouches(const Map<Buffer, Array<Var>>& axis_var_lookup,
                     const std::vector<BufferTouch>& touch_points, arith::Analyzer* analyzer);
 
   /*! \brief Update unused buffer locations based on buffer touches
@@ -245,7 +245,7 @@ class BufferState {
    *
    * \param analyzer The analyzer to use for simplifications
    */
-  void BackpropUnusedIndices(const ffi::Map<Buffer, ffi::Array<Var>>& axis_var_lookup,
+  void BackpropUnusedIndices(const Map<Buffer, Array<Var>>& axis_var_lookup,
                              const std::vector<BufferTouch>& touch_points,
                              arith::Analyzer* analyzer);
 
@@ -255,7 +255,7 @@ class BufferState {
    *
    * \param analyzer The analyzer with which to simplify after removal
    */
-  void RemoveFreeParameters(const ffi::Map<Var, Range>& free_predicate_parameters,
+  void RemoveFreeParameters(const Map<Var, Range>& free_predicate_parameters,
                             arith::Analyzer* analyzer);
 
   /*! \brief Check if two buffer states are equivalent
@@ -462,7 +462,7 @@ class ControlFlowGraph {
    *
    * \returns Variables representing a position along the buffer's axis.
    */
-  ffi::Array<Var> GetIndexVariables(const Buffer& buf, const ffi::Array<PrimExpr>& indices);
+  Array<Var> GetIndexVariables(const Buffer& buf, const Array<PrimExpr>& indices);
 
   /*! \brief Return index variables representing locations within a
    *   buffer, if they have been generated before.
@@ -473,7 +473,7 @@ class ControlFlowGraph {
    *
    * \returns Variables representing a position along the buffer's axis.
    */
-  ffi::Optional<ffi::Array<Var>> GetIndexVariables(const Buffer& buf) const;
+  Optional<Array<Var>> GetIndexVariables(const Buffer& buf) const;
 
   /*! \brief Propagate known values from known BufferStore/assume
    *  subsequent control flow blocks
@@ -501,7 +501,7 @@ class ControlFlowGraph {
      * e.g. Replacing loop iterator `i` with `i-1` when following an
      * edge from the end of a loop to the beginning of the loop.
      */
-    ffi::Map<Var, PrimExpr> var_remap;
+    Map<Var, PrimExpr> var_remap;
 
     /*! \brief Condition that must to true after following this edge
      *
@@ -509,7 +509,7 @@ class ControlFlowGraph {
      * loop_min` when following the an edge from the end of a loop to
      * the beginning of the loop.
      */
-    ffi::Optional<PrimExpr> post_condition;
+    Optional<PrimExpr> post_condition;
   };
   friend std::ostream& operator<<(std::ostream& os, const ControlFlowEdge& edge);
 
@@ -525,7 +525,7 @@ class ControlFlowGraph {
     std::vector<LoopEntry> active_loop_iterators;
 
     /*! \brief Loop-dependent Let bindings that may appear within the block */
-    ffi::Map<Var, PrimExpr> let_bindings_using_loop;
+    Map<Var, PrimExpr> let_bindings_using_loop;
 
     /*! \brief Predicate that must be true to have reached this block */
     PrimExpr scope_predicate{Bool(true)};
@@ -577,8 +577,7 @@ class ControlFlowGraph {
      * \returns The newly generated BufferTouch
      */
     BufferTouch MakeBufferTouch(ControlFlowGraph* graph, const Buffer& buf,
-                                const ffi::Array<PrimExpr>& indices,
-                                BufferTouch::AccessType touch_type,
+                                const Array<PrimExpr>& indices, BufferTouch::AccessType touch_type,
                                 PrimExpr known_value_expr) const;
 
     /* \brief Construct a BufferTouch instance as if it occurred in
@@ -603,11 +602,11 @@ class ControlFlowGraph {
      * all free parameters that may occur in the BufferTouch's
      * predicate.
      */
-    std::pair<BufferTouch, ffi::Map<Var, Range>> MakeBufferTouch(const Buffer& buf,
-                                                                 ffi::Array<Var> index_variables,
-                                                                 ffi::Array<PrimExpr> indices,
-                                                                 BufferTouch::AccessType touch_type,
-                                                                 PrimExpr known_value_expr) const;
+    std::pair<BufferTouch, Map<Var, Range>> MakeBufferTouch(const Buffer& buf,
+                                                            Array<Var> index_variables,
+                                                            Array<PrimExpr> indices,
+                                                            BufferTouch::AccessType touch_type,
+                                                            PrimExpr known_value_expr) const;
   };
   friend std::ostream& operator<<(std::ostream& os, const ControlFlowBlock& pattern);
 
@@ -630,10 +629,10 @@ class ControlFlowGraph {
    * the free parameters allows them to be removed later, by requiring
    * a predicate to be true for all values of the free parameters.
    */
-  ffi::Map<Var, Range> free_predicate_parameters_;
+  Map<Var, Range> free_predicate_parameters_;
 
   /*! \brief Ranges of iterators found in the analyzed statement */
-  ffi::Map<Var, Range> iterator_ranges_;
+  Map<Var, Range> iterator_ranges_;
 
   /* \brief A map from buffer to the variables representing positions
    * along the buffer's axes.
@@ -643,7 +642,7 @@ class ControlFlowGraph {
    * variables to represent the buffer's axes, reducing the amount of
    * variable substitution required.
    */
-  ffi::Map<Buffer, ffi::Array<Var>> axis_var_lookup_;
+  Map<Buffer, Array<Var>> axis_var_lookup_;
 
   /* \brief Assumptions that do not depend on buffer values
    *

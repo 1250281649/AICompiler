@@ -624,7 +624,6 @@ def index_put(
     Examples
     --------
     .. code-block:: python
-
         # inputs
         data = torch.zeros(3, 3)
         indices = (torch.tensor([0, 2]), torch.tensor([1, 1]))

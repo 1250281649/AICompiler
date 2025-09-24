@@ -24,7 +24,6 @@
 
 #include "codegen.h"
 
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/ir/module.h>
 #include <tvm/relax/expr.h>
 
@@ -48,7 +47,7 @@ void TensorRTCodeGen::CodeGenClassDeclare() {
   }
   // plugin headers
   if (config()->use_plugin) {
-    std::set<ffi::String> plugins;
+    std::set<String> plugins;
     for (const auto& n : graph()->node_names) {
       const auto& node = graph()->FindNode(n);
       if (IsPlugin(node->optype) && !plugins.count(node->optype)) {
@@ -95,7 +94,7 @@ void TensorRTCodeGen::CodeGenClassDeclare() {
 
 void TensorRTCodeGen::CodeGenClassDefine() {
   auto malloc_buffer = [this](const MSCTensor& tensor) {
-    const ffi::String& idx_var = "idx_" + IdxTensor(tensor);
+    const String& idx_var = "idx_" + IdxTensor(tensor);
     this->stack_
         .func_call("getBindingIndex", DocUtils::ToDeclare("int", idx_var),
                    DocUtils::ToPtr("engine"))
@@ -121,8 +120,8 @@ void TensorRTCodeGen::CodeGenClassDefine() {
   // save codegen before build
   if (config()->use_tools) {
     const auto pf = tvm::ffi::Function::GetGlobalRequired("msc_tool.codegen_step");
-    before_build_codes_ = pf(GetStepCtx(), "before_build", graph()->name, config()->tools_tag)
-                              .cast<ffi::Array<ffi::String>>();
+    before_build_codes_ =
+        pf(GetStepCtx(), "before_build", graph()->name, config()->tools_tag).cast<Array<String>>();
   }
   if (graph()->weight_holders.size() > 0) {
     stack_.func_call("TRTUtils::LoadWeights", "mWeights")
@@ -144,7 +143,7 @@ void TensorRTCodeGen::CodeGenClassDefine() {
   stack_.comment("Mark batch size");
   stack_.func_call("createOptimizationProfile", DocUtils::ToDeclare("auto", "profile"),
                    DocUtils::ToPtr("builder"));
-  ffi::Array<ffi::String> batch_flags{"MIN", "MAX", "OPT"};
+  Array<String> batch_flags{"MIN", "MAX", "OPT"};
   for (const auto& i : graph()->GetInputs()) {
     for (const auto& f : batch_flags) {
       stack_.func_call("setDimensions", std::nullopt, DocUtils::ToPtr("profile"))
@@ -207,8 +206,8 @@ void TensorRTCodeGen::CodeGenClassDefine() {
   // save codegen after build
   if (config()->use_tools) {
     const auto pf = tvm::ffi::Function::GetGlobalRequired("msc_tool.codegen_step");
-    after_build_codes_ = pf(GetStepCtx(), "after_build", graph()->name, config()->tools_tag)
-                             .cast<ffi::Array<ffi::String>>();
+    after_build_codes_ =
+        pf(GetStepCtx(), "after_build", graph()->name, config()->tools_tag).cast<Array<String>>();
   }
   // end define build method
   stack_.func_end("true");
@@ -470,7 +469,7 @@ void TensorRTCodeGen::CodeGenCmake() {
   if (config()->use_plugin) {
     stack_.line("add_definitions(-DPLUGIN_SUPPORT_TENSORRT)").line();
   }
-  ffi::String link_libs = " ${TRT_LIBS}";
+  String link_libs = " ${TRT_LIBS}";
   if (config()->extern_libs.size() > 0) {
     stack_.line("set(EXTERN_LIBS " + StringUtils::Join(config()->extern_libs, " ") + ")");
     link_libs = link_libs + " ${EXTERN_LIBS}";
@@ -481,18 +480,17 @@ void TensorRTCodeGen::CodeGenCmake() {
       .line("target_link_libraries(" + graph()->name + link_libs + ")");
 }
 
-const ffi::String TensorRTCodeGen::IdxTensor(const MSCTensor& tensor) {
+const String TensorRTCodeGen::IdxTensor(const MSCTensor& tensor) {
   const auto& pair = graph()->FindProducerAndIdx(tensor);
-  const ffi::String& prefix = "tensor_" + std::to_string(pair.first->index);
+  const String& prefix = "tensor_" + std::to_string(pair.first->index);
   if (pair.first->outputs.size() > 1) {
     return prefix + "_" + std::to_string(pair.second);
   }
   return prefix;
 }
 
-const ffi::String TensorRTCodeGen::CppDType(const DataType& dtype) {
-  const ffi::String& dtype_name =
-      CppCodeGen<TensorRTCodeGenConfig, TensorRTCodeGenHelper>::DType(dtype);
+const String TensorRTCodeGen::CppDType(const DataType& dtype) {
+  const String& dtype_name = CppCodeGen<TensorRTCodeGenConfig, TensorRTCodeGenHelper>::DType(dtype);
   if (dtype_name == "int32") {
     return "int";
   }
@@ -508,11 +506,11 @@ const ffi::String TensorRTCodeGen::CppDType(const DataType& dtype) {
   return dtype_name;
 }
 
-const ffi::String TensorRTCodeGen::GetTensorBytes(const MSCTensor& tensor) {
+const String TensorRTCodeGen::GetTensorBytes(const MSCTensor& tensor) {
   return std::to_string(tensor->GetSize()->value) + " * sizeof(" + CppDType(tensor->dtype) + ")";
 }
 
-void TensorRTCodeGen::ReturnOnFail(const ffi::String& flag, const ffi::String& err) {
+void TensorRTCodeGen::ReturnOnFail(const String& flag, const String& err) {
   stack_.cond_if("!" + flag)
       .func_call("logger.log")
       .call_arg("ILogger::Severity::kERROR")
@@ -522,11 +520,11 @@ void TensorRTCodeGen::ReturnOnFail(const ffi::String& flag, const ffi::String& e
 }
 
 template <typename T>
-const ffi::String TensorRTCodeGen::ToDims(const std::vector<T>& dims, bool use_ndim) {
+const String TensorRTCodeGen::ToDims(const std::vector<T>& dims, bool use_ndim) {
   if (dims.size() == 2 && !use_ndim) {
     return "DimsHW{" + std::to_string(dims[0]) + "," + std::to_string(dims[1]) + "}";
   }
-  ffi::String dims_str = "Dims({" + std::to_string(dims.size()) + ",{";
+  String dims_str = "Dims({" + std::to_string(dims.size()) + ",{";
   for (size_t i = 0; i < dims.size(); i++) {
     dims_str = dims_str + std::to_string(dims[i]) + (i < dims.size() - 1 ? "," : "");
   }
@@ -534,7 +532,7 @@ const ffi::String TensorRTCodeGen::ToDims(const std::vector<T>& dims, bool use_n
   return dims_str;
 }
 
-const ffi::String TensorRTCodeGen::ToDims(const ffi::Array<Integer>& dims, bool use_ndim) {
+const String TensorRTCodeGen::ToDims(const Array<Integer>& dims, bool use_ndim) {
   std::vector<int64_t> int_dims;
   for (const auto& d : dims) {
     int_dims.push_back(d->value);
@@ -542,7 +540,7 @@ const ffi::String TensorRTCodeGen::ToDims(const ffi::Array<Integer>& dims, bool 
   return ToDims(int_dims, use_ndim);
 }
 
-const ffi::Array<Doc> TensorRTCodeGen::GetOpCodes(const MSCJoint& node) {
+const Array<Doc> TensorRTCodeGen::GetOpCodes(const MSCJoint& node) {
   const auto& ops_map = GetTensorRTOpCodes();
   auto it = ops_map->find(GetOpType(node));
   ICHECK(it != ops_map->end()) << "Unsupported tensorrt op(" << node->optype << "): " << node;
@@ -555,8 +553,8 @@ const ffi::Array<Doc> TensorRTCodeGen::GetOpCodes(const MSCJoint& node) {
   }
 }
 
-const ffi::Map<ffi::String, ffi::String> TensorRTCodeGen::GetTensorCtx(const MSCTensor& tensor) {
-  ffi::Map<ffi::String, ffi::String> tensor_ctx;
+const Map<String, String> TensorRTCodeGen::GetTensorCtx(const MSCTensor& tensor) {
+  Map<String, String> tensor_ctx;
   tensor_ctx.Set("ctx", "network");
   for (const auto& pair :
        CppCodeGen<TensorRTCodeGenConfig, TensorRTCodeGenHelper>::GetTensorCtx(tensor)) {
@@ -565,8 +563,8 @@ const ffi::Map<ffi::String, ffi::String> TensorRTCodeGen::GetTensorCtx(const MSC
   return tensor_ctx;
 }
 
-const ffi::Map<ffi::String, ffi::String> TensorRTCodeGen::GetStepCtx() {
-  ffi::Map<ffi::String, ffi::String> step_ctx;
+const Map<String, String> TensorRTCodeGen::GetStepCtx() {
+  Map<String, String> step_ctx;
   step_ctx.Set("network", "network");
   step_ctx.Set("config", "config");
   step_ctx.Set("builder", "builder");
@@ -576,57 +574,51 @@ const ffi::Map<ffi::String, ffi::String> TensorRTCodeGen::GetStepCtx() {
   return step_ctx;
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef()
-      .def("msc.framework.tensorrt.GetTensorRTSources",
-           [](const MSCGraph& graph, const ffi::String& codegen_config,
-              const ffi::String& print_config) -> ffi::Map<ffi::String, ffi::String> {
-             TensorRTCodeGen codegen = TensorRTCodeGen(graph, codegen_config);
-             codegen.Init();
-             return codegen.GetSources(print_config);
-           })
-      .def("msc.framework.tensorrt.GetTensorRTRoot", []() -> ffi::String {
+TVM_FFI_REGISTER_GLOBAL("msc.framework.tensorrt.GetTensorRTSources")
+    .set_body_typed([](const MSCGraph& graph, const String& codegen_config,
+                       const String& print_config) -> Map<String, String> {
+      TensorRTCodeGen codegen = TensorRTCodeGen(graph, codegen_config);
+      codegen.Init();
+      return codegen.GetSources(print_config);
+    });
+
+TVM_FFI_REGISTER_GLOBAL("msc.framework.tensorrt.GetTensorRTRoot").set_body_typed([]() -> String {
 #ifdef TENSORRT_ROOT_DIR
-        return TENSORRT_ROOT_DIR;
+  return TENSORRT_ROOT_DIR;
 #else
   return "";
 #endif
-      });
-}
+});
 
 /*!
  * \brief Create runtime modules for MSC TensorRT.
  * \param functions The extern functions to be compiled via TensorRT
  * \return Runtime modules.
  */
-ffi::Array<ffi::Module> MSCTensorRTCompiler(ffi::Array<Function> functions,
-                                            ffi::Map<ffi::String, ffi::Any> target_option,
-                                            ffi::Map<Constant, ffi::String> constant_names) {
-  ffi::Array<ffi::Module> compiled_functions;
+Array<runtime::Module> MSCTensorRTCompiler(Array<Function> functions,
+                                           Map<String, ffi::Any> target_option,
+                                           Map<Constant, String> constant_names) {
+  Array<runtime::Module> compiled_functions;
   for (const auto& func : functions) {
     VLOG(1) << "MSC.TensorRT partition:" << std::endl << func;
-    const auto& name_opt = func->GetAttr<ffi::String>(msc_attr::kUnique);
-    ICHECK(name_opt.has_value()) << "Can not find " << msc_attr::kUnique << " from attrs";
+    const auto& name_opt = func->GetAttr<String>(msc_attr::kUnique);
+    ICHECK(name_opt.defined()) << "Can not find " << msc_attr::kUnique << " from attrs";
     const auto& name = name_opt.value();
     std::string func_name = GetExtSymbol(func);
     ICHECK(target_option.count(name)) << "Can not find target option for " << name;
-    const auto& options = Downcast<ffi::String>(target_option[name]);
+    const auto& options = Downcast<String>(target_option[name]);
     MSCJSONSerializer serializer(constant_names, options);
     serializer.serialize(func);
     std::string graph_json = serializer.GetJSON();
     const auto pf = tvm::ffi::Function::GetGlobalRequired("runtime.msc_tensorrt_runtime_create");
-    VLOG(1) << "Creating msc_tensorrt ffi::Module for '" << func_name << "'";
+    VLOG(1) << "Creating msc_tensorrt runtime::Module for '" << func_name << "'";
     compiled_functions.push_back(
-        pf(func_name, graph_json, serializer.GetConstantNames()).cast<ffi::Module>());
+        pf(func_name, graph_json, serializer.GetConstantNames()).cast<runtime::Module>());
   }
   return compiled_functions;
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("relax.ext.msc_tensorrt", MSCTensorRTCompiler);
-}
+TVM_FFI_REGISTER_GLOBAL("relax.ext.msc_tensorrt").set_body_typed(MSCTensorRTCompiler);
 
 }  // namespace msc
 }  // namespace contrib

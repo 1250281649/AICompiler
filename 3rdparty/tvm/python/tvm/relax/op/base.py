@@ -22,7 +22,7 @@ from typing import Dict, Union, List, Tuple, Optional, Callable
 import tvm
 import tvm.runtime
 from tvm.runtime.object import Object
-from tvm.runtime import ObjectConvertible
+from tvm.runtime import ObjectGeneric
 
 from . import _ffi_api
 from ..expr import Expr, StringImm, ShapeExpr, Call, ExternFunc, GlobalVar, Var
@@ -305,42 +305,6 @@ def call_dps_packed(
 
 
 @args_converter.auto
-def call_py_func(
-    func_name: str,
-    args: Expr,
-    out_sinfo: Union[TensorStructInfo, List[TensorStructInfo]],
-) -> Call:
-    """
-    Call a Python function and return the output.
-
-    Parameters
-    ----------
-    func_name : str
-        The name of the Python function to call. This should correspond to a function
-        in the IRModule's pyfuncs attribute.
-
-    args : Expr
-        The input arguments.
-
-    out_sinfo : Union[TensorStructInfo, List[TensorStructInfo]]
-        The structure info of the call_py_func output.
-        It should be a single or a list of TensorStructInfo. Each one denotes the
-        structure info of a returned tensor.
-
-    Returns
-    -------
-    ret: Call
-        A call node for the call_py_func operator.
-    """
-    args = _wrap_inline_arg_tuple(args)
-
-    if not isinstance(out_sinfo, list):
-        out_sinfo = [out_sinfo]
-
-    return _ffi_api.call_py_func(func_name, args, out_sinfo)  # type: ignore
-
-
-@args_converter.auto
 def call_builtin_with_ctx(
     func: Union[str, Expr],
     args: Expr,
@@ -450,7 +414,7 @@ def render_object(val: tvm.Object) -> str:
     ret: str
         A string representing the value, ideally human-readable
     """
-    if isinstance(val, tvm.runtime.Tensor):
+    if isinstance(val, tvm.nd.NDArray):
         return str(val)
     if isinstance(val, tvm.ir.Array):
         fields = ", ".join([render_object(val[i]) for i in range(len(val))])
@@ -458,20 +422,20 @@ def render_object(val: tvm.Object) -> str:
     return str(val)
 
 
-@tvm.register_global_func("relax.run.shape_to_tensor")
-def relax_shape_to_tensor(shape_tuple: tvm.runtime.ShapeTuple) -> tvm.runtime.Tensor:
+@tvm.register_func("relax.run.shape_to_tensor")
+def relax_shape_to_tensor(shape_tuple: tvm.runtime.ShapeTuple) -> tvm.nd.NDArray:
     """
-    Takes a ShapeTuple and convert it to Tensor.
+    Takes a ShapeTuple and convert it to NDArray.
 
     Parameters
     ----------
     shape_tuple: tvm.runtime.ShapeTuple
-        Shape tuple that we want to convert to Tensor at runtime
+        Shape tuple that we want to convert to NDArray at runtime
     """
-    return tvm.runtime.tensor([int(v) for v in shape_tuple])
+    return tvm.nd.array([int(v) for v in shape_tuple])
 
 
-@tvm.register_global_func("relax.run.print")
+@tvm.register_func("relax.run.print")
 def relax_print(format_str: str, *format_args: tvm.Object) -> None:
     """
     Takes a list of values to print, formats with the given format string.
@@ -519,7 +483,7 @@ def print(*values: List[Expr], format: Union[str, Expr] = "") -> Expr:
     return _ffi_api.print(values, format)  # type: ignore # pylint: disable=no-member
 
 
-@tvm.register_global_func("relax.run.assert_op")
+@tvm.register_func("relax.run.assert_op")
 def relax_assert_op(condition: tvm.Object, format_str: str, *format_args: tvm.Object) -> None:
     """
     A variadic function. The first value serves as the assertion condition:
@@ -550,7 +514,7 @@ def relax_assert_op(condition: tvm.Object, format_str: str, *format_args: tvm.Ob
 
     if isinstance(condition, (bool, int)):
         val = condition
-    elif isinstance(condition, tvm.runtime.Tensor):
+    elif isinstance(condition, tvm.nd.NDArray):
         # may happen if the original program had unknown shape or dtype for the tensor's type
         dtype = condition.dtype
         if dtype != "bool":
@@ -564,7 +528,7 @@ def relax_assert_op(condition: tvm.Object, format_str: str, *format_args: tvm.Ob
     else:
         # should be guaranteed by the type system
         raise ValueError(
-            f"The condition for relax assert must be a bool, int, or Tensor, "
+            f"The condition for relax assert must be a bool, int, or NDArray, "
             f"but received a {type(condition)}."
         )
 
@@ -780,7 +744,7 @@ def call_pure_packed(
         sinfo()
         if callable(sinfo)
         else sinfo.asobject()
-        if isinstance(sinfo, ObjectConvertible)
+        if isinstance(sinfo, ObjectGeneric)
         else sinfo
         for sinfo in sinfo_args
     ]

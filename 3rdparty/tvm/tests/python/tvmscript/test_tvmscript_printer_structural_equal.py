@@ -19,7 +19,7 @@ import pytest
 
 import tvm
 from tvm.ir import assert_structural_equal
-from tvm_ffi.access_path import AccessPath
+from tvm.runtime import ObjectPath
 from tvm.script import ir as I, tir as T
 
 
@@ -45,25 +45,22 @@ def test_prim_func_buffer_map():
         A = T.match_buffer(a, (128, 128))
         B = T.match_buffer(b, (128, 256))
 
-    func1 = func1.with_attr("global_symbol", "main")
-    func2 = func2.with_attr("global_symbol", "main")
-
     with pytest.raises(ValueError) as ve:
         assert_structural_equal(func1, func2)
     assert _error_message(ve.value) == _expected_result(
         func1,
         func2,
-        AccessPath.root()
+        ObjectPath.root()
         .attr("buffer_map")
-        .map_item(func1.params[1])
+        .map_value(func1.params[1])
         .attr("shape")
-        .array_item(1)
+        .array_index(1)
         .attr("value"),
-        AccessPath.root()
+        ObjectPath.root()
         .attr("buffer_map")
-        .map_item(func2.params[1])
+        .map_value(func2.params[1])
         .attr("shape")
-        .array_item(1)
+        .array_index(1)
         .attr("value"),
     )
 
@@ -86,15 +83,15 @@ def test_evaluate():
     assert _error_message(ve.value) == _expected_result(
         module1,
         module2,
-        AccessPath.root()
+        ObjectPath.root()
         .attr("functions")
-        .map_item(module1.get_global_var("func"))
+        .map_value(module1.get_global_var("func"))
         .attr("body")
         .attr("value")
         .attr("value"),
-        AccessPath.root()
+        ObjectPath.root()
         .attr("functions")
-        .map_item(module2.get_global_var("func"))
+        .map_value(module2.get_global_var("func"))
         .attr("body")
         .attr("value")
         .attr("value"),
@@ -112,17 +109,13 @@ def test_allocate():
         a_data = T.allocate((256, 128), dtype="float32")
         a = T.decl_buffer((256, 128), dtype="float32", data=a_data)
 
-    func1 = func1.with_attr("global_symbol", "main")
-    func2 = func2.with_attr("global_symbol", "main")
-
     with pytest.raises(ValueError) as ve:
         assert_structural_equal(func1, func2)
-
     assert _error_message(ve.value) == _expected_result(
         func1,
         func2,
-        AccessPath.root().attr("body").attr("extents").array_item(0).attr("value"),
-        AccessPath.root().attr("body").attr("extents").array_item(0).attr("value"),
+        ObjectPath.root().attr("body").attr("extents").array_index(0).attr("value"),
+        ObjectPath.root().attr("body").attr("extents").array_index(0).attr("value"),
     )
 
 
@@ -139,16 +132,13 @@ def test_for():
             with T.block():
                 pass
 
-    func1 = func1.with_attr("global_symbol", "main")
-    func2 = func2.with_attr("global_symbol", "main")
-
     with pytest.raises(ValueError) as ve:
         assert_structural_equal(func1, func2)
     assert _error_message(ve.value) == _expected_result(
         func1,
         func2,
-        AccessPath.root().attr("body").attr("block").attr("body").attr("body").attr("body"),
-        AccessPath.root().attr("body").attr("block").attr("body").attr("body").attr("body"),
+        ObjectPath.root().attr("body").attr("block").attr("body").attr("body").attr("body"),
+        ObjectPath.root().attr("body").attr("block").attr("body").attr("body").attr("body"),
     )
 
 

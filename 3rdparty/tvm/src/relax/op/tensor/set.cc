@@ -24,8 +24,6 @@
 
 #include "set.h"
 
-#include <tvm/ffi/reflection/registry.h>
-
 #include <algorithm>
 #include <utility>
 #include <vector>
@@ -36,7 +34,7 @@ namespace relax {
 /* relax.unique */
 
 Expr unique(Expr x, PrimValue sorted, PrimValue return_index, PrimValue return_inverse,
-            PrimValue return_counts, ffi::Optional<PrimValue> axis) {
+            PrimValue return_counts, Optional<PrimValue> axis) {
   static const Op& op = Op::Get("relax.unique");
   Call call;
   if (!axis) {
@@ -48,17 +46,14 @@ Expr unique(Expr x, PrimValue sorted, PrimValue return_index, PrimValue return_i
   return call;
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("relax.op.unique", unique);
-}
+TVM_FFI_REGISTER_GLOBAL("relax.op.unique").set_body_typed(unique);
 
 StructInfo InferStructInfoUnique(const Call& call, const BlockBuilder& ctx) {
   TensorStructInfo data_sinfo = Downcast<TensorStructInfo>(call->args[0]->struct_info_);
   PrimValue axis, return_index, return_inverse, return_counts;
   if (call->args.size() == 6) {
     if (auto* prim_value_node = call->args[5].as<PrimValueNode>()) {
-      axis = ffi::GetRef<PrimValue>(prim_value_node);
+      axis = GetRef<PrimValue>(prim_value_node);
     }
   }
   if (!data_sinfo->IsUnknownNdim() && axis.defined()) {
@@ -79,7 +74,7 @@ StructInfo InferStructInfoUnique(const Call& call, const BlockBuilder& ctx) {
     CHECK(value->IsInstance<IntImmNode>())
         << value << " expects to be IntImm, but gets " << value->GetTypeKey();
     const auto* val_node = value.as<IntImmNode>();
-    auto val_imm = ffi::GetRef<IntImm>(val_node);
+    auto val_imm = GetRef<IntImm>(val_node);
     return val_imm->value;
   };
 
@@ -149,10 +144,7 @@ Expr nonzero(Expr x) {
   return Call(op, {std::move(x)});
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("relax.op.nonzero", nonzero);
-}
+TVM_FFI_REGISTER_GLOBAL("relax.op.nonzero").set_body_typed(nonzero);
 
 StructInfo InferStructInfoNonzero(const Call& call, const BlockBuilder& ctx) {
   TensorStructInfo data_sinfo = GetInputTensorStructInfo(call, 0, ctx);

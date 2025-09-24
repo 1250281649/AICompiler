@@ -22,9 +22,9 @@ from typing_extensions import Literal
 
 # isort: on
 
-from tvm_ffi import register_object
+from tvm.ffi import register_object
 from tvm.runtime import Object
-from tvm.runtime._tensor import Tensor
+from tvm.runtime.ndarray import NDArray
 
 from .. import _ffi_api
 from ..search_strategy import MeasureCandidate
@@ -40,7 +40,7 @@ class FeatureExtractor(Object):
 
     def extract_from(
         self, context: TuneContext, candidates: List[MeasureCandidate]
-    ) -> List[Tensor]:
+    ) -> List[NDArray]:
         """Extract features from the given measure candidate.
 
         Parameters
@@ -52,7 +52,7 @@ class FeatureExtractor(Object):
 
         Returns
         -------
-        features : List[Tensor]
+        features : List[NDArray]
             The feature tvm ndarray extracted.
         """
         result = _ffi_api.FeatureExtractorExtractFrom(  # type: ignore # pylint: disable=no-member
@@ -108,7 +108,7 @@ class PyFeatureExtractor:
 
     def extract_from(
         self, context: TuneContext, candidates: List[MeasureCandidate]
-    ) -> List[Tensor]:
+    ) -> List[NDArray]:
         """Extract features from the given measure candidate.
 
         Parameters
@@ -120,7 +120,7 @@ class PyFeatureExtractor:
 
         Returns
         -------
-        features : List[Tensor]
+        features : List[NDArray]
             The feature tvm ndarray extracted.
         """
         raise NotImplementedError

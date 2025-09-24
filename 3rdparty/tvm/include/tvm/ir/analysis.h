@@ -55,7 +55,7 @@ class CalleeCollector {
   virtual void Mark(GlobalVar gvar) = 0;
 };
 
-ffi::Map<GlobalVar, ffi::Array<GlobalVar>> CollectCallMap(const IRModule& mod);
+Map<GlobalVar, Array<GlobalVar>> CollectCallMap(const IRModule& mod);
 
 }  // namespace ir
 }  // namespace tvm

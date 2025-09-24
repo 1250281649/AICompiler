@@ -17,7 +17,6 @@
  * under the License.
  */
 
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/relax/transform.h>
 
 #include "../../meta_schedule/utils.h"
@@ -34,7 +33,7 @@ tir::PrimFunc FewShotTunePrimFunc(const tir::PrimFunc& prim_func, const Target& 
   meta_schedule::Builder builder = f_get_local_builder().cast<meta_schedule::Builder>();
   ICHECK(builder.defined()) << "ValueError: The local builder is not defined!";
   // fetch a local runner
-  meta_schedule::Runner runner{ffi::UnsafeInit()};
+  meta_schedule::Runner runner{nullptr};
   if (benchmark) {
     static const auto f_get_local_runner =
         tvm::ffi::Function::GetGlobalRequired("meta_schedule.runner.get_local_runner");
@@ -42,13 +41,13 @@ tir::PrimFunc FewShotTunePrimFunc(const tir::PrimFunc& prim_func, const Target& 
     ICHECK(runner.defined()) << "ValueError: The local runner is not defined!";
   }
   // create an IRModule
-  IRModule mod = IRModule(ffi::Map<GlobalVar, BaseFunc>(
-      {{GlobalVar("main"), WithAttr(prim_func, tvm::attr::kGlobalSymbol, ffi::String("main"))}}));
+  IRModule mod = IRModule(Map<GlobalVar, BaseFunc>(
+      {{GlobalVar("main"), WithAttr(prim_func, tvm::attr::kGlobalSymbol, String("main"))}}));
   // fetch the number of physical cores
   static const auto f_cpu_count = tvm::ffi::Function::GetGlobalRequired("meta_schedule.cpu_count");
   int num_threads = f_cpu_count(false).cast<int>();
   // store the results
-  ffi::Array<IRModule> results;
+  Array<IRModule> results;
   std::vector<double> costs;
   // create a TuneContext
   meta_schedule::TuneContext task = meta_schedule::TuneContext(
@@ -72,21 +71,21 @@ tir::PrimFunc FewShotTunePrimFunc(const tir::PrimFunc& prim_func, const Target& 
       /*cost_model=*/std::nullopt);
   int fail_count = 0, max_fail_count = 100;
   while (valid_count > 0 && fail_count < max_fail_count) {
-    ffi::Optional<ffi::Array<meta_schedule::MeasureCandidate>> candidates =
+    Optional<Array<meta_schedule::MeasureCandidate>> candidates =
         task->search_strategy.value()->GenerateMeasureCandidates();
     if (!candidates.defined()) break;
-    ffi::Array<meta_schedule::BuilderInput> builder_inputs;
+    Array<meta_schedule::BuilderInput> builder_inputs;
     for (const meta_schedule::MeasureCandidate& candidate : candidates.value()) {
       builder_inputs.push_back(meta_schedule::BuilderInput(
           /*mod=*/candidate->sch->mod(),
           /*target=*/target));
     }
-    ffi::Array<meta_schedule::BuilderResult> builder_results = builder->Build(builder_inputs);
+    Array<meta_schedule::BuilderResult> builder_results = builder->Build(builder_inputs);
     ICHECK_EQ(builder_results.size(), candidates.value().size());
     int idx = 0;
     bool no_valid = true;  // whether there is no valid schedule in this iteration
     for (const meta_schedule::BuilderResult& builder_result : builder_results) {
-      if (!builder_result->error_msg.has_value()) {
+      if (!builder_result->error_msg.defined()) {
         results.push_back(candidates.value()[idx]->sch->mod());
         valid_count--;
         no_valid = false;
@@ -95,10 +94,10 @@ tir::PrimFunc FewShotTunePrimFunc(const tir::PrimFunc& prim_func, const Target& 
     }
     fail_count += no_valid;  // increase fail_count if there is no valid schedule
     if (benchmark) {
-      ffi::Array<meta_schedule::RunnerInput> runner_inputs;
+      Array<meta_schedule::RunnerInput> runner_inputs;
       int idx = 0;
       for (const meta_schedule::BuilderResult& builder_result : builder_results) {
-        if (!builder_result->error_msg.has_value()) {
+        if (!builder_result->error_msg.defined()) {
           runner_inputs.push_back(meta_schedule::RunnerInput(
               /*artifact_path=*/builder_result->artifact_path.value(),
               /*device_type=*/target->kind->name,
@@ -106,10 +105,10 @@ tir::PrimFunc FewShotTunePrimFunc(const tir::PrimFunc& prim_func, const Target& 
         }
         idx++;
       }
-      ffi::Array<meta_schedule::RunnerFuture> runner_futures = runner->Run(runner_inputs);
+      Array<meta_schedule::RunnerFuture> runner_futures = runner->Run(runner_inputs);
       for (const meta_schedule::RunnerFuture& runner_future : runner_futures) {
         meta_schedule::RunnerResult runner_result = runner_future->Result();
-        if (runner_result->error_msg.has_value()) {
+        if (runner_result->error_msg.defined()) {
           costs.push_back(1e10);
         } else {
           double sum = 0;
@@ -153,13 +152,12 @@ Pass FewShotTuning(int valid_count, bool benchmark) {
         tvm::Target target = tvm::Target::Current();
         ICHECK(target.defined()) << "Target is not set in current context";
         // generate the few shot tuned prim funcs.
-        ffi::Map<GlobalVar, BaseFunc> result;
+        Map<GlobalVar, BaseFunc> result;
         for (const auto& [gv, func] : m->functions) {
           if (func->IsInstance<tir::PrimFuncNode>() &&
               !func->HasNonzeroAttr(tir::attr::kIsScheduled)) {
-            result.Set(gv,
-                       FewShotTunePrimFunc(ffi::GetRef<tir::PrimFunc>(func.as<tir::PrimFuncNode>()),
-                                           target, valid_count, benchmark));
+            result.Set(gv, FewShotTunePrimFunc(GetRef<tir::PrimFunc>(func.as<tir::PrimFuncNode>()),
+                                               target, valid_count, benchmark));
           } else {
             result.Set(gv, func);
           }
@@ -174,10 +172,7 @@ Pass FewShotTuning(int valid_count, bool benchmark) {
                           /*required=*/{});
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("relax.transform.FewShotTuning", FewShotTuning);
-}
+TVM_FFI_REGISTER_GLOBAL("relax.transform.FewShotTuning").set_body_typed(FewShotTuning);
 
 }  // namespace transform
 }  // namespace relax

@@ -15,6 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 """FFI APIs from C++"""
-import tvm_ffi
+from ...ffi import _init_api
 
-tvm_ffi.init_ffi_api("runtime.disco", __name__)
+_init_api("runtime.disco", __name__)

@@ -17,8 +17,6 @@
  * under the License.
  */
 
-#include <tvm/ffi/reflection/registry.h>
-
 #include "../../meta_schedule/utils.h"
 
 namespace tvm {
@@ -34,20 +32,20 @@ namespace transform {
 void ThreadBind(tir::Schedule sch, const tir::BlockRV& block, int64_t max_thread_per_block,
                 int64_t max_threadblocks = 256) {
   // fetch the loops
-  ffi::Array<tir::LoopRV> loops = sch->GetLoops(block);
+  Array<tir::LoopRV> loops = sch->GetLoops(block);
   for (const tir::LoopRV& loop : loops) {
     // skip block if already scheduled
     if (sch->Get(loop)->thread_binding.defined()) {
       return;
     }
   }
-  ffi::Array<tir::IterVar> iters = sch->Get(block)->iter_vars;
+  Array<tir::IterVar> iters = sch->Get(block)->iter_vars;
 
   // when there is no loops, tir will add a dummy iter var for the block
   // so loops.size() == 0 && iters.size() == 1
   ICHECK(loops.size() == iters.size() || (loops.size() == 0 && iters.size() == 1));
 
-  ffi::Array<tir::LoopRV> data_parallel_loops;
+  Array<tir::LoopRV> data_parallel_loops;
   // only fuse data parallel loops
   for (size_t i = 0; i < loops.size(); ++i) {
     if (iters[i]->iter_type == tir::IterVarType::kDataPar) {
@@ -68,14 +66,14 @@ void ThreadBind(tir::Schedule sch, const tir::BlockRV& block, int64_t max_thread
   }
   // schedule the fused loop
   if (product > max_thread_per_block * max_threadblocks) {
-    ffi::Array<tir::LoopRV> splits = sch->Split(
+    Array<tir::LoopRV> splits = sch->Split(
         fused,
         /*factors=*/{std::nullopt, Integer(max_threadblocks), Integer(max_thread_per_block)});
     sch->Reorder(/*ordered_loop_rvs=*/{splits[1], splits[2], splits[0]});
     sch->Bind(splits[1], "blockIdx.x");
     sch->Bind(splits[2], "threadIdx.x");
   } else {
-    ffi::Array<tir::LoopRV> splits = sch->Split(
+    Array<tir::LoopRV> splits = sch->Split(
         fused, /*factors=*/{std::nullopt, Integer(std::min(product, max_thread_per_block))});
     sch->Bind(splits[0], "blockIdx.x");
     sch->Bind(splits[1], "threadIdx.x");
@@ -83,11 +81,11 @@ void ThreadBind(tir::Schedule sch, const tir::BlockRV& block, int64_t max_thread
 }
 
 IRModule MarkScheduled(const IRModule& mod) {
-  ffi::Map<GlobalVar, BaseFunc> result;
+  Map<GlobalVar, BaseFunc> result;
 
   for (const auto& [gv, base_func] : mod->functions) {
     if (const auto* prim_func_node = base_func.as<tir::PrimFuncNode>()) {
-      tir::PrimFunc prim_func = ffi::GetRef<tir::PrimFunc>(prim_func_node);
+      tir::PrimFunc prim_func = GetRef<tir::PrimFunc>(prim_func_node);
       tir::PrimFunc new_prim_func = WithAttr(std::move(prim_func), tir::attr::kIsScheduled, true);
       result.Set(gv, new_prim_func);
     } else {
@@ -105,7 +103,7 @@ bool IsScheduledOnGPU(const BaseFunc& func) {
   // the target from context.
   tvm::Target target = tvm::Target::Current();
   // the Target in kTarget attribute of PrimFunc
-  ffi::Optional<tvm::Target> func_target = func->attrs.GetAttr<tvm::Target>(tvm::attr::kTarget);
+  Optional<tvm::Target> func_target = func->attrs.GetAttr<tvm::Target>(tvm::attr::kTarget);
   if (func_target.defined()) {
     target = func_target.value();
   }
@@ -131,7 +129,7 @@ Pass DefaultGPUSchedule() {
             // get the target from context.
             tvm::Target target = tvm::Target::Current();
             // get the target from kTarget attribute
-            ffi::Optional<tvm::Target> func_target =
+            Optional<tvm::Target> func_target =
                 func->attrs.GetAttr<tvm::Target>(tvm::attr::kTarget);
             if (func_target.defined()) {
               target = func_target.value();
@@ -139,14 +137,14 @@ Pass DefaultGPUSchedule() {
             ICHECK(target.defined()) << "The target is missing either in the current context or in "
                                         "the prim_func's attribute.";
             // get the max thread per block from target.
-            ffi::Optional<Integer> opt_max_thread_per_block =
+            Optional<Integer> opt_max_thread_per_block =
                 target->GetAttr<Integer>("max_num_threads");
             ICHECK(opt_max_thread_per_block.defined())
                 << "max_num_threads is not set for target " << target;
             int64_t max_thread_per_block = opt_max_thread_per_block.value().IntValue();
 
             sch->WorkOn(gv->name_hint);
-            ffi::Array<tir::BlockRV> blocks = meta_schedule::BlockCollector::Collect(sch);
+            Array<tir::BlockRV> blocks = meta_schedule::BlockCollector::Collect(sch);
             for (const tir::BlockRV& block : blocks) {
               auto childs = sch->GetChildBlocks(block);
               if (!childs.empty()) {
@@ -164,10 +162,7 @@ Pass DefaultGPUSchedule() {
                           /*required=*/{});
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("tir.transform.DefaultGPUSchedule", DefaultGPUSchedule);
-}
+TVM_FFI_REGISTER_GLOBAL("tir.transform.DefaultGPUSchedule").set_body_typed(DefaultGPUSchedule);
 
 }  // namespace transform
 

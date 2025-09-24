@@ -20,9 +20,10 @@
 #define TVM_META_SCHEDULE_EXTRACTED_TASK_H_
 
 #include <tvm/ffi/container/array.h>
-#include <tvm/ffi/reflection/registry.h>
+#include <tvm/ffi/reflection/reflection.h>
 #include <tvm/ffi/string.h>
 #include <tvm/ir/module.h>
+#include <tvm/node/reflection.h>
 #include <tvm/runtime/object.h>
 #include <tvm/target/target.h>
 
@@ -42,13 +43,13 @@ namespace meta_schedule {
 class ExtractedTaskNode : public runtime::Object {
  public:
   /*! \brief The name of the task extracted */
-  ffi::String task_name;
+  String task_name;
   /*! \brief The high-level IR */
   IRModule mod;
   /*! \brief Target */
   Target target;
   /*! \brief A list of low-level IRs that the high-level IR could potentially dispatch to */
-  ffi::Array<IRModule> dispatched;
+  Array<IRModule> dispatched;
   /*! \brief Weight of the task */
   int weight;
 
@@ -62,9 +63,9 @@ class ExtractedTaskNode : public runtime::Object {
         .def_ro("weight", &ExtractedTaskNode::weight);
   }
 
-  static constexpr const bool _type_mutable = true;
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("meta_schedule.ExtractedTask", ExtractedTaskNode,
-                                    runtime::Object);
+  static constexpr const char* _type_key = "meta_schedule.ExtractedTask";
+
+  TVM_DECLARE_FINAL_OBJECT_INFO(ExtractedTaskNode, runtime::Object);
 };
 
 /*!
@@ -73,10 +74,10 @@ class ExtractedTaskNode : public runtime::Object {
  */
 class ExtractedTask : public runtime::ObjectRef {
  public:
-  explicit ExtractedTask(ffi::String task_name, IRModule mod, Target target,
-                         ffi::Array<IRModule> dispatched, int weight);
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NOTNULLABLE(ExtractedTask, runtime::ObjectRef,
-                                                ExtractedTaskNode);
+  explicit ExtractedTask(String task_name, IRModule mod, Target target, Array<IRModule> dispatched,
+                         int weight);
+  TVM_DEFINE_MUTABLE_NOTNULLABLE_OBJECT_REF_METHODS(ExtractedTask, runtime::ObjectRef,
+                                                    ExtractedTaskNode);
 };
 
 }  // namespace meta_schedule

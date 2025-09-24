@@ -32,7 +32,7 @@ import numpy as np  # type: ignore
 from tvm import ir, tir
 from tvm.ir import Type
 from tvm.ir.base import deprecated
-from tvm.runtime import String, convert, tensor
+from tvm.runtime import String, convert, ndarray
 from tvm.target import Target
 
 # pylint: disable=unused-import
@@ -1054,7 +1054,7 @@ def allocate_const(
         np_data = np_data.reshape(extents)
 
     return _ffi_api.AllocateConst(  # type: ignore[attr-defined] # pylint: disable=no-member
-        tensor(np_data), dtype, extents, annotations
+        ndarray.array(np_data), dtype, extents, annotations
     )
 
 
@@ -1917,8 +1917,6 @@ pow = _op_wrapper(_tir_op.pow)  # pylint: disable=redefined-builtin
 q_multiply_shift = _op_wrapper(_tir_op.q_multiply_shift)
 q_multiply_shift_per_axis = _op_wrapper(_tir_op.q_multiply_shift_per_axis)
 ret = _op_wrapper(_tir_op.ret)
-continue_loop = _op_wrapper(_tir_op.continue_loop)
-break_loop = _op_wrapper(_tir_op.break_loop)
 round = _op_wrapper(_tir_op.round)  # pylint: disable=redefined-builtin
 rsqrt = _op_wrapper(_tir_op.rsqrt)
 shift_left = _op_wrapper(_tir_op.shift_left)
@@ -1929,7 +1927,6 @@ sinh = _op_wrapper(_tir_op.sinh)
 sqrt = _op_wrapper(_tir_op.sqrt)
 tan = _op_wrapper(_tir_op.tan)
 tanh = _op_wrapper(_tir_op.tanh)
-thread_return = _op_wrapper(_tir_op.thread_return)
 trunc = _op_wrapper(_tir_op.trunc)
 truncdiv = _op_wrapper(_tir_op.truncdiv)
 truncmod = _op_wrapper(_tir_op.truncmod)
@@ -2197,8 +2194,6 @@ __all__ = float_types + [
     "q_multiply_shift",
     "q_multiply_shift_per_axis",
     "ret",
-    "continue_loop",
-    "break_loop",
     "reinterpret",
     "round",
     "rsqrt",
@@ -2210,7 +2205,6 @@ __all__ = float_types + [
     "sqrt",
     "tan",
     "tanh",
-    "thread_return",
     "trunc",
     "truncdiv",
     "truncmod",

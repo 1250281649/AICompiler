@@ -24,7 +24,6 @@
  * true.
  */
 #include <tvm/arith/analyzer.h>
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/ir/attrs.h>
 #include <tvm/node/serialization.h>
 #include <tvm/relax/analysis.h>
@@ -43,17 +42,17 @@ using namespace tir;
 static constexpr const char* kOperatorName = "operator_name";
 
 /*! \brief Construct ranges from shape dimensions */
-static ffi::Array<Range> ConstructRangeFromShape(const ffi::Array<PrimExpr>& shape) {
+static Array<Range> ConstructRangeFromShape(const Array<PrimExpr>& shape) {
   return shape.Map([](const PrimExpr& dim) { return Range(tir::make_zero(dim.dtype()), dim); });
 }
 
-static ffi::Array<PrimExpr> GetShapeFromTensorStructInfo(const TensorStructInfo& tensor_sinfo) {
+static Array<PrimExpr> GetShapeFromTensorStructInfo(const TensorStructInfo& tensor_sinfo) {
   auto shape = tensor_sinfo->GetShape();
   ICHECK(shape.defined());
   return shape.value();
 }
 
-static ffi::Array<PrimExpr> GetShapeFromTensor(const Expr& expr) {
+static Array<PrimExpr> GetShapeFromTensor(const Expr& expr) {
   const auto& tensor_sinfo = Downcast<TensorStructInfo>(expr->struct_info_);
   return GetShapeFromTensorStructInfo(tensor_sinfo);
 }
@@ -64,8 +63,8 @@ static IndexMap DeepCopyIndexMap(const IndexMap& index_map) {
 
 /*! \brief Checks if the \p transform is bijective on the shape of \p expr */
 bool IsTransformBijective(const Expr& expr, const IndexMap& transform) {
-  ffi::Array<PrimExpr> input_shape = GetShapeFromTensor(expr);
-  ffi::Array<Range> initial_ranges = ConstructRangeFromShape(input_shape);
+  Array<PrimExpr> input_shape = GetShapeFromTensor(expr);
+  Array<Range> initial_ranges = ConstructRangeFromShape(input_shape);
   arith::Analyzer analyzer;
   auto [inverse, padding_predicate] = transform.NonSurjectiveInverse(initial_ranges, &analyzer);
   (void)inverse;  // to avoid unused variable warning;
@@ -80,12 +79,10 @@ bool IsTransformBijective(const Expr& expr, const IndexMap& transform) {
  */
 class AlterOpImplMutator : public ExprMutator {
  public:
-  AlterOpImplMutator(
-      const IRModule& mod, const ffi::Map<ffi::String, tir::PrimFunc>& op_impl_map,
-      const ffi::Map<ffi::String, ffi::Array<IndexMap>>& op_buffer_transforms_,
-      const ffi::Map<ffi::String, ffi::Optional<ffi::Array<ffi::Array<IntImm>>>>& axis_separators_,
-      const ffi::Map<ffi::String, ffi::Optional<ffi::Array<ffi::Array<IntImm>>>>&
-          input_axis_separators_)
+  AlterOpImplMutator(const IRModule& mod, const Map<String, tir::PrimFunc>& op_impl_map,
+                     const Map<String, Array<IndexMap>>& op_buffer_transforms_,
+                     const Map<String, Optional<Array<Array<IntImm>>>>& axis_separators_,
+                     const Map<String, Optional<Array<Array<IntImm>>>>& input_axis_separators_)
       : ExprMutator(mod),
         mod_(mod),
         op_impl_map_(op_impl_map),
@@ -121,18 +118,18 @@ class AlterOpImplMutator : public ExprMutator {
     ICHECK(call->args[0]->IsInstance<GlobalVarNode>());
     const tir::PrimFunc& old_func =
         Downcast<tir::PrimFunc>(mod_->Lookup(Downcast<GlobalVar>(call->args[0])));
-    ffi::Optional<ffi::String> maybe_op_kind = old_func->attrs.GetAttr<ffi::String>(kOperatorName);
+    Optional<String> maybe_op_kind = old_func->attrs.GetAttr<String>(kOperatorName);
 
     // If the callee does not have kOperatorName attribute or no replacement is requested for
     // it, nothing to do here.
-    if (!maybe_op_kind.has_value() || op_impl_map_.count(maybe_op_kind.value()) == 0) return call;
+    if (!maybe_op_kind.defined() || op_impl_map_.count(maybe_op_kind.value()) == 0) return call;
     auto op_kind = maybe_op_kind.value();
 
     const auto& replacement_func = op_impl_map_[op_kind];
 
-    ffi::Array<IndexMap> buffer_transforms;
-    ffi::Optional<ffi::Array<ffi::Array<IntImm>>> axis_separators;
-    ffi::Optional<ffi::Array<ffi::Array<IntImm>>> input_axis_separators;
+    Array<IndexMap> buffer_transforms;
+    Optional<Array<Array<IntImm>>> axis_separators;
+    Optional<Array<Array<IntImm>>> input_axis_separators;
     if (op_buffer_transforms__.count(op_kind)) buffer_transforms = op_buffer_transforms__[op_kind];
     if (op_buffer_axis_separators__.count(op_kind))
       axis_separators = op_buffer_axis_separators__[op_kind];
@@ -147,7 +144,7 @@ class AlterOpImplMutator : public ExprMutator {
 
     GlobalVar replacement_gv = GetOrCreateGlobalVarForFunc(replacement_func, op_kind);
 
-    auto call_tir_inputs_tuple = ffi::GetRef<Tuple>(call->args[1].as<TupleNode>());
+    auto call_tir_inputs_tuple = GetRef<Tuple>(call->args[1].as<TupleNode>());
     Tuple updated_inputs = UpdateInputs(call_tir_inputs_tuple, buffer_transforms, axis_separators,
                                         input_axis_separators);
 
@@ -161,18 +158,18 @@ class AlterOpImplMutator : public ExprMutator {
                             input_axis_separators);
   }
 
-  ffi::Array<TensorStructInfo> GetTensorStructInfoPerOutput(const StructInfo& output_sinfo) {
+  Array<TensorStructInfo> GetTensorStructInfoPerOutput(const StructInfo& output_sinfo) {
     if (const auto* tensor_sinfo = output_sinfo.as<TensorStructInfoNode>())
-      return {ffi::GetRef<TensorStructInfo>(tensor_sinfo)};
+      return {GetRef<TensorStructInfo>(tensor_sinfo)};
     const auto* tuple_sinfo = output_sinfo.as<TupleStructInfoNode>();
     ICHECK(tuple_sinfo);
 
-    ffi::Array<TensorStructInfo> arr_tensor_sinfo;
+    Array<TensorStructInfo> arr_tensor_sinfo;
     arr_tensor_sinfo.reserve(tuple_sinfo->fields.size());
     for (const auto& sinfo : tuple_sinfo->fields) {
       const auto* tensor_sinfo = sinfo.as<TensorStructInfoNode>();
       ICHECK(tensor_sinfo) << "Nested tuples in output of call_tir is not supported yet";
-      arr_tensor_sinfo.push_back(ffi::GetRef<TensorStructInfo>(tensor_sinfo));
+      arr_tensor_sinfo.push_back(GetRef<TensorStructInfo>(tensor_sinfo));
     }
     return arr_tensor_sinfo;
   }
@@ -185,12 +182,12 @@ class AlterOpImplMutator : public ExprMutator {
   }
 
   Expr TransformLayout(const Expr& expr, const IndexMap& index_map,
-                       const ffi::Array<IntImm>& axis_separators,
-                       const ffi::Array<IntImm>& input_axis_separators) {
+                       const Array<IntImm>& axis_separators,
+                       const Array<IntImm>& input_axis_separators) {
     if (IsScalarConstant(expr) || index_map.get() == nullptr) {
       return expr;
     }
-    ObjectPtr<LayoutTransformAttrs> attrs = ffi::make_object<LayoutTransformAttrs>();
+    ObjectPtr<LayoutTransformAttrs> attrs = make_object<LayoutTransformAttrs>();
     // We want to avoid two layout_transform ops to share the same index map even if they are
     // identical. The scope of vars used in index map initial indices is local to the op. Not doing
     // so would confuse the structural equality check.
@@ -204,13 +201,13 @@ class AlterOpImplMutator : public ExprMutator {
    * \brief Adds the \p remove_pad op to the module if it has not already been added before.
    * \returns The global var associated with the remove_pad PrimFunc.
    */
-  GlobalVar GetOrCreateRemovePadOp(const ffi::Array<PrimExpr>& old_shape, const DataType& dtype) {
+  GlobalVar GetOrCreateRemovePadOp(const Array<PrimExpr>& old_shape, const DataType& dtype) {
     int t_shape = old_shape.size();
     if (remove_pad_map_.count(t_shape) != 0) {
       return remove_pad_map_[t_shape];
     }
     // Create dynamic shapes for input and output tensors
-    ffi::Array<PrimExpr> dyn_padded_shape, dyn_old_shape;
+    Array<PrimExpr> dyn_padded_shape, dyn_old_shape;
     for (int i = 0; i < t_shape; i++) {
       tir::Var var1("p" + std::to_string(i), old_shape[i].dtype());
       tir::Var var2("i" + std::to_string(i), old_shape[i].dtype());
@@ -223,12 +220,12 @@ class AlterOpImplMutator : public ExprMutator {
     // Output tensor of remove_pad op
     te::Tensor output_tensor = te::compute(
         dyn_old_shape,
-        [&placeholder_tensor](const ffi::Array<tir::Var>& indices) {
+        [&placeholder_tensor](const Array<tir::Var>& indices) {
           return placeholder_tensor(indices);
         },
         "output", topi::kElementWise);
 
-    ffi::String op_name = "remove_pad";
+    String op_name = "remove_pad";
     // Create PrimFunc and add op_name to func.attrs
     PrimFunc remove_pad_with_frozen_layout =
         WithAttr(CreatePrimFunc({placeholder_tensor, output_tensor}), kOperatorName, op_name);
@@ -244,13 +241,13 @@ class AlterOpImplMutator : public ExprMutator {
 
   Expr TransformLayoutInverse(const Expr& expr, const IndexMap& index_map,
                               const TensorStructInfo& old_tensor_sinfo,
-                              const ffi::Array<IntImm>& axis_separator,
-                              const ffi::Array<IntImm>& input_axis_separator) {
+                              const Array<IntImm>& axis_separator,
+                              const Array<IntImm>& input_axis_separator) {
     if (IsScalarConstant(expr) || index_map.get() == nullptr) {
       return expr;
     }
-    ffi::Array<PrimExpr> old_shape = GetShapeFromTensorStructInfo(old_tensor_sinfo);
-    ffi::Array<Range> initial_ranges = ConstructRangeFromShape(old_shape);
+    Array<PrimExpr> old_shape = GetShapeFromTensorStructInfo(old_tensor_sinfo);
+    Array<Range> initial_ranges = ConstructRangeFromShape(old_shape);
     arith::Analyzer analyzer;
     auto [inverse_index_map, padding_predicate] =
         index_map.NonSurjectiveInverse(initial_ranges, &analyzer);
@@ -271,8 +268,7 @@ class AlterOpImplMutator : public ExprMutator {
    * \brief Adds the \p replacement_func to the module if it has not already been added before.
    * \returns The global var associated with the PrimFunc.
    */
-  GlobalVar GetOrCreateGlobalVarForFunc(const PrimFunc& replacement_func,
-                                        const ffi::String& op_kind) {
+  GlobalVar GetOrCreateGlobalVarForFunc(const PrimFunc& replacement_func, const String& op_kind) {
     if (cache_.count(replacement_func) != 0) {
       return cache_[replacement_func];
     }
@@ -290,22 +286,22 @@ class AlterOpImplMutator : public ExprMutator {
   /*!
    * \brief Updates call inputs with layout transformed inputs
    */
-  Tuple UpdateInputs(const Tuple& inputs, const ffi::Array<IndexMap>& transforms,
-                     const ffi::Optional<ffi::Array<ffi::Array<IntImm>>>& axis_separators,
-                     const ffi::Optional<ffi::Array<ffi::Array<IntImm>>>& input_axis_separators) {
+  Tuple UpdateInputs(const Tuple& inputs, const Array<IndexMap>& transforms,
+                     const Optional<Array<Array<IntImm>>>& axis_separators,
+                     const Optional<Array<Array<IntImm>>>& input_axis_separators) {
     if (transforms.empty()) return inputs;
 
-    ffi::Array<Expr> updated_inputs;
+    Array<Expr> updated_inputs;
     int index = 0;
     for (const auto& input : inputs->fields) {
-      ffi::Array<IntImm> axis_separator;
-      ffi::Array<IntImm> input_axis_separator;
+      Array<IntImm> axis_separator;
+      Array<IntImm> input_axis_separator;
       if (axis_separators.defined()) {
-        ffi::Array<ffi::Array<IntImm>> axis_separators_value = axis_separators.value();
+        Array<Array<IntImm>> axis_separators_value = axis_separators.value();
         axis_separator = axis_separators_value[index];
       }
       if (input_axis_separators.defined()) {
-        ffi::Array<ffi::Array<IntImm>> input_axis_separators_value = input_axis_separators.value();
+        Array<Array<IntImm>> input_axis_separators_value = input_axis_separators.value();
         input_axis_separator = input_axis_separators_value[index];
       }
       auto transform = transforms[index++];
@@ -317,7 +313,7 @@ class AlterOpImplMutator : public ExprMutator {
 
   /*! \brief Updates output struct info */
   StructInfo UpdateStructInfo(const StructInfo& out_sinfo,
-                              const ffi::Array<IndexMap>& buffer_transforms) {
+                              const Array<IndexMap>& buffer_transforms) {
     if (buffer_transforms.empty()) return out_sinfo;
 
     if (out_sinfo->IsInstance<TensorStructInfoNode>())
@@ -330,7 +326,7 @@ class AlterOpImplMutator : public ExprMutator {
         << out_sinfo;
 
     const auto& tuple_sinfo = Downcast<TupleStructInfo>(out_sinfo);
-    ffi::Array<StructInfo> sinfo_fields;
+    Array<StructInfo> sinfo_fields;
     size_t first_output_index = buffer_transforms.size() - tuple_sinfo->fields.size();
     size_t i = 0;
     for (const auto& si : tuple_sinfo->fields) {
@@ -357,16 +353,15 @@ class AlterOpImplMutator : public ExprMutator {
     return TensorStructInfo(ShapeExpr(new_shape), tensor_sinfo->dtype);
   }
 
-  Expr TransformOutputs(
-      const Expr& expr, const ffi::Array<IndexMap>& buffer_transforms,
-      const StructInfo& old_struct_info,
-      const ffi::Optional<ffi::Array<ffi::Array<IntImm>>>& axis_separators,
-      const ffi::Optional<ffi::Array<ffi::Array<IntImm>>>& input_axis_separators) {
+  Expr TransformOutputs(const Expr& expr, const Array<IndexMap>& buffer_transforms,
+                        const StructInfo& old_struct_info,
+                        const Optional<Array<Array<IntImm>>>& axis_separators,
+                        const Optional<Array<Array<IntImm>>>& input_axis_separators) {
     if (buffer_transforms.empty()) return expr;
 
-    ffi::Array<TensorStructInfo> old_output_sinfo = GetTensorStructInfoPerOutput(old_struct_info);
+    Array<TensorStructInfo> old_output_sinfo = GetTensorStructInfoPerOutput(old_struct_info);
 
-    ffi::Array<IntImm> axis_sep, input_axis_sep;
+    Array<IntImm> axis_sep, input_axis_sep;
     size_t num_outputs = old_output_sinfo.size();
     if (num_outputs == 0) return expr;
 
@@ -375,11 +370,11 @@ class AlterOpImplMutator : public ExprMutator {
     if (num_outputs == 1) {
       IndexMap output_map = buffer_transforms[first_output_index];
       if (axis_separators.defined()) {
-        ffi::Array<ffi::Array<IntImm>> axis_separators_value = axis_separators.value();
+        Array<Array<IntImm>> axis_separators_value = axis_separators.value();
         axis_sep = axis_separators_value[first_output_index];
       }
       if (input_axis_separators.defined()) {
-        ffi::Array<ffi::Array<IntImm>> input_axis_separators_value = input_axis_separators.value();
+        Array<Array<IntImm>> input_axis_separators_value = input_axis_separators.value();
         input_axis_sep = input_axis_separators_value[first_output_index];
       }
       return TransformLayoutInverse(expr, output_map, old_output_sinfo[0], axis_sep,
@@ -388,15 +383,15 @@ class AlterOpImplMutator : public ExprMutator {
 
     // In case of more than one output, we would have to get each item of the output tuple,
     // transform it and return a tuple of all transformed outputs.
-    ffi::Array<Expr> transformed_outputs;
+    Array<Expr> transformed_outputs;
     for (size_t i = 0; i + first_output_index < buffer_transforms.size(); ++i) {
       const auto& output_map = buffer_transforms[i + first_output_index];
       if (axis_separators.defined()) {
-        ffi::Array<ffi::Array<IntImm>> axis_separators_value = axis_separators.value();
+        Array<Array<IntImm>> axis_separators_value = axis_separators.value();
         axis_sep = axis_separators_value[i + first_output_index];
       }
       if (input_axis_separators.defined()) {
-        ffi::Array<ffi::Array<IntImm>> input_axis_separators_value = input_axis_separators.value();
+        Array<Array<IntImm>> input_axis_separators_value = input_axis_separators.value();
         input_axis_sep = input_axis_separators_value[i + first_output_index];
       }
       auto output = builder_->Normalize(TupleGetItem(expr, static_cast<int>(i)));
@@ -408,21 +403,19 @@ class AlterOpImplMutator : public ExprMutator {
 
  private:
   /*! \brief Cache to keep track of the GlobalVar associated with the new PrimFunc added */
-  ffi::Map<PrimFunc, GlobalVar> cache_;
+  Map<PrimFunc, GlobalVar> cache_;
   /*! \brief Input IRModule */
   const IRModule& mod_;
   /*! \brief Map from shape_dim.size to the remove_pad GlobalVar */
   std::unordered_map<int, GlobalVar> remove_pad_map_;
   /*! \brief Map from kOperatorName attribute to the replacement PrimFunc */
-  const ffi::Map<ffi::String, PrimFunc>& op_impl_map_;
+  const Map<String, PrimFunc>& op_impl_map_;
   /*! \brief Map from kOperatorName attribute to the layout transforms on i/o buffers */
-  const ffi::Map<ffi::String, ffi::Array<IndexMap>>& op_buffer_transforms__;
+  const Map<String, Array<IndexMap>>& op_buffer_transforms__;
   /*! \brief Map from kOperatorName attribute to the axis separatos on i/o buffers */
-  const ffi::Map<ffi::String, ffi::Optional<ffi::Array<ffi::Array<IntImm>>>>&
-      op_buffer_axis_separators__;
+  const Map<String, Optional<Array<Array<IntImm>>>>& op_buffer_axis_separators__;
   /*! \brief Map from kOperatorName attribute to the input axis separatos */
-  const ffi::Map<ffi::String, ffi::Optional<ffi::Array<ffi::Array<IntImm>>>>&
-      op_buffer_input_axis_separators__;
+  const Map<String, Optional<Array<Array<IntImm>>>>& op_buffer_input_axis_separators__;
 
   const Op& call_tir_op_ = Op::Get("relax.call_tir");
   const Op& layout_transform_op_ = Op::Get("relax.layout_transform");
@@ -430,12 +423,10 @@ class AlterOpImplMutator : public ExprMutator {
 
 namespace transform {
 
-Pass AlterOpImpl(
-    const ffi::Map<ffi::String, tir::PrimFunc>& op_impl_map,
-    const ffi::Map<ffi::String, ffi::Array<IndexMap>>& op_buffer_transforms_,
-    const ffi::Map<ffi::String, ffi::Optional<ffi::Array<ffi::Array<IntImm>>>>& axis_separators_,
-    const ffi::Map<ffi::String, ffi::Optional<ffi::Array<ffi::Array<IntImm>>>>&
-        input_axis_separators_) {
+Pass AlterOpImpl(const Map<String, tir::PrimFunc>& op_impl_map,
+                 const Map<String, Array<IndexMap>>& op_buffer_transforms_,
+                 const Map<String, Optional<Array<Array<IntImm>>>>& axis_separators_,
+                 const Map<String, Optional<Array<Array<IntImm>>>>& input_axis_separators_) {
   auto pass_func = [=](IRModule mod, PassContext pc) {
     return AlterOpImplMutator(mod, op_impl_map, op_buffer_transforms_, axis_separators_,
                               input_axis_separators_)
@@ -447,10 +438,7 @@ Pass AlterOpImpl(
                           /*required=*/{});
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("relax.transform.AlterOpImpl", AlterOpImpl);
-}
+TVM_FFI_REGISTER_GLOBAL("relax.transform.AlterOpImpl").set_body_typed(AlterOpImpl);
 
 }  // namespace transform
 }  // namespace relax

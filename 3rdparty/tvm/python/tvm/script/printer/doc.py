@@ -19,20 +19,32 @@
 from enum import IntEnum, unique
 from typing import Dict, List, Optional, Sequence, Tuple, Union
 
-from tvm_ffi import register_object
-from tvm_ffi.access_path import AccessPath
-from tvm.runtime import Object
+from tvm.ffi import register_object
+from tvm.runtime import Object, ObjectPath
 from tvm.tir import FloatImm, IntImm
 
 from . import _ffi_api
 
 
-@register_object("script.printer.Doc")
 class Doc(Object):
     """Base class of all Docs"""
 
+    @property
+    def source_paths(self) -> Sequence[ObjectPath]:
+        """
+        The list of object paths of the source IR node.
 
-@register_object("script.printer.ExprDoc")
+        This is used to trace back to the IR node position where
+        this Doc is generated, in order to position the diagnostic
+        message.
+        """
+        return self.__getattr__("source_paths")  # pylint: disable=unnecessary-dunder-call
+
+    @source_paths.setter
+    def source_paths(self, value):
+        return _ffi_api.DocSetSourcePaths(self, value)  # type: ignore # pylint: disable=no-member
+
+
 class ExprDoc(Doc):
     """Base class of all expression Docs"""
 
@@ -102,9 +114,25 @@ class ExprDoc(Doc):
         raise RuntimeError(f"{self.__class__} cannot be used as iterable.")
 
 
-@register_object("script.printer.StmtDoc")
 class StmtDoc(Doc):
     """Base class of statement doc"""
+
+    @property
+    def comment(self) -> Optional[str]:
+        """
+        The comment of this doc.
+
+        The actual position of the comment depends on the type of Doc
+        and also the DocPrinter implementation. It could be on the same
+        line as the statement, or the line above, or inside the statement
+        if it spans over multiple lines.
+        """
+        # It has to call the dunder method to avoid infinite recursion
+        return self.__getattr__("comment")  # pylint: disable=unnecessary-dunder-call
+
+    @comment.setter
+    def comment(self, value):
+        return _ffi_api.StmtDocSetComment(self, value)  # type: ignore # pylint: disable=no-member
 
 
 @register_object("script.printer.StmtBlockDoc")
@@ -130,7 +158,7 @@ class LiteralDoc(ExprDoc):
     def __init__(
         self,
         value: Union[str, float, bool, int, None],
-        path: Optional[AccessPath] = None,
+        path: Optional[ObjectPath] = None,
     ):
         if value is None:
             self.__init_handle_by_constructor__(_ffi_api.LiteralDocNone, path)  # type: ignore # pylint: disable=no-member

@@ -49,7 +49,7 @@ Type TypeMutator::VisitType(const Type& t) {
 }
 
 // Type Mutator.
-ffi::Array<Type> TypeMutator::MutateArray(ffi::Array<Type> arr) {
+Array<Type> TypeMutator::MutateArray(Array<Type> arr) {
   // The array will do copy on write
   // If no changes are made, the original array will be returned.
   return arr.Map([this](const Type& ty) { return VisitType(ty); });
@@ -58,32 +58,32 @@ ffi::Array<Type> TypeMutator::MutateArray(ffi::Array<Type> arr) {
 Type TypeMutator::VisitType_(const FuncTypeNode* op) {
   bool changed = false;
 
-  ffi::Array<Type> new_args = MutateArray(op->arg_types);
+  Array<Type> new_args = MutateArray(op->arg_types);
   changed = changed || !new_args.same_as(op->arg_types);
 
   Type new_ret_type = VisitType(op->ret_type);
   changed = changed || !new_ret_type.same_as(op->ret_type);
 
-  if (!changed) return ffi::GetRef<Type>(op);
+  if (!changed) return GetRef<Type>(op);
   return FuncType(new_args, new_ret_type);
 }
 
 Type TypeMutator::VisitType_(const TupleTypeNode* op) {
-  ffi::Array<Type> new_fields = MutateArray(op->fields);
+  Array<Type> new_fields = MutateArray(op->fields);
   if (new_fields.same_as(op->fields)) {
-    return ffi::GetRef<Type>(op);
+    return GetRef<Type>(op);
   } else {
     return TupleType(new_fields);
   }
 }
 
-Type TypeMutator::VisitType_(const PrimTypeNode* op) { return ffi::GetRef<Type>(op); }
+Type TypeMutator::VisitType_(const PrimTypeNode* op) { return GetRef<Type>(op); }
 
 Type TypeMutator::VisitType_(const PointerTypeNode* op) {
   Type element_type = VisitType(op->element_type);
 
   if (element_type.same_as(op->element_type)) {
-    return ffi::GetRef<Type>(op);
+    return GetRef<Type>(op);
   } else {
     return PointerType(element_type, op->storage_scope);
   }

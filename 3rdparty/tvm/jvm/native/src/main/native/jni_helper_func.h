@@ -151,8 +151,8 @@ jobject newFunction(JNIEnv* env, jlong value) {
   return object;
 }
 
-jobject newTensor(JNIEnv* env, jlong handle, jboolean isview) {
-  jclass cls = env->FindClass("org/apache/tvm/TensorBase");
+jobject newNDArray(JNIEnv* env, jlong handle, jboolean isview) {
+  jclass cls = env->FindClass("org/apache/tvm/NDArrayBase");
   jmethodID constructor = env->GetMethodID(cls, "<init>", "(JZ)V");
   jobject object = env->NewObject(cls, constructor, handle, isview);
   env->DeleteLocalRef(cls);
@@ -218,25 +218,19 @@ jobject tvmRetValueToJava(JNIEnv* env, TVMFFIAny value) {
       return newFunction(env, reinterpret_cast<jlong>(value.v_obj));
     }
     case TypeIndex::kTVMFFIDLTensorPtr: {
-      return newTensor(env, reinterpret_cast<jlong>(value.v_ptr), true);
+      return newNDArray(env, reinterpret_cast<jlong>(value.v_ptr), true);
     }
-    case TypeIndex::kTVMFFITensor: {
-      return newTensor(env, reinterpret_cast<jlong>(value.v_obj), false);
-    }
-    case TypeIndex::kTVMFFISmallStr: {
-      TVMFFIByteArray arr = TVMFFISmallBytesGetContentByteArray(&value);
-      return newTVMValueString(env, &arr);
+    case TypeIndex::kTVMFFINDArray: {
+      return newNDArray(env, reinterpret_cast<jlong>(value.v_obj), false);
     }
     case TypeIndex::kTVMFFIStr: {
-      return newTVMValueString(env, TVMFFIBytesGetByteArrayPtr(value.v_obj));
-    }
-    case TypeIndex::kTVMFFISmallBytes: {
-      TVMFFIByteArray arr = TVMFFISmallBytesGetContentByteArray(&value);
-      return newTVMValueBytes(env, &arr);
+      jobject ret = newTVMValueString(env, TVMFFIBytesGetByteArrayPtr(value.v_obj));
+      TVMFFIObjectFree(value.v_obj);
+      return ret;
     }
     case TypeIndex::kTVMFFIBytes: {
       jobject ret = newTVMValueBytes(env, TVMFFIBytesGetByteArrayPtr(value.v_obj));
-      TVMFFIObjectDecRef(value.v_obj);
+      TVMFFIObjectFree(value.v_obj);
       return ret;
     }
     default: {

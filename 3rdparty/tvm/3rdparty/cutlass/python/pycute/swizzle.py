@@ -75,7 +75,7 @@ class Swizzle:
 
   # Size of the domain
   def size(self):
-    return 1 << (self.bits + self.base + abs(self.shift))
+    return 1 << (bits + base + abs(shift))
 
   # Size of the codomain
   def cosize(self):

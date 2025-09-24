@@ -30,17 +30,18 @@
  **************************************************************************************************/
 
 #pragma once
-#include "cutlass/cutlass.h"
+
 #if defined(__CUDACC_RTC__)
-#include CUDA_STD_HEADER(cstdint)
+#include <cuda/std/cstdint>
 #else
 #include <cstdint>
 #include <cmath>
 #include <type_traits>
 #endif
 #if !defined(__QNX__)
-#include CUDA_STD_HEADER(utility)
+#include <cuda/std/utility>
 #endif
+#include "cutlass/cutlass.h"
 #include "cutlass/array.h"
 #include "cutlass/uint128.h"
 #include "cutlass/coord.h"

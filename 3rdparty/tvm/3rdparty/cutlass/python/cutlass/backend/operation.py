@@ -31,10 +31,10 @@
 #################################################################################################
 
 import ctypes
-from cutlass_cppgen.utils.lazy_import import lazy_import
+from cutlass.utils.lazy_import import lazy_import
 cuda = lazy_import("cuda.cuda")
 
-from cutlass_cppgen.backend.utils.device import device_cc
+from cutlass.backend.utils.device import device_cc
 
 _supports_cluster_launch = None
 

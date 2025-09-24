@@ -22,11 +22,12 @@
 
 #include <tvm/ffi/container/array.h>
 #include <tvm/ffi/function.h>
-#include <tvm/ffi/reflection/registry.h>
+#include <tvm/ffi/reflection/reflection.h>
 #include <tvm/ffi/string.h>
 #include <tvm/meta_schedule/arg_info.h>
 #include <tvm/meta_schedule/measure_candidate.h>
 #include <tvm/meta_schedule/runner.h>
+#include <tvm/node/reflection.h>
 #include <tvm/runtime/object.h>
 #include <tvm/tir/schedule/schedule.h>
 
@@ -47,13 +48,13 @@ class CostModelNode : public runtime::Object {
    * \brief Load the cost model from given file location.
    * \param path The file path.
    */
-  virtual void Load(const ffi::String& path) = 0;
+  virtual void Load(const String& path) = 0;
 
   /*!
    * \brief Save the cost model to given file location.
    * \param path The file path.
    */
-  virtual void Save(const ffi::String& path) = 0;
+  virtual void Save(const String& path) = 0;
 
   /*!
    * \brief Update the cost model given running results.
@@ -61,8 +62,8 @@ class CostModelNode : public runtime::Object {
    * \param candidates The measure candidates.
    * \param results The running results of the measure candidates.
    */
-  virtual void Update(const TuneContext& context, const ffi::Array<MeasureCandidate>& candidates,
-                      const ffi::Array<RunnerResult>& results) = 0;
+  virtual void Update(const TuneContext& context, const Array<MeasureCandidate>& candidates,
+                      const Array<RunnerResult>& results) = 0;
 
   /*!
    * \brief Predict the normalized score (the larger the better) of given measure candidates.
@@ -71,10 +72,10 @@ class CostModelNode : public runtime::Object {
    * \return The predicted normalized score.
    */
   virtual std::vector<double> Predict(const TuneContext& context,
-                                      const ffi::Array<MeasureCandidate>& candidates) = 0;
+                                      const Array<MeasureCandidate>& candidates) = 0;
 
-  static constexpr const bool _type_mutable = true;
-  TVM_FFI_DECLARE_OBJECT_INFO("meta_schedule.CostModel", CostModelNode, Object);
+  static constexpr const char* _type_key = "meta_schedule.CostModel";
+  TVM_DECLARE_BASE_OBJECT_INFO(CostModelNode, Object);
 };
 
 /*! \brief The cost model with customized methods on the python-side. */
@@ -84,12 +85,12 @@ class PyCostModelNode : public CostModelNode {
    * \brief Load the cost model from given file location.
    * \param path The file path.
    */
-  using FLoad = ffi::TypedFunction<void(ffi::String)>;
+  using FLoad = ffi::TypedFunction<void(String)>;
   /*!
    * \brief Save the cost model to given file location.
    * \param path The file path.
    */
-  using FSave = ffi::TypedFunction<void(ffi::String)>;
+  using FSave = ffi::TypedFunction<void(String)>;
   /*!
    * \brief Update the cost model given running results.
    * \param context The tuning context.
@@ -97,21 +98,21 @@ class PyCostModelNode : public CostModelNode {
    * \param results The running results of the measure candidates.
    * \return Whether cost model was updated successfully.
    */
-  using FUpdate = ffi::TypedFunction<void(const TuneContext&, const ffi::Array<MeasureCandidate>&,
-                                          const ffi::Array<RunnerResult>&)>;
+  using FUpdate = ffi::TypedFunction<void(const TuneContext&, const Array<MeasureCandidate>&,
+                                          const Array<RunnerResult>&)>;
   /*!
    * \brief Predict the running results of given measure candidates.
    * \param context The tuning context.
    * \param candidates The measure candidates.
    * \param p_addr The address to save the estimated running results.
    */
-  using FPredict = ffi::TypedFunction<void(const TuneContext&, const ffi::Array<MeasureCandidate>&,
-                                           void* p_addr)>;
+  using FPredict =
+      ffi::TypedFunction<void(const TuneContext&, const Array<MeasureCandidate>&, void* p_addr)>;
   /*!
    * \brief Get the cost model as string with name.
    * \return The string representation of the cost model.
    */
-  using FAsString = ffi::TypedFunction<ffi::String()>;
+  using FAsString = ffi::TypedFunction<String()>;
 
   /*! \brief The packed function to the `Load` function. */
   FLoad f_load;
@@ -124,13 +125,15 @@ class PyCostModelNode : public CostModelNode {
   /*! \brief The packed function to the `AsString` function. */
   FAsString f_as_string;
 
-  void Load(const ffi::String& path);
-  void Save(const ffi::String& path);
-  void Update(const TuneContext& context, const ffi::Array<MeasureCandidate>& candidates,
-              const ffi::Array<RunnerResult>& results);
+  void Load(const String& path);
+  void Save(const String& path);
+  void Update(const TuneContext& context, const Array<MeasureCandidate>& candidates,
+              const Array<RunnerResult>& results);
   std::vector<double> Predict(const TuneContext& context,
-                              const ffi::Array<MeasureCandidate>& candidates);
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("meta_schedule.PyCostModel", PyCostModelNode, CostModelNode);
+                              const Array<MeasureCandidate>& candidates);
+
+  static constexpr const char* _type_key = "meta_schedule.PyCostModel";
+  TVM_DECLARE_FINAL_OBJECT_INFO(PyCostModelNode, CostModelNode);
 };
 
 /*!
@@ -153,7 +156,7 @@ class CostModel : public runtime::ObjectRef {
                                        PyCostModelNode::FUpdate f_update,    //
                                        PyCostModelNode::FPredict f_predict,  //
                                        PyCostModelNode::FAsString f_as_string);
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(CostModel, ObjectRef, CostModelNode);
+  TVM_DEFINE_MUTABLE_OBJECT_REF_METHODS(CostModel, ObjectRef, CostModelNode);
 };
 
 }  // namespace meta_schedule

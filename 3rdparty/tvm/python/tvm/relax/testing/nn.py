@@ -281,7 +281,7 @@ def _unpack_params(value: object) -> List[relax.Var]:
     return []
 
 
-def init_params(mod: tvm.IRModule) -> List[tvm.runtime.Tensor]:
+def init_params(mod: tvm.IRModule) -> List[tvm.nd.array]:
     """Utility function to initialize model's parameters."""
     shape_dict = {v.name_hint: v.struct_info.shape for v in mod["main"].params}
     params = []
@@ -295,7 +295,7 @@ def init_params(mod: tvm.IRModule) -> List[tvm.runtime.Tensor]:
                     shape.append(int(i))
                 else:
                     raise TypeError("cannot initialize for unknown-shape parameters.")
-            params.append(tvm.runtime.tensor(np.zeros(shape).astype(np.float32)))
+            params.append(tvm.nd.array(np.zeros(shape).astype(np.float32)))
         else:
             raise TypeError("cannot initialize for unknown-shape parameters.")
     return params

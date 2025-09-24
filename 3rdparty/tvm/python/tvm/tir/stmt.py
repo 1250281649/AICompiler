@@ -29,9 +29,9 @@ Each statement node have subfields that can be visited from python side.
 from enum import IntEnum
 from typing import List, Mapping, Optional, Union
 
-import tvm_ffi
+import tvm.ffi
 from tvm.ir import PrimExpr, Range, Span
-from tvm.runtime import Object, Scriptable, const, Tensor
+from tvm.runtime import Object, Scriptable, const, NDArray
 
 from . import _ffi_api
 from .buffer import Buffer
@@ -42,7 +42,7 @@ class Stmt(Object, Scriptable):
     """Base class of all the statements."""
 
 
-@tvm_ffi.register_object("tir.LetStmt")
+@tvm.ffi.register_object("tir.LetStmt")
 class LetStmt(Stmt):
     """LetStmt node.
 
@@ -72,7 +72,7 @@ class LetStmt(Stmt):
         )
 
 
-@tvm_ffi.register_object("tir.AssertStmt")
+@tvm.ffi.register_object("tir.AssertStmt")
 class AssertStmt(Stmt):
     """AssertStmt node.
 
@@ -120,7 +120,7 @@ class ForKind(IntEnum):
     THREAD_BINDING = 4  # pylint: disable=invalid-name
 
 
-@tvm_ffi.register_object("tir.For")
+@tvm.ffi.register_object("tir.For")
 class For(Stmt):
     """For node.
 
@@ -185,7 +185,7 @@ class For(Stmt):
         )
 
 
-@tvm_ffi.register_object("tir.While")
+@tvm.ffi.register_object("tir.While")
 class While(Stmt):
     """While node.
 
@@ -209,7 +209,7 @@ class While(Stmt):
         self.__init_handle_by_constructor__(_ffi_api.While, condition, body, span)  # type: ignore
 
 
-@tvm_ffi.register_object("tir.BufferStore")
+@tvm.ffi.register_object("tir.BufferStore")
 class BufferStore(Stmt):
     """Buffer store node.
 
@@ -252,7 +252,7 @@ class BufferStore(Stmt):
         )
 
 
-@tvm_ffi.register_object("tir.BufferRealize")
+@tvm.ffi.register_object("tir.BufferRealize")
 class BufferRealize(Stmt):
     """Buffer realize node.
 
@@ -293,7 +293,7 @@ class BufferRealize(Stmt):
         )
 
 
-@tvm_ffi.register_object("tir.Allocate")
+@tvm.ffi.register_object("tir.Allocate")
 class Allocate(Stmt):
     """Allocate node.
 
@@ -353,7 +353,7 @@ class Allocate(Stmt):
         )
 
 
-@tvm_ffi.register_object("tir.AllocateConst")
+@tvm.ffi.register_object("tir.AllocateConst")
 class AllocateConst(Stmt):
     """Allocate constant node.
 
@@ -368,8 +368,8 @@ class AllocateConst(Stmt):
     extents : list of Expr
         The extents of the allocate
 
-    data_or_idx : Union[Tensor, int]
-        If an Tensor, this is the const data associated with the
+    data_or_idx : Union[NDArray, int]
+        If an NDArray, this is the const data associated with the
         constant.  If an integer, this is the index into the
         "constants" attribute of the `IRModule` that contains the
         `AllocateConst`.
@@ -387,7 +387,7 @@ class AllocateConst(Stmt):
     buffer_var: Var
     dtype: str
     extents: List[PrimExpr]
-    data: Optional[Tensor]
+    data: Optional[NDArray]
     irmod_storage_idx: Optional[int]
     body: Stmt
     annotations: Mapping[str, Object]
@@ -398,7 +398,7 @@ class AllocateConst(Stmt):
         buffer_var: Var,
         dtype: str,
         extents: List[PrimExpr],
-        data_or_idx: Union[Tensor, int],
+        data_or_idx: Union[NDArray, int],
         body: Stmt,
         annotations: Optional[Mapping[str, Object]] = None,
         span: Optional[Span] = None,
@@ -415,7 +415,7 @@ class AllocateConst(Stmt):
         )
 
 
-@tvm_ffi.register_object("tir.DeclBuffer")
+@tvm.ffi.register_object("tir.DeclBuffer")
 class DeclBuffer(Stmt):
     """DeclBuffer node.
 
@@ -439,7 +439,7 @@ class DeclBuffer(Stmt):
         self.__init_handle_by_constructor__(_ffi_api.DeclBuffer, buffer, body, span)
 
 
-@tvm_ffi.register_object("tir.AttrStmt")
+@tvm.ffi.register_object("tir.AttrStmt")
 class AttrStmt(Stmt):
     """AttrStmt node.
 
@@ -475,7 +475,7 @@ class AttrStmt(Stmt):
         )
 
 
-@tvm_ffi.register_object("tir.SeqStmt")
+@tvm.ffi.register_object("tir.SeqStmt")
 class SeqStmt(Stmt):
     """Sequence of statements.
 
@@ -501,7 +501,7 @@ class SeqStmt(Stmt):
         return len(self.seq)
 
 
-@tvm_ffi.register_object("tir.IfThenElse")
+@tvm.ffi.register_object("tir.IfThenElse")
 class IfThenElse(Stmt):
     """IfThenElse node.
 
@@ -536,7 +536,7 @@ class IfThenElse(Stmt):
         )
 
 
-@tvm_ffi.register_object("tir.Evaluate")
+@tvm.ffi.register_object("tir.Evaluate")
 class Evaluate(Stmt):
     """Evaluate node.
 
@@ -556,7 +556,7 @@ class Evaluate(Stmt):
         self.__init_handle_by_constructor__(_ffi_api.Evaluate, value, span)  # type: ignore
 
 
-@tvm_ffi.register_object("tir.BufferRegion")
+@tvm.ffi.register_object("tir.BufferRegion")
 class BufferRegion(Object, Scriptable):
     """BufferRegion node.
 
@@ -576,7 +576,7 @@ class BufferRegion(Object, Scriptable):
         self.__init_handle_by_constructor__(_ffi_api.BufferRegion, buffer, region)  # type: ignore
 
 
-@tvm_ffi.register_object("tir.MatchBufferRegion")
+@tvm.ffi.register_object("tir.MatchBufferRegion")
 class MatchBufferRegion(Object, Scriptable):
     """MatchBufferRegion node.
 
@@ -598,7 +598,7 @@ class MatchBufferRegion(Object, Scriptable):
         )
 
 
-@tvm_ffi.register_object("tir.Block")
+@tvm.ffi.register_object("tir.Block")
 class Block(Stmt):
     """Block node.
 
@@ -680,7 +680,7 @@ class Block(Stmt):
         )  # type: ignore
 
 
-@tvm_ffi.register_object("tir.BlockRealize")
+@tvm.ffi.register_object("tir.BlockRealize")
 class BlockRealize(Stmt):
     """BlockRealize node.
 

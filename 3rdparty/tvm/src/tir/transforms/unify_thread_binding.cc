@@ -22,7 +22,6 @@
  */
 
 #include <tvm/arith/analyzer.h>
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/tir/analysis.h>
 #include <tvm/tir/stmt_functor.h>
 #include <tvm/tir/transform.h>
@@ -60,14 +59,14 @@ class ThreadBindingUnifier : public StmtExprMutator {
     if (op->kind != ForKind::kThreadBinding) {
       return StmtExprMutator::VisitStmt_(op);
     }
-    ffi::Map<ffi::String, Any> annotations = op->annotations;
+    Map<String, Any> annotations = op->annotations;
     Stmt stmt = UnifyThreadBindingImpl(op, op->loop_var, op->thread_binding.value(),
                                        Range::FromMinExtent(op->min, op->extent));
     if (annotations.empty()) {
       return stmt;
     }
     if (const auto* loop = stmt.as<ForNode>()) {
-      For new_loop = ffi::GetRef<For>(loop);
+      For new_loop = GetRef<For>(loop);
       new_loop.CopyOnWrite()->annotations = std::move(annotations);
       return new_loop;
 
@@ -88,7 +87,7 @@ class ThreadBindingUnifier : public StmtExprMutator {
                               const Range& dom) {
     // Step 1. Fetch the thread tag.
     IterVar new_iter_var{nullptr};
-    const ffi::String& thread_tag = old_iter_var->thread_tag;
+    const String& thread_tag = old_iter_var->thread_tag;
 
     // Step 2: Increase `thread_block_depth_` if the thread tag starts with "blockIdx". If the
     // thread block depth is 0 before the increment, it means we are entering a new kernel, and
@@ -107,7 +106,7 @@ class ThreadBindingUnifier : public StmtExprMutator {
     // Step 3. See if an IterVar for this kind of thread binding was created before. If so, we use
     // the created IterVar. Otherwise, we create a new IterVar for this thread binding and store the
     // IterVar in mapping `thread_tag2iter_var_map_`.
-    ffi::Map<ffi::String, IterVar>::iterator it = thread_tag2iter_var_map_.find(thread_tag);
+    Map<String, IterVar>::iterator it = thread_tag2iter_var_map_.find(thread_tag);
     if (it != thread_tag2iter_var_map_.end()) {
       new_iter_var = (*it).second;
       ICHECK(ana.CanProveEqual(dom->min, new_iter_var->dom->min));
@@ -164,22 +163,22 @@ class ThreadBindingUnifier : public StmtExprMutator {
   PrimExpr VisitExpr_(const VarNode* var) final {
     // If this variable appears as a key in `var_substitution_map_`, we substitute it with its
     // corresponding value in the mapping.
-    ffi::Map<Var, PrimExpr>::iterator it = var_substitution_map_.find(ffi::GetRef<Var>(var));
-    return it != var_substitution_map_.end() ? (*it).second : ffi::GetRef<Var>(var);
+    Map<Var, PrimExpr>::iterator it = var_substitution_map_.find(GetRef<Var>(var));
+    return it != var_substitution_map_.end() ? (*it).second : GetRef<Var>(var);
   }
 
   /*!
    * \brief A mapping from a thread tag to its corresponding IterVar that is shared by all
    * occurrences of the thread tag
    */
-  ffi::Map<ffi::String, IterVar> thread_tag2iter_var_map_;
+  Map<String, IterVar> thread_tag2iter_var_map_;
   /*!
    * \brief A list of IterVar corresponding to threads in current kernel. This will be used to
    * generate for-loops to launch threads.
    */
-  ffi::Array<IterVar> launch_threads_;
+  Array<IterVar> launch_threads_;
   /*! \brief A mapping from old variables to new variables, which is used for substitution */
-  ffi::Map<Var, PrimExpr> var_substitution_map_;
+  Map<Var, PrimExpr> var_substitution_map_;
   /*! \brief A integer counter storing the depth of thread bindings of "blockIdx.x/y/z" */
   int thread_block_depth_ = 0;
   /*! \brief An analyzer used for equality proof */
@@ -201,10 +200,7 @@ Pass UnifyThreadBinding() {
   return CreatePrimFuncPass(pass_func, 0, "tir.UnifyThreadBinding", {});
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("tir.transform.UnifyThreadBinding", UnifyThreadBinding);
-}
+TVM_FFI_REGISTER_GLOBAL("tir.transform.UnifyThreadBinding").set_body_typed(UnifyThreadBinding);
 
 }  // namespace transform
 

@@ -18,7 +18,6 @@
  */
 #include "./multi_level_tiling.h"
 
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/meta_schedule/schedule_rule.h>
 
 #include <algorithm>
@@ -55,10 +54,12 @@ using tir::IterVarType;
 using tir::LoopRV;
 using tir::Schedule;
 
-TVM_FFI_STATIC_INIT_BLOCK() { MultiLevelTilingNode::RegisterReflection(); }
+TVM_FFI_STATIC_INIT_BLOCK({ MultiLevelTilingNode::RegisterReflection(); });
 
-State::State(tir::Schedule sch, tir::BlockRV block_rv, ffi::Array<ffi::Array<tir::LoopRV>> tiles) {
-  ObjectPtr<StateNode> node = ffi::make_object<StateNode>();
+TVM_REGISTER_OBJECT_TYPE(StateNode);
+
+State::State(tir::Schedule sch, tir::BlockRV block_rv, Array<Array<tir::LoopRV>> tiles) {
+  ObjectPtr<StateNode> node = make_object<StateNode>();
   node->sch = std::move(sch);
   node->block_rv = std::move(block_rv);
   node->tiles = std::move(tiles);
@@ -66,23 +67,22 @@ State::State(tir::Schedule sch, tir::BlockRV block_rv, ffi::Array<ffi::Array<tir
 }
 
 State StateNode::Copy() const {
-  ObjectPtr<StateNode> node = ffi::make_object<StateNode>(*this);
+  ObjectPtr<StateNode> node = make_object<StateNode>(*this);
   node->sch = sch->Copy();
   return State(node);
 }
 
 // Do nothing; Inherited from ScheduleRuleNode
 void MultiLevelTilingNode::InitializeWithTuneContext(const TuneContext& context) {
-  if (ffi::Optional<Integer> v =
-          context->target.value()->GetAttr<Integer>("max_threads_per_block")) {
+  if (Optional<Integer> v = context->target.value()->GetAttr<Integer>("max_threads_per_block")) {
     this->max_threads_per_block_ = v.value()->value;
-    if (ffi::Optional<Integer> v = context->target.value()->GetAttr<Integer>("thread_warp_size")) {
+    if (Optional<Integer> v = context->target.value()->GetAttr<Integer>("thread_warp_size")) {
       this->thread_warp_size_ = v.value()->value;
     } else {
       TVM_PY_LOG(INFO, context->logger) << "'thread_warp_size' is not defined in the target";
     }
   }
-  if (ffi::Optional<ffi::String> opt_sm = context->target.value()->GetAttr<ffi::String>("arch")) {
+  if (Optional<String> opt_sm = context->target.value()->GetAttr<String>("arch")) {
     std::string sm = opt_sm.value();
     if (support::StartsWith(sm, "sm_")) {
       sm = sm.substr(3);
@@ -103,12 +103,12 @@ void MultiLevelTilingNode::InitializeWithTuneContext(const TuneContext& context)
 }
 
 // Entry of the mega rule; Inherited from ScheduleRuleNode
-ffi::Array<Schedule> MultiLevelTilingNode::Apply(const Schedule& sch, const BlockRV& block_rv) {
+Array<Schedule> MultiLevelTilingNode::Apply(const Schedule& sch, const BlockRV& block_rv) {
   if ((filter_fn_ && filter_fn_.value()(sch, sch->GetSRef(block_rv)).cast<bool>()) ||
       NeedsMultiLevelTiling(sch->state(), sch->GetSRef(block_rv))) {
     sch->Annotate(block_rv, tir::attr::meta_schedule_tiling_structure, structure);
 
-    ffi::Array<Schedule> results;
+    Array<Schedule> results;
     for (auto&& state : ApplySubRules({State(sch, block_rv)})) {
       results.push_back(std::move(state->sch));
     }
@@ -119,7 +119,7 @@ ffi::Array<Schedule> MultiLevelTilingNode::Apply(const Schedule& sch, const Bloc
 
 // Inherited from ScheduleRuleNode
 ScheduleRule MultiLevelTilingNode::Clone() const {
-  ObjectPtr<MultiLevelTilingNode> n = ffi::make_object<MultiLevelTilingNode>(*this);
+  ObjectPtr<MultiLevelTilingNode> n = make_object<MultiLevelTilingNode>(*this);
   return ScheduleRule(n);
 }
 
@@ -139,7 +139,7 @@ std::vector<State> MultiLevelTilingNode::AddWriteReuse(State state) const {
   }
   std::vector<int> levels = config.levels;
   ReuseType req = config.req;
-  if (ffi::Optional<ffi::Array<Integer>> ann = tir::GetAnn<ffi::Array<Integer>>(
+  if (Optional<Array<Integer>> ann = tir::GetAnn<Array<Integer>>(
           state->sch->GetSRef(state->block_rv), "meta_schedule.write_cache_level")) {
     req = ReuseType::kMustReuse;
     levels.clear();
@@ -149,7 +149,7 @@ std::vector<State> MultiLevelTilingNode::AddWriteReuse(State state) const {
   std::vector<State> results;
   if (req == ReuseType::kMayReuse) {
     // Case 1. If the write cache is already there, we don't need to add another.
-    ffi::Array<BlockRV> consumer_rvs = state->sch->GetConsumers(state->block_rv);
+    Array<BlockRV> consumer_rvs = state->sch->GetConsumers(state->block_rv);
     if (consumer_rvs.size() == 1 && IsWriteCache(state->sch->GetSRef(consumer_rvs[0]))) {
       for (int level : levels) {
         State new_state = state->Copy();
@@ -181,14 +181,14 @@ std::vector<State> MultiLevelTilingNode::AddWriteReuse(State state) const {
   return results;
 }
 
-std::pair<ffi::Array<tir::ExprRV>, ffi::Array<tir::LoopRV>> MultiLevelTilingNode::SplitLoop(
+std::pair<Array<tir::ExprRV>, Array<tir::LoopRV>> MultiLevelTilingNode::SplitLoop(
     const Schedule& sch, BlockRV block, LoopRV loop, int n_tiles) const {
-  ffi::Array<tir::ExprRV> factors = sch->SamplePerfectTile(
+  Array<tir::ExprRV> factors = sch->SamplePerfectTile(
       /*loop=*/loop,
       /*n=*/n_tiles,
       /*max_innermost_factor=*/max_innermost_factor);
-  ffi::Array<tir::LoopRV> splits = sch->Split(/*loop=*/loop,
-                                              /*factors=*/{factors.begin(), factors.end()});
+  Array<tir::LoopRV> splits = sch->Split(/*loop=*/loop,
+                                         /*factors=*/{factors.begin(), factors.end()});
   return {factors, splits};
 }
 
@@ -197,7 +197,7 @@ std::vector<State> MultiLevelTilingNode::TileLoopNest(State state,
   Schedule& sch = state->sch;
   const BlockRV& block_rv = state->block_rv;
   // Step 1. Assuming trivial binding, pair the loops and their iter-var-types
-  ffi::Array<LoopRV> loops = sch->GetLoops(block_rv);
+  Array<LoopRV> loops = sch->GetLoops(block_rv);
   std::vector<IterVarType> iter_types = GetBlockVarTypes(sch->GetSRef(state->block_rv));
   ICHECK_EQ(loops.size(), iter_types.size());
   // Step 2. For each loop axis, tile it
@@ -211,10 +211,10 @@ std::vector<State> MultiLevelTilingNode::TileLoopNest(State state,
   if (tile_inner_most_space_loop_num < 0) tile_inner_most_space_loop_num = total_spatial_loop_num;
   int outer_most_spatial_loop_skipped_num = total_spatial_loop_num - tile_inner_most_space_loop_num;
 
-  ffi::Array<LoopRV> skipped_outer_spatial_loops;
-  std::vector<ffi::Array<LoopRV>> tiles(s_indices_.size() + r_indices_.size());
+  Array<LoopRV> skipped_outer_spatial_loops;
+  std::vector<Array<LoopRV>> tiles(s_indices_.size() + r_indices_.size());
   state->tile_factors.resize(tiles.size());
-  std::vector<ffi::Array<tir::ExprRV>> tile_factors;
+  std::vector<Array<tir::ExprRV>> tile_factors;
   tile_factors.resize(tiles.size());
   for (int i = 0, n = loops.size(); i < n; ++i) {
     LoopRV loop = loops[i];
@@ -269,7 +269,7 @@ std::vector<State> MultiLevelTilingNode::TileLoopNest(State state,
     sch->Bind(fused, tile_binds[i]);
     tiles[i] = {fused};
   }
-  state->tiles = ffi::Array<ffi::Array<LoopRV>>{tiles.begin(), tiles.end()};
+  state->tiles = Array<Array<LoopRV>>{tiles.begin(), tiles.end()};
   if (this->thread_warp_size_ != -1) {
     int64_t low_inclusive = 1;
     int64_t high_inclusive = this->max_threads_per_block_;
@@ -309,9 +309,9 @@ std::vector<State> MultiLevelTilingNode::AddReadReuse(State state) const {
       // Insert cache_read block to the proper place
       sch->ComputeAt(cache_read_block, loop_rv, true);
       // Fuse the iterators of the cache_read
-      ffi::Array<LoopRV> buffer_loops = sch->GetLoops(cache_read_block);
-      sch->Fuse(ffi::Array<LoopRV>{buffer_loops.end() - buffer_ndim,  //
-                                   buffer_loops.end()});
+      Array<LoopRV> buffer_loops = sch->GetLoops(cache_read_block);
+      sch->Fuse(Array<LoopRV>{buffer_loops.end() - buffer_ndim,  //
+                              buffer_loops.end()});
       AnnotateCooperativeFetching(&sch, cache_read_block);
       new_state->read_reuse.emplace(i, cache_read_block);
     }
@@ -331,7 +331,7 @@ std::vector<State> MultiLevelTilingNode::AddAsyncPipeline(State state) const {
   // therefore it matches the notation array size in the following code
   tir::StmtSRef r_loop_sref = state->sch->GetSRef(state->tiles[r_indices_[0]].back());
   const tir::ForNode* r_for_loop = TVM_SREF_TO_FOR(r_loop_sref);
-  ffi::Array<tir::Stmt> seq = Downcast<tir::SeqStmt>(r_for_loop->body)->seq;
+  Array<tir::Stmt> seq = Downcast<tir::SeqStmt>(r_for_loop->body)->seq;
   if (seq.size() != 3) {
     return {state};
   }
@@ -347,11 +347,11 @@ std::vector<State> MultiLevelTilingNode::AddAsyncPipeline(State state) const {
     State new_state = state->Copy();
     LoopRV r_loop_fused = new_state->sch->Fuse(new_state->tiles[r_indices_[0]]);
     new_state->sch->Annotate(r_loop_fused, tir::attr::software_pipeline_stage,
-                             ffi::Array<Integer>{0, 0, stage - 2});
+                             Array<Integer>{0, 0, stage - 2});
     new_state->sch->Annotate(r_loop_fused, tir::attr::software_pipeline_order,
-                             ffi::Array<Integer>{0, 1, 2});
+                             Array<Integer>{0, 1, 2});
     new_state->sch->Annotate(r_loop_fused, tir::attr::software_pipeline_async_stages,
-                             ffi::Array<Integer>{0});
+                             Array<Integer>{0});
     ret.push_back(std::move(new_state));
   }
   return ret;
@@ -387,31 +387,28 @@ void MultiLevelTilingNode::AnnotateCooperativeFetching(Schedule* sch,
     double prob = 1.0 / n;
     tir::ExprRV vector_load_len =
         (*sch)->SampleCategorical(support::AsArray<int, Integer>(valid_vector_lens),
-                                  ffi::Array<FloatImm>(n, FloatImm(DataType::Float(32), prob)));
+                                  Array<FloatImm>(n, FloatImm(DataType::Float(32), prob)));
     (*sch)->Annotate(block, tir::attr::meta_schedule_cooperative_fetch, vector_load_len);
   }
 }
 
 // Constructor
 
-ScheduleRule ScheduleRule::MultiLevelTiling(
-    ffi::String structure, ffi::Optional<ffi::Array<ffi::String>> tile_binds,
-    ffi::Optional<Integer> max_innermost_factor,
-    ffi::Optional<ffi::Array<Integer>> vector_load_lens,
-    ffi::Optional<ffi::Map<ffi::String, ffi::Any>> reuse_read,
-    ffi::Optional<ffi::Map<ffi::String, ffi::Any>> reuse_write,
-    ffi::Optional<ffi::Function> filter_fn) {
+ScheduleRule ScheduleRule::MultiLevelTiling(String structure, Optional<Array<String>> tile_binds,
+                                            Optional<Integer> max_innermost_factor,
+                                            Optional<Array<Integer>> vector_load_lens,
+                                            Optional<Map<String, ffi::Any>> reuse_read,
+                                            Optional<Map<String, ffi::Any>> reuse_write,
+                                            Optional<ffi::Function> filter_fn) {
   auto node = MultiLevelTilingInitCommon<MultiLevelTilingNode>(
       structure, tile_binds, max_innermost_factor, vector_load_lens, reuse_read, reuse_write);
   node->filter_fn_ = filter_fn;
   return ScheduleRule(node);
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("meta_schedule.ScheduleRuleMultiLevelTiling",
-                        ScheduleRule::MultiLevelTiling);
-}
+TVM_REGISTER_NODE_TYPE(MultiLevelTilingNode);
+TVM_FFI_REGISTER_GLOBAL("meta_schedule.ScheduleRuleMultiLevelTiling")
+    .set_body_typed(ScheduleRule::MultiLevelTiling);
 
 }  // namespace meta_schedule
 }  // namespace tvm

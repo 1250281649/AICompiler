@@ -31,7 +31,7 @@ public class TVMType {
   /**
    * TVMType constructor.
    * @param typeStr type name, e.g., "float32", "float64", "uint8", etc.
-   * @param lanes Tensor lanes.
+   * @param lanes NDArray lanes.
    */
   public TVMType(String typeStr, int lanes) {
     this.lanes = lanes;

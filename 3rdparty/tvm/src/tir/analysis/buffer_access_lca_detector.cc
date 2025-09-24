@@ -22,7 +22,6 @@
  * \brief Detect the lowest common ancestor(LCA) of buffer access
  */
 
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/tir/analysis.h>
 #include <tvm/tir/stmt_functor.h>
 
@@ -42,7 +41,7 @@ namespace tir {
  */
 class LCADetector : public StmtExprVisitor {
  public:
-  static ffi::Map<Buffer, ffi::Optional<Stmt>> Detect(const PrimFunc& func) {
+  static Map<Buffer, Optional<Stmt>> Detect(const PrimFunc& func) {
     LCADetector detector;
     for (const auto& kv : func->buffer_map) {
       const Buffer& buffer = kv.second;
@@ -60,11 +59,11 @@ class LCADetector : public StmtExprVisitor {
     detector.UpdateWithBlockidx();
 
     // Prepare the return
-    ffi::Map<Buffer, ffi::Optional<Stmt>> buffer_lca;
+    Map<Buffer, Optional<Stmt>> buffer_lca;
     for (const auto& kv : detector.buffer_lca_) {
-      const Buffer& buffer = ffi::GetRef<Buffer>(kv.first);
-      const ffi::Optional<Stmt> stmt =
-          kv.second ? ffi::GetRef<ffi::Optional<Stmt>>(kv.second->stmt) : std::nullopt;
+      const Buffer& buffer = GetRef<Buffer>(kv.first);
+      const Optional<Stmt> stmt =
+          kv.second ? GetRef<Optional<Stmt>>(kv.second->stmt) : std::nullopt;
       buffer_lca.Set(buffer, stmt);
     }
     return buffer_lca;
@@ -289,7 +288,7 @@ class LCADetector : public StmtExprVisitor {
   void UpdateWithBlockidx() {
     for (const auto& it : buffer_lca_) {
       const runtime::StorageScope& scope =
-          runtime::StorageScope::Create(ffi::GetRef<Buffer>(it.first).scope());
+          runtime::StorageScope::Create(GetRef<Buffer>(it.first).scope());
       if (scope.rank == runtime::StorageRank::kGlobal) {
         const ScopeInfo*& lca = buffer_lca_[it.first];
         for (const ScopeInfo* blockidx_scope : blockidx_scopes_) {
@@ -343,13 +342,11 @@ class LCADetector : public StmtExprVisitor {
   support::Arena arena_;
 };
 
-ffi::Map<Buffer, ffi::Optional<Stmt>> DetectBufferAccessLCA(const PrimFunc& func) {
+Map<Buffer, Optional<Stmt>> DetectBufferAccessLCA(const PrimFunc& func) {
   return LCADetector::Detect(func);
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("tir.analysis.detect_buffer_access_lca", DetectBufferAccessLCA);
-}
+TVM_FFI_REGISTER_GLOBAL("tir.analysis.detect_buffer_access_lca")
+    .set_body_typed(DetectBufferAccessLCA);
 }  // namespace tir
 }  // namespace tvm

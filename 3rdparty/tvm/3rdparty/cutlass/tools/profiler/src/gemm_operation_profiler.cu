@@ -176,7 +176,7 @@ Status GemmOperationProfiler::GemmProblem::parse(
 
   if (!arg_as_int(this->cluster_m, "cluster_m", problem_space, problem)) {
     // default value
-    this->cluster_m = std::string(operation_desc.name).find("_2sm") != std::string::npos ? 2 : 1;
+    this->cluster_m = 1;
   }
 
   if (!arg_as_int(this->cluster_n, "cluster_n", problem_space, problem)) {
@@ -191,17 +191,17 @@ Status GemmOperationProfiler::GemmProblem::parse(
 
   if (!arg_as_int(this->cluster_m_fallback, "cluster_m_fallback", problem_space, problem)) {
     // default value
-    this->cluster_m_fallback = (this->cluster_m % 2 == 0) ? 2 : 1;
+    this->cluster_m_fallback = 0;
   }
 
   if (!arg_as_int(this->cluster_n_fallback, "cluster_n_fallback", problem_space, problem)) {
     // default value
-    this->cluster_n_fallback = 1;
+    this->cluster_n_fallback = 0;
   }
 
   if (!arg_as_int(this->cluster_k_fallback, "cluster_k_fallback", problem_space, problem)) {
     // default value
-    this->cluster_k_fallback = 1;
+    this->cluster_k_fallback = 0;
   }
 
   if (!arg_as_bool(this->use_pdl, "use_pdl", problem_space, problem)) {
@@ -661,8 +661,7 @@ void GemmOperationProfiler::update_workspace_(
   std::array<int64_t, 3> const &preferred_cluster,
   std::array<int64_t, 3> const &fallback_cluster,
   cutlass::library::RasterOrder const &raster_order,
-  int swizzle_size,
-  bool is_dynamic_cluster_enabled
+  int swizzle_size
 ) {
 
   gemm_workspace.arguments.problem_size.m() = problem_shape.m();
@@ -676,16 +675,15 @@ void GemmOperationProfiler::update_workspace_(
   gemm_workspace.arguments.swizzle_size = swizzle_size;
   gemm_workspace.arguments.raster_order = raster_order;
 
-  if (is_dynamic_cluster_enabled) {
-    gemm_workspace.arguments.cluster_shape = {int(preferred_cluster[0]), int(preferred_cluster[1]), int(preferred_cluster[2])};
-    gemm_workspace.arguments.cluster_shape_fallback = {int(fallback_cluster[0]), int(fallback_cluster[1]), int(fallback_cluster[2])};
-    gemm_workspace.configuration.cluster_shape = {int(preferred_cluster[0]), int(preferred_cluster[1]), int(preferred_cluster[2])};
-    gemm_workspace.configuration.cluster_shape_fallback = {int(fallback_cluster[0]), int(fallback_cluster[1]), int(fallback_cluster[2])};
-  }
+  gemm_workspace.arguments.cluster_shape = {int(preferred_cluster[0]), int(preferred_cluster[1]), int(preferred_cluster[2])};
+  gemm_workspace.arguments.cluster_shape_fallback = {int(fallback_cluster[0]), int(fallback_cluster[1]), int(fallback_cluster[2])};
 
   gemm_workspace.configuration.problem_size.m() = problem_shape.m();
   gemm_workspace.configuration.problem_size.n() = problem_shape.n();
   gemm_workspace.configuration.problem_size.k() = problem_shape.k();
+
+  gemm_workspace.configuration.cluster_shape = {int(preferred_cluster[0]), int(preferred_cluster[1]), int(preferred_cluster[2])};
+  gemm_workspace.configuration.cluster_shape_fallback = {int(fallback_cluster[0]), int(fallback_cluster[1]), int(fallback_cluster[2])};
 
   gemm_workspace.configuration.lda = leading_dim[0];
   gemm_workspace.configuration.ldb = leading_dim[1];
@@ -701,8 +699,7 @@ void GemmOperationProfiler::update_result_(
   cutlass::library::RasterOrder const &raster_order,
   std::array<int64_t, 3> const &preferred_cluster,
   std::array<int64_t, 3> const &fallback_cluster,
-  int swizzle_size,
-  bool is_dynamic_cluster_enabled
+  int swizzle_size
 ) {
   result.bytes = problem_.bytes_with_problem_shape(operation_desc, problem_shape);
   result.flops = problem_.flops_with_problem_shape(operation_desc, problem_shape);
@@ -714,14 +711,12 @@ void GemmOperationProfiler::update_result_(
   set_argument(result, "raster_order", problem_space, library::to_string(raster_order));
   set_argument(result, "swizzle_size", problem_space, swizzle_size);
 
-  if (is_dynamic_cluster_enabled) {
-    set_argument(result, "cluster_m", problem_space, preferred_cluster[0]);
-    set_argument(result, "cluster_n", problem_space, preferred_cluster[1]);
-    set_argument(result, "cluster_k", problem_space, preferred_cluster[2]);
-    set_argument(result, "cluster_m_fallback", problem_space, fallback_cluster[0]);
-    set_argument(result, "cluster_n_fallback", problem_space, fallback_cluster[1]);
-    set_argument(result, "cluster_k_fallback", problem_space, fallback_cluster[2]);
-  }
+  set_argument(result, "cluster_m", problem_space, preferred_cluster[0]);
+  set_argument(result, "cluster_n", problem_space, preferred_cluster[1]);
+  set_argument(result, "cluster_k", problem_space, preferred_cluster[2]);
+  set_argument(result, "cluster_m_fallback", problem_space, fallback_cluster[0]);
+  set_argument(result, "cluster_n_fallback", problem_space, fallback_cluster[1]);
+  set_argument(result, "cluster_k_fallback", problem_space, fallback_cluster[2]);
 
 }
 
@@ -982,7 +977,7 @@ Status GemmOperationProfiler::initialize_workspace(
       gemm_workspace_[i].arguments.batch_stride_D = gemm_workspace_[i].Computed->batch_stride();
 
       /* Query device SM count to pass onto the kernel as an argument, where needed */
-      gemm_workspace_[i].arguments.sm_count = options.device.get_sm_count(i);
+      gemm_workspace_[i].arguments.sm_count = options.device.properties[i].multiProcessorCount;
       gemm_workspace_[i].arguments.device_index = static_cast<int>(i);
     }
   }
@@ -1581,8 +1576,9 @@ bool GemmOperationProfiler::profile(
       library::GemmDescription const &operation_desc =
         static_cast<library::GemmDescription const &>(operation->description());
 
-      auto cluster_shape = operation_desc.tile_description.cluster_shape;
-      bool is_dynamic_cluster_enabled = cluster_shape.m() == 0 || cluster_shape.n() == 0 || cluster_shape.k() == 0;
+      auto min_cc = operation_desc.tile_description.minimum_compute_capability;
+
+      bool is_dynamic_cluster_enabled = (min_cc >= 100);
 
       // Helper function wrapping up performance test with flexible parameters.
       auto initialize_and_profile = [&](
@@ -1622,7 +1618,7 @@ bool GemmOperationProfiler::profile(
             workspace.reduction_arguments.pointer_mode = library::ScalarPointerMode::kHost;
           }
 
-          update_workspace_(workspace, problem_shape, leading_dim, preferred_cluster, fallback_cluster, raster_order, swizzle_size, is_dynamic_cluster_enabled);
+          update_workspace_(workspace, problem_shape, leading_dim, preferred_cluster, fallback_cluster, raster_order, swizzle_size);
 
           const auto can_implement = operation->can_implement(&workspace.configuration, &workspace.arguments);
           if (can_implement != Status::kSuccess) {
@@ -1676,7 +1672,7 @@ bool GemmOperationProfiler::profile(
         }
 
         PerformanceResult curr_result(result);
-        update_result_(curr_result, operation_desc, problem_space, problem_shape, raster_order, preferred_cluster, fallback_cluster, swizzle_size, is_dynamic_cluster_enabled);
+        update_result_(curr_result, operation_desc, problem_space, problem_shape, raster_order, preferred_cluster, fallback_cluster, swizzle_size);
 
         curr_result.status = profile_cutlass_(
           curr_result,
@@ -1716,13 +1712,17 @@ bool GemmOperationProfiler::profile(
       std::vector<PerformanceResult> candidates;
       PerformanceResult result_base = results_.back();
       results_.pop_back();
+      
+      bool dynamic_cluster = int64_t(operation_desc.tile_description.cluster_shape.m()) == 0 ||
+                             int64_t(operation_desc.tile_description.cluster_shape.n()) == 0 ||
+                             int64_t(operation_desc.tile_description.cluster_shape.k()) == 0;
 
       std::vector<std::array<int64_t, 3>> preferred_clusters;
       std::vector<std::array<int64_t, 3>> fallback_clusters;
 
       // Only loop over built-in cluster shape lists for dynamic cluster kernels
       // and for kernels that can leverage the dynamic cluster feature.
-      if (is_dynamic_cluster_enabled) {
+      if (dynamic_cluster && is_dynamic_cluster_enabled) {
         preferred_clusters = this->problem_.preferred_clusters;
         fallback_clusters = this->problem_.fallback_clusters;
       } 
@@ -1733,7 +1733,7 @@ bool GemmOperationProfiler::profile(
 
       for (auto preferred_cluster : preferred_clusters) {
         for (auto fallback_cluster : fallback_clusters) {
-          if (is_dynamic_cluster_enabled && !is_valid_dynamic_cluster_shape(preferred_cluster, fallback_cluster)) {
+          if (dynamic_cluster && !is_valid_dynamic_cluster_shape(preferred_cluster, fallback_cluster)) {
             continue;
           }
           for (auto swizzle_size : this->problem_.swizzle_sizes) {

@@ -348,127 +348,132 @@ int OperationProfiler::profile_all(
   Options const &options,
   library::Manifest const &manifest,
   DeviceContext &device_context) {
-  ProblemSpace cmdline_problem_space(arguments_, options.cmdline);
-
-  bool do_testlist_run = !options.operation_problems.empty();
-
-  std::vector<std::pair<std::string, std::unique_ptr<ProblemSpace>>> all_operations_and_problems;
-  if (do_testlist_run) {
-    for (const auto& [operation_name, cmd_vec] : options.operation_problems)  {
-      for (auto& cmd_line : cmd_vec) {
-        all_operations_and_problems.push_back({operation_name, std::make_unique<ProblemSpace>(arguments_, cmd_line)});
-      }
-    }
-  }
+  ProblemSpace problem_space(arguments_, options.cmdline);
 
   // 1. Construct performance report
-  PerformanceReport report(options, cmdline_problem_space.argument_names(), kind_);
+  PerformanceReport report(options, problem_space.argument_names(), kind_);
 
-  //
+  // 2. For each problem in problem space
+  ProblemSpace::Iterator problem_it = problem_space.begin();
+  ProblemSpace::Iterator problem_end = problem_space.end();
+
+  bool continue_profiling = true;
   int retval = 0;
 
-  size_t bound = (all_operations_and_problems.empty() ? 1 : all_operations_and_problems.size());
-  for (size_t i = 0; i < bound; i++) {
+  // For each problem in problem space
+  for (; continue_profiling && problem_it != problem_end; ++problem_it) {
+    ProblemSpace::Problem problem = problem_it.at();
+    report.next_problem();
 
-    // New problem space for each operation if we are running a testlist
-    ProblemSpace& problem_space = do_testlist_run ? *all_operations_and_problems[i].second : cmdline_problem_space;
+    // For each operation in manifest
+    int matched_operation_count = 0;
+    int profiled_operation_count = 0;
+    for (auto const& operation_ptr : manifest) {
 
-    // 2. For each problem in problem space
-    ProblemSpace::Iterator problem_it = problem_space.begin();
-    ProblemSpace::Iterator problem_end = problem_space.end();
-
-    bool continue_profiling = true;
-
-    // For each problem in problem space
-    for (; continue_profiling && problem_it != problem_end; ++problem_it) {
-      ProblemSpace::Problem problem = problem_it.at();
-      report.next_problem();
-
-      // For each operation in manifest
-      int matched_operation_count = 0;
-      int profiled_operation_count = 0;
-      for (auto const& operation_ptr : manifest) {
-
-        library::Operation const *operation = operation_ptr.get();
+      library::Operation const *operation = operation_ptr.get();
 #if defined(CUTLASS_DEBUG_TRACE_LEVEL) && (CUTLASS_DEBUG_TRACE_LEVEL > 1)
-        std::cerr << "  Operation: " << typeid(*operation).name() << "\n"
-                  << "    name: " << operation->description().name << "\n"
-                  << "    kind: " << operation->description().kind << "\n"
-                  << "    provider: " << operation->description().provider << "\n";
+      std::cerr << "  Operation: " << typeid(*operation).name() << "\n"
+                << "    name: " << operation->description().name << "\n"
+                << "    kind: " << operation->description().kind << "\n"
+                << "    provider: " << operation->description().provider << "\n";
 #endif // CUTLASS_DEBUG_TRACE_LEVEL
 
-        auto min_cc = operation->description().tile_description.minimum_compute_capability;
-        auto max_cc = operation->description().tile_description.maximum_compute_capability;
+      auto min_cc = operation->description().tile_description.minimum_compute_capability;
+      auto max_cc = operation->description().tile_description.maximum_compute_capability;
 
 #if defined(CUTLASS_DEBUG_TRACE_LEVEL) && (CUTLASS_DEBUG_TRACE_LEVEL > 1)
-        std::cerr << "    min_cc: " << min_cc << "\n";
-        std::cerr << "    max_cc: " << min_cc << "\n";
+      std::cerr << "    min_cc: " << min_cc << "\n";
+      std::cerr << "    max_cc: " << min_cc << "\n";
 #endif
 
-        // Clear named allocations
-        device_context.free();
+      // Clear named allocations
+      device_context.free();
 
 #if defined(CUTLASS_DEBUG_TRACE_LEVEL) && (CUTLASS_DEBUG_TRACE_LEVEL > 1)
-        if (operation->description().kind != kind_) {
-          std::cerr << "    @ kind " << operation->description().kind
-                    << " != kind_ " << kind_ << "\n";
-        }
-        if (operation->description().provider != library::Provider::kCUTLASS) {
-          std::cerr << "    @ provider " << operation->description().provider
-                    << " != library::Provider::kCUTLASS\n";
-        }
-        if (options.device.compute_capability(0) < min_cc) {
-          std::cerr << "    @ compute_capability "
-                    << options.device.compute_capability(0)
-                    << " < min_cc " << min_cc << "\n";
-        }
-        if (options.device.compute_capability(0) > max_cc) {
-          std::cerr << "    @ compute_capability "
-                    << options.device.compute_capability(0)
-                    << " > max_cc " << max_cc << "\n";
-        }
+      if (operation->description().kind != kind_) {
+        std::cerr << "    @ kind " << operation->description().kind
+                  << " != kind_ " << kind_ << "\n";
+      }
+      if (operation->description().provider != library::Provider::kCUTLASS) {
+        std::cerr << "    @ provider " << operation->description().provider
+                  << " != library::Provider::kCUTLASS\n";
+      }
+      if (options.device.compute_capability(0) < min_cc) {
+        std::cerr << "    @ compute_capability "
+                  << options.device.compute_capability(0)
+                  << " < min_cc " << min_cc << "\n";
+      }
+      if (options.device.compute_capability(0) > max_cc) {
+        std::cerr << "    @ compute_capability "
+                  << options.device.compute_capability(0)
+                  << " > max_cc " << max_cc << "\n";
+      }
 #endif
 
-        // Execute compatible cutlass operations if they satisfy the current device's compute capability
-        if (operation->description().kind == kind_ &&
-            operation->description().provider == library::Provider::kCUTLASS &&
-            options.device.compute_capability(0) >= min_cc &&
-            options.device.compute_capability(0) <= max_cc) {
+      // Execute compatible cutlass operations if they satisfy the current device's compute capability
+      if (operation->description().kind == kind_ &&
+          operation->description().provider == library::Provider::kCUTLASS &&
+          options.device.compute_capability(0) >= min_cc &&
+          options.device.compute_capability(0) <= max_cc) {
 
-          std::string operation_name(operation->description().name);
-          // Filter kernels by name
-          bool filtered_by_name = options.operation_names.empty();
-          if (!filtered_by_name) {
+        std::string operation_name(operation->description().name);
+        // Filter kernels by name
+        bool filtered_by_name = options.operation_names.empty();
+        if (!filtered_by_name) {
 
-            for (auto const & op_name : options.operation_names) {
-              if (find_string_matches_(op_name, operation_name)) {
-                filtered_by_name = true;
-                break;
-              }
-            }
-          }
-
-          for (auto const & op_name : options.excluded_operation_names) {
+          for (auto const & op_name : options.operation_names) {
             if (find_string_matches_(op_name, operation_name)) {
-              filtered_by_name = false;
+              filtered_by_name = true;
               break;
             }
           }
+        }
 
-          // Problems list uses exact match on operation names
-          if (do_testlist_run && !(all_operations_and_problems[i].first == operation_name)) {
+        for (auto const & op_name : options.excluded_operation_names) {
+          if (find_string_matches_(op_name, operation_name)) {
             filtered_by_name = false;
+            break;
+          }
+        }
+
+        if (!filtered_by_name || !satisfies(operation->description(), problem_space, problem)) {
+          continue;
+        }
+
+        // we have found a kernel match, so increment the counter for match kernels
+        ++matched_operation_count;
+
+        // A. Initialize configuration
+        Status status = this->initialize_configuration(
+          options,
+          report,
+          device_context,
+          operation,
+          problem_space,
+          problem);
+
+        if (status == Status::kErrorInternal) {
+
+          // If there was an internal error, consume the CUDA error and move to the next operation.
+          (void)cudaGetLastError();
+
+          report.append_result(model_result_);
+          continue;
+        }
+        else if (status != Status::kSuccess) {
+          // If the workspace could not be initialized for any other reason, continue to
+          // the next operation.
+          continue;
+        }
+
+        if (continue_profiling) {
+
+          if (options.report.print_kernel_before_running) {
+            std::cout << "Profiling kernel for JUnit test " << options.report.junit_output_path << ": "
+                      << operation_name << std::endl;
           }
 
-          if (!filtered_by_name || !satisfies(operation->description(), problem_space, problem)) {
-            continue;
-          }
-
-          // we have found a kernel match, so increment the counter for match kernels
-          ++matched_operation_count;
-
-          // A. Initialize configuration
-          Status status = this->initialize_configuration(
+          status = this->initialize_workspace(
             options,
             report,
             device_context,
@@ -481,7 +486,7 @@ int OperationProfiler::profile_all(
             // If there was an internal error, consume the CUDA error and move to the next operation.
             (void)cudaGetLastError();
 
-            report.append_result(model_result_);
+            report.append_results(results_);
             continue;
           }
           else if (status != Status::kSuccess) {
@@ -489,123 +494,93 @@ int OperationProfiler::profile_all(
             // the next operation.
             continue;
           }
+        }
 
-          if (continue_profiling) {
+        //
+        // Profile CUTLASS if it is enabled
+        //
 
-            if (options.report.print_kernel_before_running) {
-              std::cout << "Profiling kernel for JUnit test " << options.report.junit_output_path << ": "
-                        << operation_name << std::endl;
-            }
+        // B. Verify CUTLASS
+        if (continue_profiling && options.profiling.provider_enabled(library::Provider::kCUTLASS)) {
 
-            status = this->initialize_workspace(
-              options,
-              report,
-              device_context,
-              operation,
-              problem_space,
-              problem);
+          continue_profiling = this->verify_cutlass(
+            options,
+            report,
+            device_context,
+            operation,
+            problem_space,
+            problem);
 
-            if (status == Status::kErrorInternal) {
+          retval |= (not continue_profiling);
+        }
 
-              // If there was an internal error, consume the CUDA error and move to the next operation.
-              (void)cudaGetLastError();
-
-              report.append_results(results_);
-              continue;
-            }
-            else if (status != Status::kSuccess) {
-              // If the workspace could not be initialized for any other reason, continue to
-              // the next operation.
-              continue;
-            }
-          }
-
-          //
-          // Profile CUTLASS if it is enabled
-          //
-
-          // B. Verify CUTLASS
-          if (continue_profiling && options.profiling.provider_enabled(library::Provider::kCUTLASS)) {
-
-            continue_profiling = this->verify_cutlass(
-              options,
-              report,
-              device_context,
-              operation,
-              problem_space,
-              problem);
-
-            retval |= (not continue_profiling);
-          }
-
-          if (options.execution_mode == ExecutionMode::kDryRun) {
-            report.append_results(results_);
-            results_.clear();
-            continue;
-          }
-
-          //
-          // C. Optionally save workspace
-          //
-
-          if (options.verification.save_workspace == SaveWorkspace::kAlways) {
-            save_workspace(
-              device_context,
-              options,
-              operation->description(),
-              library::Provider::kCUTLASS);
-          }
-
-          //
-          // D. Profile
-          //
-
-          if (continue_profiling && options.profiling.enabled) {
-
-            continue_profiling = this->profile(
-              options,
-              report,
-              device_context,
-              operation,
-              problem_space,
-              problem);
-
-            // Count op as profiled, even it failed to profile
-            profiled_operation_count++;
-          }
-
+        if (options.execution_mode == ExecutionMode::kDryRun) {
           report.append_results(results_);
           results_.clear();
-        } // if op satisfied compute capacity
-
-        if (!continue_profiling) {
-          // break out of `for op in manifest` loop and move to next problem
-          // `for each problem in problem space` conditional check on not continue profiling
-          break;
+          continue;
         }
-      } // for op in manifest
 
-      // If we did not find any kernels that match our filters and error_on_no_match was set, report an error
-      if (options.profiling.error_on_no_match && matched_operation_count <= 0) {
-        #if !NDEBUG
-        std::cerr << "Error: No matching kernels found with kernel selection filters [--error_on_no_match]" << std::endl;
-        #endif
-        retval |= 1;
-        // Stop profiling on error no match
-        continue_profiling = false;
+        //
+        // C. Optionally save workspace
+        //
+
+        if (options.verification.save_workspace == SaveWorkspace::kAlways) {
+          save_workspace(
+            device_context,
+            options,
+            operation->description(),
+            library::Provider::kCUTLASS);
+        }
+
+        //
+        // D. Profile
+        //
+
+        if (continue_profiling && options.profiling.enabled) {
+
+          continue_profiling = this->profile(
+            options,
+            report,
+            device_context,
+            operation,
+            problem_space,
+            problem);
+
+          // Count op as profiled, even it failed to profile
+          profiled_operation_count++;
+        }
+
+        report.append_results(results_);
+        results_.clear();
+      } // if op satisfied compute capacity
+
+      if (!continue_profiling) {
+        // break out of `for op in manifest` loop and move to next problem
+        // `for each problem in problem space` conditional check on not continue profiling
+        break;
       }
+    } // for op in manifest
 
-      if (options.profiling.error_if_nothing_is_profiled && options.profiling.enabled && profiled_operation_count <= 0) {
-        #if !NDEBUG
-        std::cerr << "Error: No kernels profiled found with kernel selection filters [--error_if_nothing_is_profiled]" << std::endl;
-        #endif
-        retval |= 1;
-        // Stop profiling on error no match
-        continue_profiling = false;
-      }
+    // If we did not find any kernels that match our filters and error_on_no_match was set, report an error
+    if (options.profiling.error_on_no_match && matched_operation_count <= 0) {
+      #if !NDEBUG
+      std::cerr << "Error: No matching kernels found with kernel selection filters [--error_on_no_match]" << std::endl;
+      #endif
+      retval |= 1;
+      // Stop profiling on error no match
+      continue_profiling = false;
+    }
 
-    } // for each problem in problem space
-  }
+    if (options.profiling.error_if_nothing_is_profiled && options.profiling.enabled && profiled_operation_count <= 0) {
+      #if !NDEBUG
+      std::cerr << "Error: No kernels profiled found with kernel selection filters [--error_if_nothing_is_profiled]" << std::endl;
+      #endif
+      retval |= 1;
+      // Stop profiling on error no match
+      continue_profiling = false;
+    }
+
+  } // for each problem in problem space
 
   return retval;
 }

@@ -19,7 +19,7 @@
 #ifndef TVM_SCRIPT_PRINTER_IR_UTILS_H_
 #define TVM_SCRIPT_PRINTER_IR_UTILS_H_
 
-#include <tvm/ffi/reflection/registry.h>
+#include <tvm/ffi/reflection/reflection.h>
 #include <tvm/ir/expr.h>
 #include <tvm/ir/function.h>
 #include <tvm/ir/op.h>
@@ -37,26 +37,28 @@ namespace printer {
 
 class IRFrameNode : public FrameNode {
  public:
-  ffi::Map<ffi::String, ffi::Array<GlobalInfo>>* global_infos = nullptr;
+  Map<String, Array<GlobalInfo>>* global_infos = nullptr;
 
   static void RegisterReflection() {
     namespace refl = tvm::ffi::reflection;
     // global infos is not exposed
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("script.printer.IRFrame", IRFrameNode, FrameNode);
+
+  static constexpr const char* _type_key = "script.printer.IRFrame";
+  TVM_DECLARE_FINAL_OBJECT_INFO(IRFrameNode, FrameNode);
 };
 
 class IRFrame : public Frame {
  public:
   explicit IRFrame(const IRDocsifier& d) {
-    ObjectPtr<IRFrameNode> n = ffi::make_object<IRFrameNode>();
+    ObjectPtr<IRFrameNode> n = make_object<IRFrameNode>();
     n->stmts.clear();
     n->d = d.get();
     n->global_infos = nullptr;
     data_ = std::move(n);
   }
 
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NOTNULLABLE(IRFrame, Frame, IRFrameNode);
+  TVM_DEFINE_MUTABLE_NOTNULLABLE_OBJECT_REF_METHODS(IRFrame, Frame, IRFrameNode);
 };
 
 /*! \brief Redirected method for the ReprPrinter */

@@ -21,7 +21,6 @@
  * \file thread_storage_sync.cc
  */
 #include <tvm/ffi/function.h>
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/tir/analysis.h>
 #include <tvm/tir/builtin.h>
 #include <tvm/tir/expr.h>
@@ -401,7 +400,7 @@ class ThreadSyncInserter : public StmtExprMutator {
   // private functions.
   Stmt InitGlobalBarrier(const AttrStmtNode* op) {
     ICHECK(op != nullptr);
-    ffi::Array<PrimExpr> pargs = {StringImm(runtime::symbol::tvm_prepare_global_barrier)};
+    Array<PrimExpr> pargs = {StringImm(runtime::symbol::tvm_prepare_global_barrier)};
     Stmt prep = Evaluate(Call(DataType::Int(32), builtin::tvm_call_packed(), pargs));
     Stmt body = op->body;
     for (const auto& kv : rw_stats_) {
@@ -463,7 +462,7 @@ Stmt ThreadSync(Stmt stmt, std::string storage_scope) {
 
 namespace transform {
 
-Pass ThreadSync(ffi::String storage_scope) {
+Pass ThreadSync(String storage_scope) {
   auto pass_func = [storage_scope](PrimFunc f, IRModule m, PassContext ctx) {
     auto* n = f.CopyOnWrite();
     n->body = ThreadSync(std::move(n->body), storage_scope);
@@ -472,10 +471,7 @@ Pass ThreadSync(ffi::String storage_scope) {
   return CreatePrimFuncPass(pass_func, 0, "tir.ThreadSync", {});
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("tir.transform.ThreadSync", ThreadSync);
-}
+TVM_FFI_REGISTER_GLOBAL("tir.transform.ThreadSync").set_body_typed(ThreadSync);
 
 }  // namespace transform
 }  // namespace tir

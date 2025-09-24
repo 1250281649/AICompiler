@@ -18,7 +18,7 @@
 from typing import List, Tuple, Union
 
 import numpy as np  # type: ignore
-import tvm.runtime
+from tvm.runtime.ndarray import NDArray, array
 
 from ..feature_extractor import PyFeatureExtractor
 from ..search_strategy import MeasureCandidate
@@ -54,11 +54,11 @@ class RandomFeatureExtractor(PyFeatureExtractor):
 
     def extract_from(
         self, context: TuneContext, candidates: List[MeasureCandidate]
-    ) -> List[tvm.runtime.Tensor]:
+    ) -> List[NDArray]:
         np.random.set_state(self.random_state)
         result = [
             np.random.rand(np.random.randint(1, self.max_block_num + 1), self.feature_size)
             for candidate in candidates
         ]
         self.random_state = np.random.get_state()
-        return [tvm.runtime.tensor(x) for x in result]
+        return [array(x) for x in result]

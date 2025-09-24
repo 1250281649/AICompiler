@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/relax/analysis.h>
 #include <tvm/relax/struct_info.h>
 #include <tvm/script/ir_builder/relax/ir.h>
@@ -34,7 +33,7 @@ namespace relax {
 using tvm::script::ir_builder::details::Namer;
 
 TVM_STATIC_IR_FUNCTOR(Namer, vtable)
-    .set_dispatch<tvm::relax::VarNode>([](const ObjectRef& node, ffi::String name) -> void {
+    .set_dispatch<tvm::relax::VarNode>([](const ObjectRef& node, String name) -> void {
       using tvm::relax::VarNode;
       using tvm::relax::IdNode;
       const VarNode* var = node.as<VarNode>();
@@ -43,7 +42,7 @@ TVM_STATIC_IR_FUNCTOR(Namer, vtable)
     });
 
 TVM_STATIC_IR_FUNCTOR(Namer, vtable)
-    .set_dispatch<tvm::relax::DataflowVarNode>([](const ObjectRef& node, ffi::String name) -> void {
+    .set_dispatch<tvm::relax::DataflowVarNode>([](const ObjectRef& node, String name) -> void {
       using tvm::relax::DataflowVarNode;
       using tvm::relax::IdNode;
       const DataflowVarNode* var = node.as<DataflowVarNode>();
@@ -54,11 +53,10 @@ TVM_STATIC_IR_FUNCTOR(Namer, vtable)
 /////////////////////////////// Function ////////////////////////////////
 
 FunctionFrame Function(const Bool& is_pure, const Bool& is_private) {
-  ObjectPtr<FunctionFrameNode> n = ffi::make_object<FunctionFrameNode>();
+  ObjectPtr<FunctionFrameNode> n = make_object<FunctionFrameNode>();
   const IRBuilder& ir_builder = IRBuilder::Current();
-  ffi::Optional<tvm::IRModule> mod = std::nullopt;
-  if (const ffi::Optional<ir::IRModuleFrame> mod_frame =
-          ir_builder->GetLastFrame<ir::IRModuleFrame>()) {
+  Optional<tvm::IRModule> mod = std::nullopt;
+  if (const Optional<ir::IRModuleFrame> mod_frame = ir_builder->GetLastFrame<ir::IRModuleFrame>()) {
     mod = tvm::IRModule(mod_frame.value()->functions);
   }
   n->block_builder = tvm::relax::BlockBuilder::Create(
@@ -68,7 +66,7 @@ FunctionFrame Function(const Bool& is_pure, const Bool& is_private) {
   return FunctionFrame(n);
 }
 
-tvm::relax::Var Arg(const ffi::String& name, const tvm::relax::StructInfo& struct_info) {
+tvm::relax::Var Arg(const String& name, const tvm::relax::StructInfo& struct_info) {
   FunctionFrame frame = FindFunctionFrame("R.Arg");
   tvm::relax::Var var(name, struct_info);
   frame->params.push_back(var);
@@ -77,16 +75,16 @@ tvm::relax::Var Arg(const ffi::String& name, const tvm::relax::StructInfo& struc
   return var;
 }
 
-void FuncName(const ffi::String& name) {
+void FuncName(const String& name) {
   FunctionFrame frame = FindFunctionFrame("R.func_name");
-  if (frame->name.has_value()) {
+  if (frame->name.defined()) {
     LOG(FATAL) << "ValueError: Duplicate function name, previous one is: \"" << frame->name.value()
                << "\"";
   }
   frame->name = name;
 }
 
-void FuncAttrs(ffi::Map<ffi::String, ffi::Any> attrs) {
+void FuncAttrs(Map<String, ffi::Any> attrs) {
   FunctionFrame frame = FindFunctionFrame("R.func_attr");
   for (const auto& [key, value] : attrs) {
     if (key == tvm::attr::kGlobalSymbol && frame->is_private.value_or(Bool(false))->value) {
@@ -146,36 +144,33 @@ void FuncRetValue(const tvm::relax::Expr& value) {
   frame->output = std::move(normalized_value);
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef()
-      .def("script.ir_builder.relax.Function", Function)
-      .def("script.ir_builder.relax.Arg", Arg)
-      .def("script.ir_builder.relax.FuncName", FuncName)
-      .def("script.ir_builder.relax.FuncAttrs", FuncAttrs)
-      .def("script.ir_builder.relax.FuncRetStructInfo", FuncRetStructInfo)
-      .def("script.ir_builder.relax.FuncRetValue", FuncRetValue);
-}
+TVM_FFI_REGISTER_GLOBAL("script.ir_builder.relax.Function").set_body_typed(Function);
+TVM_FFI_REGISTER_GLOBAL("script.ir_builder.relax.Arg").set_body_typed(Arg);
+TVM_FFI_REGISTER_GLOBAL("script.ir_builder.relax.FuncName").set_body_typed(FuncName);
+TVM_FFI_REGISTER_GLOBAL("script.ir_builder.relax.FuncAttrs").set_body_typed(FuncAttrs);
+TVM_FFI_REGISTER_GLOBAL("script.ir_builder.relax.FuncRetStructInfo")
+    .set_body_typed(FuncRetStructInfo);
+TVM_FFI_REGISTER_GLOBAL("script.ir_builder.relax.FuncRetValue").set_body_typed(FuncRetValue);
 
 ///////////////////////////// BindingBlock //////////////////////////////
 
 BlockFrame Dataflow() {
-  ObjectPtr<BlockFrameNode> n = ffi::make_object<BlockFrameNode>();
+  ObjectPtr<BlockFrameNode> n = make_object<BlockFrameNode>();
   n->is_dataflow = true;
   n->block_ended = false;
   return BlockFrame(n);
 }
 
 BlockFrame BindingBlock() {
-  ObjectPtr<BlockFrameNode> n = ffi::make_object<BlockFrameNode>();
+  ObjectPtr<BlockFrameNode> n = make_object<BlockFrameNode>();
   n->is_dataflow = false;
   n->block_ended = false;
   return BlockFrame(n);
 }
 
-void DataflowBlockOutput(const ffi::Array<tvm::relax::Var>& vars) {
+void DataflowBlockOutput(const Array<tvm::relax::Var>& vars) {
   // Step 1. Check that we're in a Dataflow block that is not ended.
-  ffi::Optional<BlockFrame> block_frame = IRBuilder::Current()->GetLastFrame<BlockFrame>();
+  Optional<BlockFrame> block_frame = IRBuilder::Current()->GetLastFrame<BlockFrame>();
   CHECK(block_frame.defined() && block_frame.value()->is_dataflow)
       << "ValueError: `R.output` should appear inside a dataflow block. However, the current "
          "innermost block is not a dataflow block.";
@@ -188,7 +183,7 @@ void DataflowBlockOutput(const ffi::Array<tvm::relax::Var>& vars) {
 
   // Step 3. All the output variables must be global variables and must be emitted by this dataflow
   // block.
-  const ffi::Array<tvm::relax::Var>& emitted_vars = block_frame.value()->emitted_vars;
+  const Array<tvm::relax::Var>& emitted_vars = block_frame.value()->emitted_vars;
   for (const tvm::relax::Var& var : vars) {
     CHECK(std::find(emitted_vars.begin(), emitted_vars.end(), var) != emitted_vars.end())
         << "ValueError: An output variable is not emitted by this dataflow block. Please make sure "
@@ -197,18 +192,15 @@ void DataflowBlockOutput(const ffi::Array<tvm::relax::Var>& vars) {
   }
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef()
-      .def("script.ir_builder.relax.Dataflow", Dataflow)
-      .def("script.ir_builder.relax.BindingBlock", BindingBlock)
-      .def("script.ir_builder.relax.DataflowBlockOutput", DataflowBlockOutput);
-}
+TVM_FFI_REGISTER_GLOBAL("script.ir_builder.relax.Dataflow").set_body_typed(Dataflow);
+TVM_FFI_REGISTER_GLOBAL("script.ir_builder.relax.BindingBlock").set_body_typed(BindingBlock);
+TVM_FFI_REGISTER_GLOBAL("script.ir_builder.relax.DataflowBlockOutput")
+    .set_body_typed(DataflowBlockOutput);
 
 /////////////////////////////// Bindings ///////////////////////////////
 
 tvm::relax::Var Emit(const tvm::relax::Expr& expr,
-                     const ffi::Optional<tvm::relax::StructInfo>& annotate_struct_info) {
+                     const Optional<tvm::relax::StructInfo>& annotate_struct_info) {
   using tvm::relax::GetStructInfo;
   BlockFrame block_frame = CheckBlockFrameExistAndUnended();
   const tvm::relax::BlockBuilder& block_builder = GetBlockBuilder();
@@ -245,30 +237,23 @@ tvm::relax::Var EmitVarBinding(const tvm::relax::VarBinding& binding) {
   return binding->var;
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef()
-      .def("script.ir_builder.relax.Emit", Emit)
-      .def("script.ir_builder.relax.EmitMatchCast", EmitMatchCast)
-      .def("script.ir_builder.relax.EmitVarBinding", EmitVarBinding);
-}
+TVM_FFI_REGISTER_GLOBAL("script.ir_builder.relax.Emit").set_body_typed(Emit);
+TVM_FFI_REGISTER_GLOBAL("script.ir_builder.relax.EmitMatchCast").set_body_typed(EmitMatchCast);
+TVM_FFI_REGISTER_GLOBAL("script.ir_builder.relax.EmitVarBinding").set_body_typed(EmitVarBinding);
 
 /////////////////////////////// SeqExpr ///////////////////////////////
 
 SeqExprFrame SeqExpr() {
-  ObjectPtr<SeqExprFrameNode> n = ffi::make_object<SeqExprFrameNode>();
+  ObjectPtr<SeqExprFrameNode> n = make_object<SeqExprFrameNode>();
   return SeqExprFrame(n);
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("script.ir_builder.relax.SeqExpr", SeqExpr);
-}
+TVM_FFI_REGISTER_GLOBAL("script.ir_builder.relax.SeqExpr").set_body_typed(SeqExpr);
 
 ///////////////////////////// If Then Else /////////////////////////////
 
 IfFrame If(tvm::relax::Expr condition) {
-  ObjectPtr<IfFrameNode> n = ffi::make_object<IfFrameNode>();
+  ObjectPtr<IfFrameNode> n = make_object<IfFrameNode>();
   n->condition = condition;
   n->then_expr = std::nullopt;
   n->else_expr = std::nullopt;
@@ -276,22 +261,18 @@ IfFrame If(tvm::relax::Expr condition) {
 }
 
 ThenFrame Then() {
-  ObjectPtr<ThenFrameNode> n = ffi::make_object<ThenFrameNode>();
+  ObjectPtr<ThenFrameNode> n = make_object<ThenFrameNode>();
   return ThenFrame(n);
 }
 
 ElseFrame Else() {
-  ObjectPtr<ElseFrameNode> n = ffi::make_object<ElseFrameNode>();
+  ObjectPtr<ElseFrameNode> n = make_object<ElseFrameNode>();
   return ElseFrame(n);
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef()
-      .def("script.ir_builder.relax.If", If)
-      .def("script.ir_builder.relax.Then", Then)
-      .def("script.ir_builder.relax.Else", Else);
-}
+TVM_FFI_REGISTER_GLOBAL("script.ir_builder.relax.If").set_body_typed(If);
+TVM_FFI_REGISTER_GLOBAL("script.ir_builder.relax.Then").set_body_typed(Then);
+TVM_FFI_REGISTER_GLOBAL("script.ir_builder.relax.Else").set_body_typed(Else);
 
 }  // namespace relax
 }  // namespace ir_builder

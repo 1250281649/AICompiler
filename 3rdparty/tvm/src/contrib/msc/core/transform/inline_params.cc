@@ -22,7 +22,6 @@
  * \brief Pass for inline Exprs.
  */
 
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/relax/expr.h>
 #include <tvm/relax/expr_functor.h>
 #include <tvm/relax/transform.h>
@@ -40,8 +39,7 @@ using namespace tvm::contrib::msc;
  */
 class ParamsInliner : public ExprMutator {
  public:
-  explicit ParamsInliner(IRModule ctx_module, const ffi::String& entry_name)
-      : ExprMutator(ctx_module) {
+  explicit ParamsInliner(IRModule ctx_module, const String& entry_name) : ExprMutator(ctx_module) {
     mod_ = ctx_module;
     entry_name_ = entry_name;
   }
@@ -55,22 +53,22 @@ class ParamsInliner : public ExprMutator {
         continue;
       }
       if (func->IsInstance<FunctionNode>()) {
-        ffi::Array<Var> new_params;
-        ffi::Array<ffi::String> attrs;
+        Array<Var> new_params;
+        Array<String> attrs;
         for (const auto& p : Downcast<Function>(func)->params) {
           auto struct_info = GetStructInfo(p);
           if (struct_info->IsInstance<ShapeStructInfoNode>()) {
             continue;
           }
           if (struct_info->IsInstance<FuncStructInfoNode>()) {
-            const auto& optype_opt = func->GetAttr<ffi::String>(msc_attr::kOptype);
-            ICHECK(optype_opt.has_value())
+            const auto& optype_opt = func->GetAttr<String>(msc_attr::kOptype);
+            ICHECK(optype_opt.defined())
                 << "Can not find attr " << msc_attr::kOptype << " form extern func";
             extern_types_.Set(p, optype_opt.value());
             continue;
           }
           if (const auto* tuple_info = struct_info.as<TupleStructInfoNode>()) {
-            ffi::Array<StructInfo> new_fields;
+            Array<StructInfo> new_fields;
             for (const auto& i : tuple_info->fields) {
               if (i->IsInstance<TensorStructInfoNode>()) {
                 new_fields.push_back(i);
@@ -89,7 +87,7 @@ class ParamsInliner : public ExprMutator {
           continue;
         }
         const auto& new_func = Downcast<Function>(VisitExpr(func));
-        ffi::Map<ffi::String, ffi::Any> func_attrs = new_func->attrs->dict;
+        Map<String, ffi::Any> func_attrs = new_func->attrs->dict;
         if (attrs.size() > 0) {
           func_attrs.Set(msc_attr::kOpattrs, attrs);
         }
@@ -106,7 +104,7 @@ class ParamsInliner : public ExprMutator {
   }
 
   void VisitBinding_(const VarBindingNode* binding, const CallNode* call_node) final {
-    ffi::Array<Expr> new_args;
+    Array<Expr> new_args;
     bool has_inline = false;
     for (const auto& a : call_node->args) {
       auto struct_info = GetStructInfo(a);
@@ -125,8 +123,8 @@ class ParamsInliner : public ExprMutator {
         has_inline = true;
       } else if (call_node->op->IsInstance<GlobalVarNode>() && a->IsInstance<TupleNode>()) {
         const auto& tuple = Downcast<Tuple>(a);
-        ffi::Array<Expr> new_fields;
-        ffi::Array<StructInfo> new_infos;
+        Array<Expr> new_fields;
+        Array<StructInfo> new_infos;
 
         for (const auto& f : tuple->fields) {
           if (f->IsInstance<VarNode>()) {
@@ -153,7 +151,7 @@ class ParamsInliner : public ExprMutator {
       ReEmitBinding(binding, builder_->Normalize(new_call));
     } else if (const auto* gv_node = call_node->op.as<GlobalVarNode>()) {
       const auto& func_info = Downcast<FuncStructInfo>(gv_node->struct_info_);
-      ffi::Array<StructInfo> params_info;
+      Array<StructInfo> params_info;
       for (const auto& a : new_args) {
         ICHECK(a->struct_info_.defined())
             << "Global func argument without defined struct info " << a;
@@ -165,31 +163,28 @@ class ParamsInliner : public ExprMutator {
           Call(call_node->op, new_args, call_node->attrs, call_node->sinfo_args, call_node->span);
       ReEmitBinding(binding, builder_->Normalize(new_call));
     } else {
-      LOG_FATAL << "Unexpected shape consumer " << ffi::GetRef<Call>(call_node);
+      LOG_FATAL << "Unexpected shape consumer " << GetRef<Call>(call_node);
     }
   }
 
  private:
   IRModule mod_;
-  ffi::String entry_name_;
-  ffi::Map<Expr, ffi::String> extern_types_;
+  String entry_name_;
+  Map<Expr, String> extern_types_;
 };
 
-IRModule InlineParams(IRModule mod, const ffi::String& entry_name) {
+IRModule InlineParams(IRModule mod, const String& entry_name) {
   return ParamsInliner(mod, entry_name).Bind();
 }
 
 namespace transform {
 
-Pass InlineParams(const ffi::String& entry_name) {
+Pass InlineParams(const String& entry_name) {
   auto pass_func = [=](IRModule m, PassContext pc) { return relax::InlineParams(m, entry_name); };
   return CreateModulePass(pass_func, 0, "InlineParams", {});
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("relax.transform.InlineParams", InlineParams);
-}
+TVM_FFI_REGISTER_GLOBAL("relax.transform.InlineParams").set_body_typed(InlineParams);
 
 }  // namespace transform
 }  // namespace relax

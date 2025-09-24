@@ -26,9 +26,11 @@ from .common import register_legalize
 
 @register_legalize("relax.take")
 def _take(bb: BlockBuilder, call: Call) -> Expr:
-    # Currently "fast" is the default mode, which leads to segmentation faults
-    # when there are out-of-bounds indices.
-    return bb.call_te(topi.take, call.args[0], call.args[1], call.attrs.axis, mode=call.attrs.mode)
+    # Currently Relax `take` operator doesn't provide the mode choices and
+    # requires input indices to be in range.
+    # We use fast mode, which leads to runtime error whenever some index is
+    # out of bound.
+    return bb.call_te(topi.take, call.args[0], call.args[1], call.attrs.axis, mode="fast")
 
 
 @register_legalize("relax.strided_slice")

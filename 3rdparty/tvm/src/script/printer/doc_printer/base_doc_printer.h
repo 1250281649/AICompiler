@@ -81,7 +81,7 @@ class DocPrinter {
    *
    * \sa Append
    */
-  ffi::String GetString() const;
+  String GetString() const;
 
  protected:
   /*!
@@ -255,7 +255,7 @@ class DocPrinter {
   std::vector<ByteSpan> underlines_exempted_;
 
  private:
-  void MarkSpan(const ByteSpan& span, const AccessPath& path);
+  void MarkSpan(const ByteSpan& span, const ObjectPath& path);
 
   /*! \brief Options to customize certain aspects of the output */
   PrinterConfig options_;
@@ -267,7 +267,7 @@ class DocPrinter {
   std::vector<size_t> line_starts_;
 
   /*! \brief Path of the object that we would like to underline */
-  ffi::Array<AccessPath> path_to_underline_;
+  Array<ObjectPath> path_to_underline_;
 
   /*!
    * \brief Candidate spans to be underlined, until we find a better match.
@@ -276,7 +276,7 @@ class DocPrinter {
   std::vector<std::vector<ByteSpan>> current_underline_candidates_;
 
   /*! \brief Path length of the objects that are current candidates for underlining. */
-  std::vector<int> current_max_path_depth_;
+  std::vector<int> current_max_path_length_;
 
   /*! \brief Spans that we have already committed to underline. */
   std::vector<ByteSpan> underlines_;

@@ -17,7 +17,7 @@
  * under the License.
  */
 
-#include <tvm/ffi/reflection/registry.h>
+#include <tvm/ffi/reflection/reflection.h>
 
 #include "../module_equality.h"
 #include "../utils.h"
@@ -112,10 +112,10 @@ class SizedHeap {
 };
 
 struct PerThreadData {
-  IRModule mod{ffi::UnsafeInit()};
+  IRModule mod{nullptr};
   TRandState rand_state{-1};
   std::function<int32_t()> trace_sampler = nullptr;
-  std::function<ffi::Optional<Mutator>()> mutator_sampler = nullptr;
+  std::function<Optional<Mutator>()> mutator_sampler = nullptr;
 
   /*!
    * \brief Set the value for the trace and mutator samplers per thread.
@@ -124,7 +124,7 @@ struct PerThreadData {
    * \param mutator_probs The probability of each mutator as a dict.
    */
   void Set(const std::vector<double>& scores, double genetic_mutate_prob,
-           const ffi::Map<Mutator, FloatImm>& mutator_probs) {
+           const Map<Mutator, FloatImm>& mutator_probs) {
     trace_sampler = tir::MakeMultinomialSampler(&rand_state, scores);
     mutator_sampler = MakeMutatorSampler(genetic_mutate_prob, mutator_probs, &rand_state);
   }
@@ -135,11 +135,11 @@ struct PerThreadData {
    * \param rand_state The random state for sampling
    * \return The sampler created
    */
-  static std::function<ffi::Optional<Mutator>()> MakeMutatorSampler(
-      double genetic_mutate_prob,                        //
-      const ffi::Map<Mutator, FloatImm>& mutator_probs,  //
+  static std::function<Optional<Mutator>()> MakeMutatorSampler(
+      double genetic_mutate_prob,                   //
+      const Map<Mutator, FloatImm>& mutator_probs,  //
       TRandState* rand_state) {
-    std::vector<ffi::Optional<Mutator>> mutators;
+    std::vector<Optional<Mutator>> mutators;
     std::vector<double> masses;
     mutators.push_back(std::nullopt);
     masses.push_back(1.0 - genetic_mutate_prob);
@@ -165,7 +165,7 @@ struct PerThreadData {
       }
     }
     return [idx_sampler = tir::MakeMultinomialSampler(rand_state, masses),
-            mutators = std::move(mutators)]() -> ffi::Optional<Mutator> {
+            mutators = std::move(mutators)]() -> Optional<Mutator> {
       int i = idx_sampler();
       return mutators[i];
     };
@@ -212,8 +212,8 @@ struct ConcurrentBitmask {
  * \param traces The picked candidate traces.
  * \return The assembled measure candidates.
  */
-ffi::Array<MeasureCandidate> AssembleCandidates(const std::vector<Schedule>& picks) {
-  ffi::Array<MeasureCandidate> measure_inputs;
+Array<MeasureCandidate> AssembleCandidates(const std::vector<Schedule>& picks) {
+  Array<MeasureCandidate> measure_inputs;
   measure_inputs.reserve(picks.size());
   for (const Schedule& sch : picks) {
     measure_inputs.push_back(
@@ -261,7 +261,7 @@ class EvolutionarySearchNode : public SearchStrategyNode {
     /*! \brief The counter of returning empty results. */
     int num_empty_iters;
     /*! \brief The design spaces. Decisions are not used so traces only. */
-    ffi::Array<tir::Trace> design_spaces;
+    Array<tir::Trace> design_spaces;
     /*! \brief Pre thread data including module to be tuned and random state. */
     std::vector<PerThreadData> per_thread_data_;
     /*!
@@ -270,15 +270,14 @@ class EvolutionarySearchNode : public SearchStrategyNode {
      * */
     IRModuleSet measured_workloads_;
     /*! \brief A Database for selecting useful candidates. */
-    Database database_{ffi::UnsafeInit()};
+    Database database_{nullptr};
     /*! \brief A cost model helping to explore the search space */
-    CostModel cost_model_{ffi::UnsafeInit()};
+    CostModel cost_model_{nullptr};
     /*! \brief The token registered for the given workload in database. */
-    Workload token_{ffi::UnsafeInit()};
+    Workload token_{nullptr};
 
     explicit State(EvolutionarySearchNode* self, int max_trials, int num_trials_per_iter,
-                   ffi::Array<Schedule> design_space_schedules, Database database,
-                   CostModel cost_model)
+                   Array<Schedule> design_space_schedules, Database database, CostModel cost_model)
         : self(self),
           max_trials(max_trials),
           num_trials_per_iter(num_trials_per_iter),
@@ -332,10 +331,10 @@ class EvolutionarySearchNode : public SearchStrategyNode {
     inline std::vector<Schedule> PickWithEpsGreedy(const std::vector<Schedule>& inits,
                                                    const std::vector<Schedule>& bests, int num);
     /*! \brief An interface method to be called by it's counterpart in EvolutionarySearchNode */
-    inline ffi::Optional<ffi::Array<MeasureCandidate>> GenerateMeasureCandidates();
+    inline Optional<Array<MeasureCandidate>> GenerateMeasureCandidates();
     /*! \brief An interface method to be called by it's counterpart in EvolutionarySearchNode */
-    inline void NotifyRunnerResults(const ffi::Array<MeasureCandidate>& measure_candidates,
-                                    const ffi::Array<RunnerResult>& results);
+    inline void NotifyRunnerResults(const Array<MeasureCandidate>& measure_candidates,
+                                    const Array<RunnerResult>& results);
     /*!
      * \brief Compute the hash for the given module.
      * \param mod The input TIR module.
@@ -347,9 +346,9 @@ class EvolutionarySearchNode : public SearchStrategyNode {
   /*! \brief The tuning context of the evolutionary search strategy. */
   const TuneContextNode* ctx_{nullptr};
   /*! \brief The postprocessors */
-  ffi::Array<Postproc> postprocs_;
+  Array<Postproc> postprocs_;
   /*! \brief The mutators and their probability. */
-  ffi::Map<Mutator, FloatImm> mutator_probs_;
+  Map<Mutator, FloatImm> mutator_probs_;
   /*! \brief The random state. To be initialized with TuneContext. */
   TRandState rand_state_;
   /*! \brief The state of the search strategy. */
@@ -395,8 +394,9 @@ class EvolutionarySearchNode : public SearchStrategyNode {
         .def_ro("genetic_max_fail_count", &EvolutionarySearchNode::genetic_max_fail_count)
         .def_ro("eps_greedy", &EvolutionarySearchNode::eps_greedy);
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("meta_schedule.EvolutionarySearch", EvolutionarySearchNode,
-                                    SearchStrategyNode);
+
+  static constexpr const char* _type_key = "meta_schedule.EvolutionarySearch";
+  TVM_DECLARE_FINAL_OBJECT_INFO(EvolutionarySearchNode, SearchStrategyNode);
 
   void InitializeWithTuneContext(const TuneContext& ctx) final {
     CHECK(ctx->num_threads > 0) << "ValueError: `TuneContext.num_threads` must be > 0";
@@ -413,9 +413,8 @@ class EvolutionarySearchNode : public SearchStrategyNode {
     this->state_.reset();
   }
 
-  void PreTuning(int max_trials, int num_trials_per_iter, const ffi::Array<Schedule>& design_spaces,
-                 const ffi::Optional<Database>& database,
-                 const ffi::Optional<CostModel>& cost_model) final {
+  void PreTuning(int max_trials, int num_trials_per_iter, const Array<Schedule>& design_spaces,
+                 const Optional<Database>& database, const Optional<CostModel>& cost_model) final {
     ICHECK(!design_spaces.empty());
     CHECK(this->ctx_ != nullptr) << "ValueError: Did you forget to initialize the TuneContext?";
     CHECK(database.defined())
@@ -440,19 +439,19 @@ class EvolutionarySearchNode : public SearchStrategyNode {
     this->state_.reset();
   }
 
-  ffi::Optional<ffi::Array<MeasureCandidate>> GenerateMeasureCandidates() final {
+  Optional<Array<MeasureCandidate>> GenerateMeasureCandidates() final {
     ICHECK(this->state_ != nullptr);
     return this->state_->GenerateMeasureCandidates();
   }
 
-  void NotifyRunnerResults(const ffi::Array<MeasureCandidate>& measure_candidates,
-                           const ffi::Array<RunnerResult>& results) final {
+  void NotifyRunnerResults(const Array<MeasureCandidate>& measure_candidates,
+                           const Array<RunnerResult>& results) final {
     ICHECK(this->state_ != nullptr);
     this->state_->NotifyRunnerResults(measure_candidates, results);
   }
 
   SearchStrategy Clone() const final {
-    ObjectPtr<EvolutionarySearchNode> n = ffi::make_object<EvolutionarySearchNode>();
+    ObjectPtr<EvolutionarySearchNode> n = make_object<EvolutionarySearchNode>();
     n->population_size = this->population_size;
     n->num_empty_iters_before_early_stop = this->num_empty_iters_before_early_stop;
     n->init_measured_ratio = this->init_measured_ratio;
@@ -473,7 +472,7 @@ std::vector<Schedule> EvolutionarySearchNode::State::PickBestFromDatabase(int nu
   auto _ = Profiler::TimedScope("EvoSearch/PickBestFromDatabase");
   std::vector<tir::Trace> measured_traces;
   measured_traces.reserve(num);
-  ffi::Array<TuningRecord> top_records = this->database_->GetTopK(this->token_, num);
+  Array<TuningRecord> top_records = this->database_->GetTopK(this->token_, num);
   for (TuningRecord record : top_records) {
     measured_traces.push_back(record->trace);
   }
@@ -488,7 +487,7 @@ std::vector<Schedule> EvolutionarySearchNode::State::PickBestFromDatabase(int nu
     tir::Trace trace = measured_traces.at(trace_id);
     Schedule& result = results.at(trace_id);
     ICHECK(!result.defined());
-    if (ffi::Optional<Schedule> sch = pp.Apply(mod, trace, rand_state)) {
+    if (Optional<Schedule> sch = pp.Apply(mod, trace, rand_state)) {
       result = sch.value();
     } else {
       LOG(FATAL) << "ValueError: Cannot postprocess the trace:\n" << trace;
@@ -515,7 +514,7 @@ std::vector<Schedule> EvolutionarySearchNode::State::SampleInitPopulation(int nu
       ICHECK(!result.defined());
       int design_space_index = tir::SampleInt(rand_state, 0, design_spaces.size());
       tir::Trace trace(design_spaces[design_space_index]->insts, {});
-      if (ffi::Optional<Schedule> sch = pp.Apply(mod, trace, rand_state)) {
+      if (Optional<Schedule> sch = pp.Apply(mod, trace, rand_state)) {
         result = sch.value();
       }
     };
@@ -547,7 +546,7 @@ std::vector<Schedule> EvolutionarySearchNode::State::EvolveWithCostModel(
   for (int iter = 0;; ++iter) {
     // Predict normalized score with the cost model,
     std::vector<double> scores =
-        PredictNormalizedScore(population, ffi::GetRef<TuneContext>(self->ctx_), this->cost_model_);
+        PredictNormalizedScore(population, GetRef<TuneContext>(self->ctx_), this->cost_model_);
 
     {
       auto _ = Profiler::TimedScope("EvoSearch/Evolve/Misc");
@@ -584,7 +583,7 @@ std::vector<Schedule> EvolutionarySearchNode::State::EvolveWithCostModel(
         TRandState* rand_state = &data.rand_state;
         const IRModule& mod = data.mod;
         std::function<int()>& trace_sampler = data.trace_sampler;
-        std::function<ffi::Optional<Mutator>()>& mutator_sampler = data.mutator_sampler;
+        std::function<Optional<Mutator>()>& mutator_sampler = data.mutator_sampler;
         Schedule& result = next_population.at(trace_id);
         int sampled_trace_id = -1;
         // Loop until success
@@ -592,11 +591,11 @@ std::vector<Schedule> EvolutionarySearchNode::State::EvolveWithCostModel(
           sampled_trace_id = trace_sampler();
           sampled_trace_id = sampled_trace_id % self->population_size;
           tir::Trace trace = population.at(sampled_trace_id)->trace().value();
-          if (ffi::Optional<Mutator> opt_mutator = mutator_sampler()) {
+          if (Optional<Mutator> opt_mutator = mutator_sampler()) {
             // Decision: mutate
             Mutator mutator = opt_mutator.value();
-            if (ffi::Optional<tir::Trace> new_trace = mutator->Apply(trace, rand_state)) {
-              if (ffi::Optional<Schedule> sch = pp.Apply(mod, new_trace.value(), rand_state)) {
+            if (Optional<tir::Trace> new_trace = mutator->Apply(trace, rand_state)) {
+              if (Optional<Schedule> sch = pp.Apply(mod, new_trace.value(), rand_state)) {
                 // note that sch's trace is different from new_trace
                 // because it contains post-processing information
                 result = sch.value();
@@ -695,8 +694,7 @@ std::vector<Schedule> EvolutionarySearchNode::State::PickWithEpsGreedy(
   return results;
 }
 
-ffi::Optional<ffi::Array<MeasureCandidate>>
-EvolutionarySearchNode::State::GenerateMeasureCandidates() {
+Optional<Array<MeasureCandidate>> EvolutionarySearchNode::State::GenerateMeasureCandidates() {
   if (st >= max_trials) {
     return std::nullopt;
   }
@@ -739,8 +737,7 @@ EvolutionarySearchNode::State::GenerateMeasureCandidates() {
 }
 
 void EvolutionarySearchNode::State::NotifyRunnerResults(
-    const ffi::Array<MeasureCandidate>& measure_candidates,
-    const ffi::Array<RunnerResult>& results) {
+    const Array<MeasureCandidate>& measure_candidates, const Array<RunnerResult>& results) {
   st += results.size();
   ed += results.size();
 }
@@ -760,7 +757,7 @@ SearchStrategy SearchStrategy::EvolutionarySearch(int population_size,         /
   TVM_META_SCHEDULE_CHECK_PROB_RANGE(init_measured_ratio, "Initial measured ratio");
   TVM_META_SCHEDULE_CHECK_PROB_RANGE(genetic_mutate_prob, "Mutation probability");
   TVM_META_SCHEDULE_CHECK_PROB_RANGE(eps_greedy, "Greedy pick probability");
-  ObjectPtr<EvolutionarySearchNode> n = ffi::make_object<EvolutionarySearchNode>();
+  ObjectPtr<EvolutionarySearchNode> n = make_object<EvolutionarySearchNode>();
   n->population_size = population_size;
   n->num_empty_iters_before_early_stop = 5;
   n->init_measured_ratio = init_measured_ratio;
@@ -775,19 +772,18 @@ SearchStrategy SearchStrategy::EvolutionarySearch(int population_size,         /
 
 class EvolutionarySearch : public SearchStrategy {
  public:
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NOTNULLABLE(EvolutionarySearch, SearchStrategy,
-                                                EvolutionarySearchNode);
+  TVM_DEFINE_MUTABLE_NOTNULLABLE_OBJECT_REF_METHODS(EvolutionarySearch, SearchStrategy,
+                                                    EvolutionarySearchNode);
 };
 
-ffi::Array<Schedule> EvolutionarySearchSampleInitPopulation(EvolutionarySearch self, int num) {
+Array<Schedule> EvolutionarySearchSampleInitPopulation(EvolutionarySearch self, int num) {
   std::vector<Schedule> results = self->state_->SampleInitPopulation(num);
-  return ffi::Array<Schedule>(results.begin(), results.end());
+  return Array<Schedule>(results.begin(), results.end());
 }
 
-ffi::Array<Schedule> EvolutionarySearchEvolveWithCostModel(EvolutionarySearch self,
-                                                           ffi::Array<Schedule> population,
-                                                           int num) {
-  ffi::Array<Schedule> result;
+Array<Schedule> EvolutionarySearchEvolveWithCostModel(EvolutionarySearch self,
+                                                      Array<Schedule> population, int num) {
+  Array<Schedule> result;
   std::vector<Schedule> population_vec =
       std::vector<Schedule>(population.begin(), population.end());
   std::vector<Schedule> schs = self->state_->EvolveWithCostModel(population_vec, num);
@@ -802,17 +798,15 @@ ffi::Array<Schedule> EvolutionarySearchEvolveWithCostModel(EvolutionarySearch se
   return result;
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() { EvolutionarySearchNode::RegisterReflection(); }
+TVM_FFI_STATIC_INIT_BLOCK({ EvolutionarySearchNode::RegisterReflection(); });
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef()
-      .def("meta_schedule.SearchStrategyEvolutionarySearch", SearchStrategy::EvolutionarySearch)
-      .def("meta_schedule.SearchStrategyEvolutionarySearchSampleInitPopulation",
-           EvolutionarySearchSampleInitPopulation)
-      .def("meta_schedule.SearchStrategyEvolutionarySearchEvolveWithCostModel",
-           EvolutionarySearchEvolveWithCostModel);
-}
+TVM_REGISTER_NODE_TYPE(EvolutionarySearchNode);
+TVM_FFI_REGISTER_GLOBAL("meta_schedule.SearchStrategyEvolutionarySearch")
+    .set_body_typed(SearchStrategy::EvolutionarySearch);
+TVM_FFI_REGISTER_GLOBAL("meta_schedule.SearchStrategyEvolutionarySearchSampleInitPopulation")
+    .set_body_typed(EvolutionarySearchSampleInitPopulation);
+TVM_FFI_REGISTER_GLOBAL("meta_schedule.SearchStrategyEvolutionarySearchEvolveWithCostModel")
+    .set_body_typed(EvolutionarySearchEvolveWithCostModel);
 
 }  // namespace meta_schedule
 }  // namespace tvm

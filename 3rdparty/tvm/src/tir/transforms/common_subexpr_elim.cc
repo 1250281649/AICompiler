@@ -30,7 +30,6 @@
 #include "common_subexpr_elim.h"
 
 #include <tvm/ffi/container/array.h>
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/ffi/string.h>
 #include <tvm/ir/transform.h>  // For the class Pass and the class PassContext
 #include <tvm/tir/analysis.h>  // For the analysis which gives the size of an expr
@@ -150,8 +149,8 @@ Var CommonSubexpressionEliminator::GenerateNewVar(DataType type_annotation) {
   // Builds the variable name, which is cse_vi where i will go up from 1
   std::string prefix = "cse_v";
   std::string name = prefix.append(std::to_string(num_last_try_));
-  // Builds a ffi::String using the std::string
-  ffi::String string_name(name);
+  // Builds a String using the std::string
+  String string_name(name);
 
   // Check that the name that we want to use for the new variable isn't already being used
   // (names don't really have to be unique as they are just hints, and having the same name
@@ -280,11 +279,11 @@ PrimExpr CommonSubexpressionEliminator::VisitExpr(const PrimExpr& expr) {
           [](const std::pair<Var, MaybeValue>& pair) { return pair.first; };
       std::vector<Var> vector_vars_known = VectorMap(context_, forget_value);
       // 2.2 - Transform the std::vector into an Array
-      ffi::Array<Var> array_vars_known = ffi::Array<Var>(vector_vars_known);
+      Array<Var> array_vars_known = Array<Var>(vector_vars_known);
       // --- End of chunk needed for reusing the UndefinedVars() analysis ---
 
       // We use the UndefinedVars() analysis to get the undefined vars of the computation
-      ffi::Array<Var> vars_undefined = UndefinedVars(computation_wrapped_in_stmt, array_vars_known);
+      Array<Var> vars_undefined = UndefinedVars(computation_wrapped_in_stmt, array_vars_known);
 
       // Check if we can introduce it : if it contains no undefined variables and if we want
       // to introduce it according to the predicate
@@ -375,7 +374,7 @@ PrimExpr CommonSubexpressionEliminator::VisitExpr_(const LetNode* op) {
   // If the `value` and the `body` of the let-in have been rewritten to the same thing
   if (value_new.same_as(op->value) && body_new.same_as(op->body)) {
     // then return a reference to the same node
-    return ffi::GetRef<PrimExpr>(op);
+    return GetRef<PrimExpr>(op);
   } else {
     // Otherwise return a let-in built with the new `value_new` and the new `body_new` that
     // have just been obtained
@@ -460,11 +459,11 @@ Stmt CommonSubexpressionEliminator::VisitStmt(const Stmt& stmt) {
           [](const std::pair<Var, MaybeValue>& pair) { return pair.first; };
       std::vector<Var> vector_vars_known = VectorMap(context_, forget_value);
       // 2.2 - Transform the std::vector into an Array
-      ffi::Array<Var> array_vars_known = ffi::Array<Var>(vector_vars_known);
+      Array<Var> array_vars_known = Array<Var>(vector_vars_known);
       // --- End of chunk needed for reusing the UndefinedVars() analysis ---
 
       // We use the UndefinedVars() analysis to get the undefined vars of the computation
-      ffi::Array<Var> vars_undefined = UndefinedVars(computation_wrapped_in_stmt, array_vars_known);
+      Array<Var> vars_undefined = UndefinedVars(computation_wrapped_in_stmt, array_vars_known);
 
       // Check if we can introduce it : if it contains no undefined variables and if we want
       // to introduce it according to the predicate
@@ -556,7 +555,7 @@ Stmt CommonSubexpressionEliminator::VisitStmt_(const LetStmtNode* op) {
   // If the `value` and the `body` of the let-in have been rewritten to the same thing
   if (value_new.same_as(op->value) && body_new.same_as(op->body)) {
     // Return a reference to the same node
-    return ffi::GetRef<Stmt>(op);
+    return GetRef<Stmt>(op);
   } else {
     // Otherwise return a let-in built with the new `value_new` and the new `body_new` that
     // have just been obtained
@@ -597,7 +596,7 @@ Stmt CommonSubexpressionEliminator::VisitStmt_(const ForNode* op) {
   // If the `min`, `extent` and `body` of the for loop have been rewritten to the same thing
   if (min_new.same_as(op->min) && extent_new.same_as(op->extent) && body_new.same_as(op->body)) {
     // Return a reference to the same node
-    return ffi::GetRef<Stmt>(op);
+    return GetRef<Stmt>(op);
   } else {
     // Otherwise return a for node built with the new `min_new`, `extent_new` and `body_new`
     // that have just been obtained
@@ -638,10 +637,7 @@ Pass CommonSubexprElimTIR(bool enable_cse_tir, bool identify_equiv_terms) {
 }
 
 // The pass can now be invoked via the pass infrastructure, but we also add a Python binding for it
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("tir.transform.CommonSubexprElimTIR", CommonSubexprElimTIR);
-}
+TVM_FFI_REGISTER_GLOBAL("tir.transform.CommonSubexprElimTIR").set_body_typed(CommonSubexprElimTIR);
 
 }  // namespace transform
 }  // namespace tir

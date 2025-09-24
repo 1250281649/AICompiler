@@ -22,7 +22,6 @@
  * \brief Split device function from host.
  */
 #include <tvm/ffi/function.h>
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/ir/transform.h>
 #include <tvm/target/target.h>
 #include <tvm/tir/builtin.h>
@@ -40,12 +39,12 @@ class DeviceRegionAnnotater : public StmtMutator {
   Stmt VisitStmt_(const AttrStmtNode* op) final {
     if (op->attr_key == tvm::attr::kTarget) {
       // If a target attribute already exists, use it as-is.
-      return ffi::GetRef<Stmt>(op);
+      return GetRef<Stmt>(op);
     } else if (op->attr_key == attr::thread_extent || op->attr_key == attr::pipeline_exec_scope ||
                op->attr_key == attr::device_scope) {
       // These attributes are only allowed in device-side code, so
       // they should be annotated with the function's default target.
-      Stmt body = ffi::GetRef<Stmt>(op);
+      Stmt body = GetRef<Stmt>(op);
       return AttrStmt(device_target_, tvm::attr::kTarget, 0, body);
     } else {
       // All other annotations are ignored
@@ -75,10 +74,8 @@ Pass AnnotateDeviceRegions() {
   return CreatePrimFuncPass(pass_func, 0, "tir.AnnotateDeviceRegions", {});
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("tir.transform.AnnotateDeviceRegions", AnnotateDeviceRegions);
-}
+TVM_FFI_REGISTER_GLOBAL("tir.transform.AnnotateDeviceRegions")
+    .set_body_typed(AnnotateDeviceRegions);
 
 }  // namespace transform
 }  // namespace tir

@@ -92,10 +92,10 @@ class PythonPrinter : public MSCBasePrinter {
 
  private:
   /*! \brief Print block with indent*/
-  void PrintIndentedBlock(const ffi::Array<StmtDoc>& docs);
+  void PrintIndentedBlock(const Array<StmtDoc>& docs);
 
   /*! \brief Print decorators for function and class*/
-  void PrintDecorators(const ffi::Array<ExprDoc>& decorators);
+  void PrintDecorators(const Array<ExprDoc>& decorators);
 };
 
 }  // namespace msc

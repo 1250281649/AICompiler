@@ -24,7 +24,6 @@
  */
 #include <tvm/arith/analyzer.h>
 #include <tvm/arith/iter_affine_map.h>
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/relax/analysis.h>
 #include <tvm/tir/analysis.h>
 #include <tvm/tir/index_map.h>
@@ -40,8 +39,8 @@ using namespace tir;
 /********** Helper Functions **********/
 
 /*! \brief Checks if a transformation is bijective affine over the given ranges */
-static bool IsBijectiveAffine(const IndexMap& m, const ffi::Array<Range>& ranges) {
-  ffi::Map<tir::Var, Range> input_iters;
+static bool IsBijectiveAffine(const IndexMap& m, const Array<Range>& ranges) {
+  Map<tir::Var, Range> input_iters;
   ICHECK_EQ(m->initial_indices.size(), ranges.size());
   for (size_t i = 0; i < ranges.size(); i++) {
     input_iters.Set(m->initial_indices[i], ranges[i]);
@@ -61,7 +60,7 @@ static bool IsBijectiveAffine(const IndexMap& m, const ffi::Array<Range>& ranges
  */
 class IndexAnalyzer : public ExprVisitor {
  public:
-  ffi::Array<tir::Var> Analyze(const arith::IterSumExpr& expr) {
+  Array<tir::Var> Analyze(const arith::IterSumExpr& expr) {
     VisitExpr(expr);
     return iterators_;
   }
@@ -86,14 +85,14 @@ class IndexAnalyzer : public ExprVisitor {
 
   void VisitIterMark(const arith::IterMark& op) {
     if (const auto* var = op->source.as<tir::VarNode>())
-      iterators_.push_back(ffi::GetRef<tir::Var>(var));
+      iterators_.push_back(GetRef<tir::Var>(var));
     else
       VisitExpr(op->source);
     VisitExpr(op->extent);
   }
 
  private:
-  ffi::Array<tir::Var> iterators_;
+  Array<tir::Var> iterators_;
 };
 
 /*!
@@ -111,13 +110,13 @@ class IndexAnalyzer : public ExprVisitor {
  * SpatialLayout(A[s0, constant, r0, s1]) = {s0, null, null, s1}
  * SpatialLayout(A[s0 * c + s1]) = undefined
  */
-using SpatialLayout = ffi::Array<ffi::Optional<tir::Var>>;
+using SpatialLayout = Array<Optional<tir::Var>>;
 static SpatialLayout GetSpatialLayout(const arith::IterMapResult& iter_map_result) {
   ICHECK(!iter_map_result->indices.empty());
   SpatialLayout result;
   for (const arith::IterSumExpr& index : iter_map_result->indices) {
     IndexAnalyzer index_analyzer;
-    ffi::Array<tir::Var> iter_vars = index_analyzer.Analyze(index);
+    Array<tir::Var> iter_vars = index_analyzer.Analyze(index);
     if (iter_vars.size() >= 2) {
       LOG(WARNING) << "[LayoutInference] Unable to get spatial layout of access: "
                    << arith::NormalizeIterMapToExpr(index);
@@ -173,7 +172,7 @@ static bool AreIdenticalTransforms(const IndexMap& t0, const IndexMap& t1) {
   if (t0->final_indices.size() != t1->final_indices.size()) return false;
 
   // Create a new shape expression.
-  ffi::Array<PrimExpr> t1_initial_indices =
+  Array<PrimExpr> t1_initial_indices =
       t1->initial_indices.Map([](tir::Var i) -> PrimExpr { return i; });
   arith::Analyzer analyzer;
   auto t0_output = t0->MapIndices(t1_initial_indices, &analyzer);
@@ -213,9 +212,9 @@ static bool AreIdenticalTransforms(const IndexMap& t0, const IndexMap& t1) {
  * target transformation = lambda dim, C, H, W -> (dim, H, W, C // 4, C %4)
  */
 using VarSet = std::unordered_set<tir::Var>;
-static ffi::Optional<IndexMap> InferLayoutTransformation(const SpatialLayout& src_spatial_layout,
-                                                         const IndexMap& src_transformation,
-                                                         const SpatialLayout& tgt_spatial_layout) {
+static Optional<IndexMap> InferLayoutTransformation(const SpatialLayout& src_spatial_layout,
+                                                    const IndexMap& src_transformation,
+                                                    const SpatialLayout& tgt_spatial_layout) {
   // Copy over the src transformation intial and final indices
   auto initial_indices = support::AsList(src_transformation->initial_indices);
   auto final_indices = support::AsList(src_transformation->final_indices);
@@ -244,7 +243,7 @@ static ffi::Optional<IndexMap> InferLayoutTransformation(const SpatialLayout& sr
   auto final_indices_it = final_indices.begin();
   while (final_indices_it != final_indices.end()) {
     // Collect all the vars used in this final index.
-    ffi::Array<tir::Var> used_vars = tir::UndefinedVars(*final_indices_it);
+    Array<tir::Var> used_vars = tir::UndefinedVars(*final_indices_it);
     ICHECK(!used_vars.empty())
         << "IndexMap expression must always contain tir::Var nodes but found none in: "
         << *final_indices_it;
@@ -318,7 +317,7 @@ static ffi::Optional<IndexMap> InferLayoutTransformation(const SpatialLayout& sr
  */
 class BlockAnalyzer : public StmtExprVisitor {
  public:
-  explicit BlockAnalyzer(const Block& block, const ffi::Map<Buffer, IndexMap>& transformation_cache,
+  explicit BlockAnalyzer(const Block& block, const Map<Buffer, IndexMap>& transformation_cache,
                          IndexMap write_transformation)
       : can_transform_block_(true),
         write_transformation_(write_transformation),
@@ -380,7 +379,7 @@ class BlockAnalyzer : public StmtExprVisitor {
     }
     block_transformation_ = maybe_block_transformation.value();
 
-    ffi::Array<Range> block_ranges = block_->iter_vars.Map([](const IterVar& i) { return i->dom; });
+    Array<Range> block_ranges = block_->iter_vars.Map([](const IterVar& i) { return i->dom; });
     if (!IsBijectiveAffine(block_transformation_, block_ranges)) {
       can_transform_block_ = false;
       LOG(WARNING) << "[LayoutInference] Inferred block transformation is not bijective affine, "
@@ -437,7 +436,7 @@ class BlockAnalyzer : public StmtExprVisitor {
   };
 
   // Helper to break down the indices of buffer access.
-  SpatialLayout DetectBufferAccessIterMap(ffi::Array<PrimExpr> indices) {
+  SpatialLayout DetectBufferAccessIterMap(Array<PrimExpr> indices) {
     auto result = arith::DetectIterMap(
         /*indices=*/indices, /*input_iters*/ spatial_dom_,
         /*predicate*/ 1, /*check_level*/ arith::IterMapLevel::NoCheck, &arith_analyzer_);
@@ -516,19 +515,19 @@ class BlockAnalyzer : public StmtExprVisitor {
  public:
   bool CanBeTransformed() { return can_transform_block_; }
   IndexMap GetBlockTransformation() { return block_transformation_; }
-  ffi::Map<Buffer, IndexMap> GetReadBufferTransformations() { return read_buffer_transformations_; }
+  Map<Buffer, IndexMap> GetReadBufferTransformations() { return read_buffer_transformations_; }
 
  private:
   bool can_transform_block_;
   IndexMap write_transformation_;
-  ffi::Map<tir::Var, Range> spatial_dom_;
+  Map<tir::Var, Range> spatial_dom_;
   arith::Analyzer arith_analyzer_;
 
   Block block_;
   IndexMap block_transformation_;
 
-  ffi::Map<Buffer, IndexMap> read_buffer_transformations_;
-  const ffi::Map<Buffer, IndexMap>& buffer_transformation_cache_;
+  Map<Buffer, IndexMap> read_buffer_transformations_;
+  const Map<Buffer, IndexMap>& buffer_transformation_cache_;
   std::unordered_map<Buffer, BufferAccessInfo, ObjectPtrHash, ObjectPtrEqual> buffer_access_info_;
 };
 
@@ -542,14 +541,14 @@ class BlockAnalyzer : public StmtExprVisitor {
  */
 class PrimFuncAnalyzer : public StmtExprVisitor {
  public:
-  explicit PrimFuncAnalyzer(const PrimFunc& func, ffi::Array<IndexMap> write_transformations) {
+  explicit PrimFuncAnalyzer(const PrimFunc& func, Array<IndexMap> write_transformations) {
     ICHECK_LE(write_transformations.size(), func->params.size())
         << "Incompatible PrimFunc and write_transformations";
 
     size_t first_write_index = func->params.size() - write_transformations.size();
     for (size_t i = 0; i < write_transformations.size(); ++i) {
       auto param = func->params[first_write_index + i];
-      ffi::Optional<Buffer> param_buf = func->buffer_map.Get(param);
+      Optional<Buffer> param_buf = func->buffer_map.Get(param);
       ICHECK(param_buf.defined());
       ICHECK_EQ(param_buf.value()->shape.size(), write_transformations[i]->initial_indices.size())
           << "Mismatch between output buffer shape and index map";
@@ -557,10 +556,10 @@ class PrimFuncAnalyzer : public StmtExprVisitor {
     }
     VisitStmt(func->body);
   }
-  ffi::Map<Block, ffi::Map<ObjectRef, IndexMap>> GetSuggestedTransforms() {
-    ffi::Map<Block, ffi::Map<ObjectRef, IndexMap>> result;
+  Map<Block, Map<ObjectRef, IndexMap>> GetSuggestedTransforms() {
+    Map<Block, Map<ObjectRef, IndexMap>> result;
     for (const auto& [block, index_map] : block_transformations_) {
-      ffi::Map<ObjectRef, IndexMap> block_transformations;
+      Map<ObjectRef, IndexMap> block_transformations;
       block_transformations.Set(block, index_map);
       for (const auto& buffer : block_to_buffer_[block]) {
         block_transformations.Set(buffer, buffer_transformation_cache_[buffer]);
@@ -578,7 +577,7 @@ class PrimFuncAnalyzer : public StmtExprVisitor {
       return;
     }
 
-    Block block = ffi::GetRef<Block>(op);
+    Block block = GetRef<Block>(op);
     // Get block write buffer transformation.
     if (block->writes.size() != 1) return;
     auto write_buffer = block->writes[0]->buffer;
@@ -601,13 +600,13 @@ class PrimFuncAnalyzer : public StmtExprVisitor {
   }
 
  private:
-  ffi::Map<Buffer, IndexMap> buffer_transformation_cache_;
-  ffi::Map<Block, IndexMap> block_transformations_;
-  std::unordered_map<Block, ffi::Array<Buffer>, ObjectPtrHash, ObjectPtrEqual> block_to_buffer_;
+  Map<Buffer, IndexMap> buffer_transformation_cache_;
+  Map<Block, IndexMap> block_transformations_;
+  std::unordered_map<Block, Array<Buffer>, ObjectPtrHash, ObjectPtrEqual> block_to_buffer_;
 };
 
-ffi::Map<tir::Block, ffi::Map<ObjectRef, tir::IndexMap>> SuggestLayoutTransforms(
-    const PrimFunc& prim_func, ffi::Array<IndexMap> write_buffer_transformations) {
+Map<tir::Block, Map<ObjectRef, tir::IndexMap>> SuggestLayoutTransforms(
+    const PrimFunc& prim_func, Array<IndexMap> write_buffer_transformations) {
   // No changes to the PrimFunc are required if no transformations on output buffers.
   if (write_buffer_transformations.empty()) return {};
 
@@ -615,13 +614,10 @@ ffi::Map<tir::Block, ffi::Map<ObjectRef, tir::IndexMap>> SuggestLayoutTransforms
   return analyzer.GetSuggestedTransforms();
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("relax.analysis.suggest_layout_transforms",
-                        [](PrimFunc fn, ffi::Array<tir::IndexMap> write_buffer_transformations) {
-                          return SuggestLayoutTransforms(fn, write_buffer_transformations);
-                        });
-}
+TVM_FFI_REGISTER_GLOBAL(("relax.analysis.suggest_layout_transforms"))
+    .set_body_typed([](PrimFunc fn, Array<tir::IndexMap> write_buffer_transformations) {
+      return SuggestLayoutTransforms(fn, write_buffer_transformations);
+    });
 
 }  // namespace relax
 }  // namespace tvm

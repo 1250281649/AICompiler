@@ -24,7 +24,6 @@
 
 #include <tvm/arith/analyzer.h>
 #include <tvm/ffi/function.h>
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/te/operation.h>
 #include <tvm/tir/analysis.h>
 #include <tvm/tir/builtin.h>
@@ -39,11 +38,11 @@ namespace tvm {
 namespace te {
 using namespace tir;
 
-TVM_FFI_STATIC_INIT_BLOCK() {
+TVM_FFI_STATIC_INIT_BLOCK({
   OperationNode::RegisterReflection();
   BaseComputeOpNode::RegisterReflection();
   ComputeOpNode::RegisterReflection();
-}
+});
 
 TVM_STATIC_IR_FUNCTOR(ReprPrinter, vtable)
     .set_dispatch<ComputeOpNode>([](const ObjectRef& node, ReprPrinter* p) {
@@ -52,6 +51,8 @@ TVM_STATIC_IR_FUNCTOR(ReprPrinter, vtable)
                 << ", reduce_axis=" << op->reduce_axis << ", tag=" << op->tag
                 << ", attrs=" << op->attrs << ")";
     });
+
+TVM_REGISTER_NODE_TYPE(ComputeOpNode);
 
 /// Verify if ComputeOp is valid with respect to Reduce operations.
 static void VerifyComputeOp(const ComputeOpNode* op);
@@ -84,10 +85,10 @@ DataType ComputeOpNode::output_dtype(size_t idx) const {
   return body[idx].dtype();
 }
 
-ffi::Array<PrimExpr> BaseComputeOpNode::output_shape(size_t idx) const {
+Array<PrimExpr> BaseComputeOpNode::output_shape(size_t idx) const {
   ICHECK_LT(idx, num_outputs());
   // for now, all outputs of a BaseComputeOp have the same shape
-  ffi::Array<PrimExpr> shape;
+  Array<PrimExpr> shape;
   for (const auto& ivar : this->axis) {
     const Range& r = ivar->dom;
     shape.push_back(r->extent);
@@ -95,8 +96,8 @@ ffi::Array<PrimExpr> BaseComputeOpNode::output_shape(size_t idx) const {
   return shape;
 }
 
-Tensor compute(ffi::Array<PrimExpr> shape, FCompute fcompute, std::string name, std::string tag,
-               ffi::Map<ffi::String, ffi::Any> attrs) {
+Tensor compute(Array<PrimExpr> shape, FCompute fcompute, std::string name, std::string tag,
+               Map<String, ffi::Any> attrs) {
   // compute dimension.
   size_t ndim = shape.size();
   std::vector<IterVar> axis;
@@ -112,8 +113,8 @@ Tensor compute(ffi::Array<PrimExpr> shape, FCompute fcompute, std::string name, 
   return ComputeOp(name, tag, attrs, axis, {fcompute(args)}).output(0);
 }
 
-ffi::Array<Tensor> compute(ffi::Array<PrimExpr> shape, FBatchCompute fcompute, std::string name,
-                           std::string tag, ffi::Map<ffi::String, ffi::Any> attrs) {
+Array<Tensor> compute(Array<PrimExpr> shape, FBatchCompute fcompute, std::string name,
+                      std::string tag, Map<String, ffi::Any> attrs) {
   // compute dimension.
   size_t ndim = shape.size();
   std::vector<IterVar> axis;
@@ -127,19 +128,19 @@ ffi::Array<Tensor> compute(ffi::Array<PrimExpr> shape, FBatchCompute fcompute, s
   }
 
   Operation op = ComputeOp(name, tag, attrs, axis, fcompute(args));
-  ffi::Array<Tensor> outputs;
+  Array<Tensor> outputs;
   for (int idx = 0; idx < op->num_outputs(); ++idx) {
     outputs.push_back(op.output(idx));
   }
   return outputs;
 }
 
-ComputeOp::ComputeOp(std::string name, std::string tag, ffi::Map<ffi::String, ffi::Any> attrs,
-                     ffi::Array<IterVar> axis, ffi::Array<PrimExpr> body) {
+ComputeOp::ComputeOp(std::string name, std::string tag, Map<String, ffi::Any> attrs,
+                     Array<IterVar> axis, Array<PrimExpr> body) {
   if (!attrs.defined()) {
-    attrs = ffi::Map<ffi::String, ffi::Any>();
+    attrs = Map<String, ffi::Any>();
   }
-  auto n = ffi::make_object<ComputeOpNode>();
+  auto n = make_object<ComputeOpNode>();
   n->name = std::move(name);
   n->tag = std::move(tag);
   n->attrs = std::move(attrs);
@@ -153,18 +154,15 @@ ComputeOp::ComputeOp(std::string name, std::string tag, ffi::Map<ffi::String, ff
   data_ = std::move(n);
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("te.ComputeOp", [](std::string name, std::string tag,
-                                           ffi::Optional<ffi::Map<ffi::String, ffi::Any>> attrs,
-                                           ffi::Array<IterVar> axis, ffi::Array<PrimExpr> body) {
-    return ComputeOp(name, tag, attrs.value_or({}), axis, body);
-  });
-}
+TVM_FFI_REGISTER_GLOBAL("te.ComputeOp")
+    .set_body_typed([](std::string name, std::string tag, Optional<Map<String, ffi::Any>> attrs,
+                       Array<IterVar> axis, Array<PrimExpr> body) {
+      return ComputeOp(name, tag, attrs.value_or({}), axis, body);
+    });
 
 // The schedule related logics
-ffi::Array<Tensor> ComputeOpNode::InputTensors() const {
-  ffi::Array<Tensor> ret;
+Array<Tensor> ComputeOpNode::InputTensors() const {
+  Array<Tensor> ret;
   std::unordered_set<Tensor> visited;
   for (auto& e : body) {
     tir::PostOrderVisit(e, [&ret, &visited](const ObjectRef& n) {

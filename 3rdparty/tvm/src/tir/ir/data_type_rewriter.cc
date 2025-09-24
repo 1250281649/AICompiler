@@ -47,7 +47,7 @@ Stmt DataTypeLegalizer::VisitStmt_(const ForNode* op) {
 
 Stmt DataTypeLegalizer::VisitStmt_(const BlockRealizeNode* op) {
   BlockRealize realize = Downcast<BlockRealize>(StmtExprMutator::VisitStmt_(op));
-  ffi::Array<PrimExpr> new_iter_values;
+  Array<PrimExpr> new_iter_values;
   bool changed = false;
   for (int i = 0; i < static_cast<int>(op->iter_values.size()); ++i) {
     auto dtype = realize->block->iter_vars[i]->var->dtype;
@@ -66,18 +66,17 @@ Stmt DataTypeLegalizer::VisitStmt_(const BlockRealizeNode* op) {
 
 Stmt DataTypeLegalizer::VisitStmt_(const BlockNode* op) {
   Block new_block = Downcast<Block>(StmtExprMutator::VisitStmt_(op));
-  ffi::Array<IterVar> new_iter_vars =
-      MutateArray(new_block->iter_vars, [/*this*/](const IterVar& iter) {
-        auto dtype = iter->var.dtype();
-        if (iter->dom->min->dtype != dtype || iter->dom->extent->dtype != dtype) {
-          IterVar new_iter = iter;
-          new_iter.CopyOnWrite()->dom =
-              Range(cast(dtype, iter->dom->min), cast(dtype, iter->dom->extent));
-          return new_iter;
-        } else {
-          return iter;
-        }
-      });
+  Array<IterVar> new_iter_vars = MutateArray(new_block->iter_vars, [/*this*/](const IterVar& iter) {
+    auto dtype = iter->var.dtype();
+    if (iter->dom->min->dtype != dtype || iter->dom->extent->dtype != dtype) {
+      IterVar new_iter = iter;
+      new_iter.CopyOnWrite()->dom =
+          Range(cast(dtype, iter->dom->min), cast(dtype, iter->dom->extent));
+      return new_iter;
+    } else {
+      return iter;
+    }
+  });
   if (!op->iter_vars.same_as(new_iter_vars)) {
     new_block.CopyOnWrite()->iter_vars = std::move(new_iter_vars);
   }
@@ -92,7 +91,7 @@ Stmt DataTypeLegalizer::VisitStmt_(const AttrStmtNode* op) {
                           << ", but get " << s->GetTypeKey();
     const IterVarNode* iv = op->node.as<IterVarNode>();
     ICHECK(iv != nullptr) << "Expected type to be IterVarNode"
-                          << ", but get " << op->node.GetTypeKey();
+                          << ", but get " << op->node->GetTypeKey();
     PrimExpr e = VisitExpr(iv->var);
     Var var = Downcast<Var>(e);
     if (ivmap_.find(iv) == ivmap_.end()) {
@@ -124,7 +123,7 @@ PrimExpr DataTypeLegalizer::VisitExpr_(const LetNode* op) {
   PrimExpr new_body = this->VisitExpr(op->body);
 
   if (value.same_as(op->value) && new_body.same_as(op->body)) {
-    return ffi::GetRef<PrimExpr>(op);
+    return GetRef<PrimExpr>(op);
   } else {
     return Let(var, value, new_body, op->span);
   }
@@ -142,7 +141,7 @@ Stmt DataTypeLegalizer::VisitStmt_(const LetStmtNode* op) {
   Stmt new_body = this->VisitStmt(op->body);
 
   if (value.same_as(op->value) && new_body.same_as(op->body)) {
-    return ffi::GetRef<Stmt>(op);
+    return GetRef<Stmt>(op);
   } else {
     return LetStmt(var, value, new_body, op->span);
   }
@@ -152,7 +151,7 @@ PrimExpr DataTypeLegalizer::VisitExpr_(const VarNode* op) {
   if (auto it = var_remap_.find(op); it != var_remap_.end()) {
     return it->second;
   }
-  return ffi::GetRef<Var>(op);
+  return GetRef<Var>(op);
 }
 
 PrimExpr DataTypeLegalizer::VisitExpr_(const SelectNode* op) {
@@ -161,7 +160,7 @@ PrimExpr DataTypeLegalizer::VisitExpr_(const SelectNode* op) {
   PrimExpr false_value = this->VisitExpr(op->false_value);
   if (condition.same_as(op->condition) && true_value.same_as(op->true_value) &&
       false_value.same_as(op->false_value) && true_value.dtype() == false_value.dtype()) {
-    return ffi::GetRef<PrimExpr>(op);
+    return GetRef<PrimExpr>(op);
   } else {
     int bits = std::max(true_value.dtype().bits(), false_value.dtype().bits());
     DataType dtype = true_value.dtype().with_bits(bits);
@@ -175,7 +174,7 @@ PrimExpr DataTypeLegalizer::VisitExpr_(const RampNode* op) {
   PrimExpr base = VisitExpr(op->base);
   PrimExpr stride = VisitExpr(op->stride);
   if (base.same_as(op->base) && stride.same_as(op->stride) && base.dtype() == stride.dtype()) {
-    return ffi::GetRef<PrimExpr>(op);
+    return GetRef<PrimExpr>(op);
   } else {
     ICHECK(base.dtype().is_int() && stride.dtype().is_int());
     int bits = std::max(base.dtype().bits(), stride.dtype().bits());
@@ -195,7 +194,7 @@ PrimExpr DataTypeLegalizer::VisitExpr_(const CastNode* op) {
     PrimExpr a = this->VisitExpr(op->a);                                  \
     PrimExpr b = this->VisitExpr(op->b);                                  \
     if (op->a.same_as(a) && op->b.same_as(b) && a.dtype() == b.dtype()) { \
-      return ffi::GetRef<PrimExpr>(op);                                   \
+      return GetRef<PrimExpr>(op);                                        \
     } else {                                                              \
       return FUNC(a, b);                                                  \
     }                                                                     \
@@ -220,7 +219,7 @@ TVM_DEFINE_BIOP_EXPR_MUTATE_WITH_TYPE_MATCH(GENode, operator>=);
 #undef TVM_DEFINE_BIOP_EXPR_MUTATE_WITH_TYPE_MATCH
 
 PrimExpr DataTypeLegalizer::VisitExpr_(const CallNode* op) {
-  Call before = ffi::GetRef<Call>(op);
+  Call before = GetRef<Call>(op);
   PrimExpr e = StmtExprMutator::VisitExpr_(op);
   op = e.as<CallNode>();
   static const Op& builtin_pow_ = Op::Get("tir.pow");
@@ -265,7 +264,7 @@ Stmt IndexDataTypeRewriter::VisitStmt_(const AllocateNode* op) {
   auto new_body = this->VisitStmt(op->body);
   if (!new_extents.same_as(op->extents) || !new_cond.same_as(op->condition) ||
       !new_body.same_as(op->body)) {
-    Allocate new_allocate = ffi::GetRef<Allocate>(op);
+    Allocate new_allocate = GetRef<Allocate>(op);
     auto* n = new_allocate.CopyOnWrite();
     n->extents = std::move(new_extents);
     n->condition = std::move(new_cond);
@@ -273,7 +272,7 @@ Stmt IndexDataTypeRewriter::VisitStmt_(const AllocateNode* op) {
     return new_allocate;
 
   } else {
-    return ffi::GetRef<Stmt>(op);
+    return GetRef<Stmt>(op);
   }
 }
 
@@ -311,7 +310,7 @@ Stmt IndexDataTypeRewriter::VisitStmt_(const BlockRealizeNode* op) {
   Block new_body = Downcast<Block>(this->VisitStmt(op->block));
   if (!new_predicate.same_as(op->predicate) || !new_iter_values.same_as(op->iter_values) ||
       !new_body.same_as(op->block)) {
-    BlockRealize new_block_realize = ffi::GetRef<BlockRealize>(op);
+    BlockRealize new_block_realize = GetRef<BlockRealize>(op);
     auto* n = new_block_realize.CopyOnWrite();
     n->predicate = std::move(new_predicate);
     n->iter_values = std::move(new_iter_values);
@@ -319,14 +318,14 @@ Stmt IndexDataTypeRewriter::VisitStmt_(const BlockRealizeNode* op) {
     return new_block_realize;
 
   } else {
-    return ffi::GetRef<Stmt>(op);
+    return GetRef<Stmt>(op);
   }
 }
 
 Stmt IndexDataTypeRewriter::VisitStmt_(const BlockNode* op) {
-  ffi::Array<Buffer> new_alloc_buffers =
+  Array<Buffer> new_alloc_buffers =
       op->alloc_buffers.Map([this](const Buffer& buffer) { return this->VisitBuffer(buffer); });
-  ffi::Array<MatchBufferRegion> new_match_buffers =
+  Array<MatchBufferRegion> new_match_buffers =
       op->match_buffers.Map([this](const MatchBufferRegion& match_buffer_region) {
         Buffer new_buffer = this->VisitBuffer(match_buffer_region->buffer);
         BufferRegion new_buffer_region = this->VisitBufferRegion(match_buffer_region->source);
@@ -337,17 +336,17 @@ Stmt IndexDataTypeRewriter::VisitStmt_(const BlockNode* op) {
           return match_buffer_region;
         }
       });
-  ffi::Array<BufferRegion> new_reads = op->reads.Map(
+  Array<BufferRegion> new_reads = op->reads.Map(
       [this](const BufferRegion& buffer_region) { return this->VisitBufferRegion(buffer_region); });
-  ffi::Array<BufferRegion> new_writes = op->writes.Map(
+  Array<BufferRegion> new_writes = op->writes.Map(
       [this](const BufferRegion& buffer_region) { return this->VisitBufferRegion(buffer_region); });
-  ffi::Array<IterVar> new_iter_vars =
+  Array<IterVar> new_iter_vars =
       op->iter_vars.Map([this](const IterVar& iter_var) { return this->VisitIterVar(iter_var); });
-  ffi::Optional<Stmt> new_init = std::nullopt;
+  Optional<Stmt> new_init = std::nullopt;
   if (op->init.defined()) {
     new_init = this->VisitStmt(op->init.value());
   }
-  ffi::Map<ffi::String, ffi::Any> new_annotations = VisitBlockAnnotations(op->annotations);
+  Map<String, ffi::Any> new_annotations = VisitBlockAnnotations(op->annotations);
   Stmt new_body = this->VisitStmt(op->body);
 
   if (!new_init.same_as(op->init) || !new_body.same_as(op->body) ||
@@ -355,7 +354,7 @@ Stmt IndexDataTypeRewriter::VisitStmt_(const BlockNode* op) {
       !new_match_buffers.same_as(op->match_buffers) || !new_reads.same_as(op->reads) ||
       !new_writes.same_as(op->writes) || new_iter_vars.same_as(op->iter_vars) ||
       !new_annotations.same_as(op->annotations)) {
-    Block new_block = ffi::GetRef<Block>(op);
+    Block new_block = GetRef<Block>(op);
     BlockNode* n = new_block.CopyOnWrite();
     n->alloc_buffers = std::move(new_alloc_buffers);
     n->match_buffers = std::move(new_match_buffers);
@@ -367,24 +366,25 @@ Stmt IndexDataTypeRewriter::VisitStmt_(const BlockNode* op) {
     n->body = std::move(new_body);
     return new_block;
   }
-  return ffi::GetRef<Stmt>(op);
+  return GetRef<Stmt>(op);
 }
 
-ffi::Map<ffi::String, ffi::Any> IndexDataTypeRewriter::VisitBlockAnnotations(
-    const ffi::Map<ffi::String, ffi::Any>& annotations) {
+Map<String, ffi::Any> IndexDataTypeRewriter::VisitBlockAnnotations(
+    const Map<String, ffi::Any>& annotations) {
   auto new_annotations = annotations;
 
-  std::function<Any(const Any&)> f_mutate_obj = [this, &f_mutate_obj](const Any& obj) -> Any {
-    if (obj == nullptr) {
+  std::function<ObjectRef(const ObjectRef&)> f_mutate_obj =
+      [this, &f_mutate_obj](const ObjectRef& obj) -> ObjectRef {
+    if (!obj.defined()) {
       return obj;
     }
-    if (obj.as<BufferNode>()) {
+    if (obj->IsInstance<BufferNode>()) {
       Buffer buffer = Downcast<Buffer>(obj);
       if (Buffer new_buffer = GetRemappedBuffer(buffer); !new_buffer.same_as(buffer)) {
         return new_buffer;
       }
-    } else if (obj.as<ffi::ArrayObj>()) {
-      return Downcast<ffi::Array<Any>>(obj).Map(f_mutate_obj);
+    } else if (obj->IsInstance<ffi::ArrayObj>()) {
+      return Downcast<Array<ObjectRef>>(obj).Map(f_mutate_obj);
     }
     return obj;
   };
@@ -428,9 +428,9 @@ Buffer IndexDataTypeRewriter::VisitBuffer(const Buffer& buffer) {
   bool is_enabled = is_enabled_;
 
   is_enabled_ = true;
-  ffi::Array<PrimExpr> new_shape =
+  Array<PrimExpr> new_shape =
       buffer->shape.Map([&](const PrimExpr& e) { return this->VisitExpr(e); });
-  ffi::Array<PrimExpr> new_strides =
+  Array<PrimExpr> new_strides =
       buffer->strides.Map([&](const PrimExpr& e) { return this->VisitExpr(e); });
   auto new_elem_offset = VisitExpr(buffer->elem_offset);
   is_enabled_ = is_enabled;
@@ -468,7 +468,7 @@ BufferRegion IndexDataTypeRewriter::VisitBufferRegion(const BufferRegion& buffer
 }
 
 Stmt IndexDataTypeRewriter::VisitStmt_(const BufferStoreNode* op) {
-  BufferStore store = ffi::GetRef<BufferStore>(op);
+  BufferStore store = GetRef<BufferStore>(op);
 
   Buffer new_buffer = GetRemappedBuffer(op->buffer);
   auto value = this->VisitExpr(op->value);
@@ -489,7 +489,7 @@ Stmt IndexDataTypeRewriter::VisitStmt_(const BufferStoreNode* op) {
 }
 
 PrimExpr IndexDataTypeRewriter::VisitExpr_(const BufferLoadNode* op) {
-  BufferLoad load = ffi::GetRef<BufferLoad>(op);
+  BufferLoad load = GetRef<BufferLoad>(op);
 
   Buffer new_buffer = GetRemappedBuffer(op->buffer);
   auto indices = VisitIndices(op->indices);
@@ -503,7 +503,7 @@ PrimExpr IndexDataTypeRewriter::VisitExpr_(const BufferLoadNode* op) {
   return load;
 }
 
-ffi::Array<PrimExpr> IndexDataTypeRewriter::VisitIndices(ffi::Array<PrimExpr> indices) {
+Array<PrimExpr> IndexDataTypeRewriter::VisitIndices(Array<PrimExpr> indices) {
   bool is_enabled = is_enabled_;
   is_enabled_ = true;
 
@@ -522,19 +522,18 @@ Stmt IndexDataTypeRewriter::VisitStmt_(const IfThenElseNode* op) {
   is_condition_ = is_condition;
 
   Stmt then_case = VisitStmt(op->then_case);
-  ffi::Optional<Stmt> else_case = op->else_case.defined()
-                                      ? ffi::Optional<Stmt>{VisitStmt(op->else_case.value())}
-                                      : std::nullopt;
+  Optional<Stmt> else_case =
+      op->else_case.defined() ? Optional<Stmt>{VisitStmt(op->else_case.value())} : std::nullopt;
   if (!cond.same_as(op->condition) || !then_case.same_as(op->then_case) ||
       !else_case.same_as(op->else_case)) {
-    IfThenElse new_stmt = ffi::GetRef<IfThenElse>(op);
+    IfThenElse new_stmt = GetRef<IfThenElse>(op);
     auto* n = new_stmt.CopyOnWrite();
     n->condition = std::move(cond);
     n->then_case = std::move(then_case);
     n->else_case = std::move(else_case);
     return new_stmt;
   }
-  return ffi::GetRef<Stmt>(op);
+  return GetRef<Stmt>(op);
 }
 
 Stmt IndexDataTypeRewriter::VisitStmt_(const ForNode* op) {
@@ -549,7 +548,7 @@ Stmt IndexDataTypeRewriter::VisitStmt_(const ForNode* op) {
 
   if (!new_loop_var.same_as(op->loop_var) || !min.same_as(op->min) || !extent.same_as(op->extent) ||
       !new_body.same_as(op->body)) {
-    For new_for = ffi::GetRef<For>(op);
+    For new_for = GetRef<For>(op);
     auto* n = new_for.CopyOnWrite();
     n->loop_var = new_loop_var;
     n->min = cast(new_loop_var.dtype(), min);
@@ -558,13 +557,13 @@ Stmt IndexDataTypeRewriter::VisitStmt_(const ForNode* op) {
       auto old_thread_binding = op->thread_binding.value();
       auto* ptr = old_thread_binding.CopyOnWrite();
       ptr->var = old_thread_binding->var.copy_with_dtype(new_loop_var.dtype());
-      n->thread_binding = ffi::Optional<IterVar>(std::move(old_thread_binding));
+      n->thread_binding = std::move(Optional<IterVar>(std::move(old_thread_binding)));
     }
     n->body = new_body;
     return new_for;
 
   } else {
-    return ffi::GetRef<Stmt>(op);
+    return GetRef<Stmt>(op);
   }
 }
 
@@ -621,7 +620,7 @@ PrimExpr IndexDataTypeRewriter::VisitExpr_(const SelectNode* op) {
 
   if (condition.same_as(op->condition) && true_value.same_as(op->true_value) &&
       false_value.same_as(op->false_value) && true_value.dtype() == false_value.dtype()) {
-    return ffi::GetRef<PrimExpr>(op);
+    return GetRef<PrimExpr>(op);
   } else {
     int bits = std::max(true_value.dtype().bits(), false_value.dtype().bits());
     DataType dtype = true_value.dtype().with_bits(bits);
@@ -642,14 +641,14 @@ PrimFunc IndexDataTypeNormalizer::Rewrite(PrimFunc func) {
   buffer_remap_.clear();
   ivmap_.clear();
   // start rewrite
-  ffi::Map<Var, Buffer> new_buffer_map = func->buffer_map;
+  Map<Var, Buffer> new_buffer_map = func->buffer_map;
   for (const auto& [var, buffer] : func->buffer_map) {
     new_buffer_map.Set(var, VisitBuffer(buffer));
   }
   // remap params
   bool is_enabled = true;
   std::swap(is_enabled_, is_enabled);
-  ffi::Array<Var> params = func->params.Map([this](Var param) {
+  Array<Var> params = func->params.Map([this](Var param) {
     if (param.dtype().is_int()) {
       return Downcast<Var>(this->VisitExpr(param));
     } else {
@@ -672,15 +671,15 @@ bool IndexDataTypeNormalizer::CanRewriteDType(DataType dtype) const {
 PrimExpr IndexDataTypeNormalizer::VisitExpr_(const IntImmNode* op) {
   if (is_enabled_ && CanRewriteDType(op->dtype)) {
     ICHECK_LE(op->value, Downcast<Integer>(max_value(target_data_type_))->value);
-    return cast(target_data_type_, ffi::GetRef<IntImm>(op));
+    return cast(target_data_type_, GetRef<IntImm>(op));
   }
-  return ffi::GetRef<IntImm>(op);
+  return GetRef<IntImm>(op);
 }
 
 PrimExpr IndexDataTypeNormalizer::VisitExpr_(const VarNode* op) {
   if (is_enabled_ && CanRewriteDType(op->dtype) && op->dtype != target_data_type_ &&
       !var_remap_.count(op)) {
-    var_remap_[op] = ffi::GetRef<Var>(op).copy_with_dtype(target_data_type_);
+    var_remap_[op] = GetRef<Var>(op).copy_with_dtype(target_data_type_);
   }
   return DataTypeLegalizer::VisitExpr_(op);
 }

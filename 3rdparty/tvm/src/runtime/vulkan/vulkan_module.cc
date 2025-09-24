@@ -21,7 +21,6 @@
 
 #include <dmlc/memory_io.h>
 #include <tvm/ffi/function.h>
-#include <tvm/ffi/reflection/registry.h>
 
 #include "../file_utils.h"
 #include "vulkan_wrapped_func.h"
@@ -30,14 +29,13 @@ namespace tvm {
 namespace runtime {
 namespace vulkan {
 
-ffi::Module VulkanModuleCreate(std::unordered_map<std::string, SPIRVShader> smap,
-                               std::unordered_map<std::string, FunctionInfo> fmap,
-                               std::string source) {
-  auto n = ffi::make_object<VulkanModuleNode>(smap, fmap, source);
-  return ffi::Module(n);
+Module VulkanModuleCreate(std::unordered_map<std::string, SPIRVShader> smap,
+                          std::unordered_map<std::string, FunctionInfo> fmap, std::string source) {
+  auto n = make_object<VulkanModuleNode>(smap, fmap, source);
+  return Module(n);
 }
 
-ffi::Module VulkanModuleLoadFile(const std::string& file_name, const ffi::String& format) {
+Module VulkanModuleLoadFile(const std::string& file_name, const String& format) {
   std::string data;
   std::unordered_map<std::string, SPIRVShader> smap;
   std::unordered_map<std::string, FunctionInfo> fmap;
@@ -54,9 +52,8 @@ ffi::Module VulkanModuleLoadFile(const std::string& file_name, const ffi::String
   return VulkanModuleCreate(smap, fmap, "");
 }
 
-ffi::Module VulkanModuleLoadFromBytes(const ffi::Bytes& bytes) {
-  dmlc::MemoryFixedSizeStream ms(const_cast<char*>(bytes.data()), bytes.size());
-  dmlc::Stream* stream = &ms;
+Module VulkanModuleLoadBinary(void* strm) {
+  dmlc::Stream* stream = static_cast<dmlc::Stream*>(strm);
   std::unordered_map<std::string, SPIRVShader> smap;
   std::unordered_map<std::string, FunctionInfo> fmap;
 
@@ -67,12 +64,9 @@ ffi::Module VulkanModuleLoadFromBytes(const ffi::Bytes& bytes) {
   return VulkanModuleCreate(smap, fmap, "");
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef()
-      .def("ffi.Module.load_from_file.vulkan", VulkanModuleLoadFile)
-      .def("ffi.Module.load_from_bytes.vulkan", VulkanModuleLoadFromBytes);
-}
+TVM_FFI_REGISTER_GLOBAL("runtime.module.loadfile_vulkan").set_body_typed(VulkanModuleLoadFile);
+
+TVM_FFI_REGISTER_GLOBAL("runtime.module.loadbinary_vulkan").set_body_typed(VulkanModuleLoadBinary);
 
 }  // namespace vulkan
 }  // namespace runtime

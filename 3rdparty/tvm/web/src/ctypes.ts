@@ -41,7 +41,7 @@ export const enum SizeOf {
   TVMFFIAny = 8 * 2,
   DLDataType = I32,
   DLDevice = I32 + I32,
-  ObjectHeader = 8 * 3,
+  ObjectHeader = 8 * 2,
 }
 
 //---------------The new TVM FFI---------------
@@ -72,10 +72,6 @@ export const enum TypeIndex {
   kTVMFFIByteArrayPtr = 9,
   /*! \brief R-value reference to ObjectRef */
   kTVMFFIObjectRValueRef = 10,
-  /*! \brief Small string on stack */
-  kTVMFFISmallStr = 11,
-  /*! \brief Small bytes on stack */
-  kTVMFFISmallBytes = 12,
   /*! \brief Start of statically defined objects. */
   kTVMFFIStaticObjectBegin = 64,
   /*!
@@ -97,16 +93,16 @@ export const enum TypeIndex {
   kTVMFFIFunction = 68,
   /*! \brief Array object. */
   kTVMFFIArray = 69,
+  /*! \brief Map object. */
+  kTVMFFIMap = 70,
   /*!
    * \brief Shape object, layout = { TVMFFIObject, { const int64_t*, size_t }, ... }
    */
-  kTVMFFIShape = 70,
+  kTVMFFIShape = 71,
   /*!
-   * \brief Tensor object, layout = { TVMFFIObject, DLTensor, ... }
+   * \brief NDArray object, layout = { TVMFFIObject, DLTensor, ... }
    */
-  kTVMFFITensor = 71,
-  /*! \brief Map object. */
-  kTVMFFIMap = 72,
+  kTVMFFINDArray = 72,
   /*! \brief Runtime module object. */
   kTVMFFIModule = 73,
 }
@@ -142,9 +138,9 @@ export type FTVMFFIWasmFunctionCreate = (
 export type FTVMFFIWasmFunctionDeleter = (self: Pointer) => void;
 
 /**
- * int TVMFFIObjectDecRef(TVMFFIObjectHandle obj);
+ * int TVMFFIObjectFree(TVMFFIObjectHandle obj);
  */
-export type FTVMFFIObjectDecRef = (obj: Pointer) => number;
+export type FTVMFFIObjectFree = (obj: Pointer) => number;
 
 /**
  * int TVMFFITypeKeyToIndex(const TVMFFIByteArray* type_key, int32_t* out_tindex);

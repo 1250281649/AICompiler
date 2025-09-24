@@ -22,7 +22,6 @@
  * \brief Allocate and manage memory for the runtime.
  */
 #include <tvm/ffi/function.h>
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/runtime/memory/memory_manager.h>
 
 #include <memory>
@@ -36,7 +35,7 @@ namespace runtime {
 namespace memory {
 
 Storage::Storage(Buffer buffer, Allocator* allocator) {
-  auto n = ffi::make_object<StorageObj>();
+  auto n = make_object<StorageObj>();
   n->buffer = std::move(buffer);
   n->allocator = allocator;
   data_ = std::move(n);
@@ -60,10 +59,10 @@ inline size_t GetDataAlignment(const DLDataType& dtype) {
   return align;
 }
 
-Tensor StorageObj::AllocTensorScoped(int64_t offset, ffi::Shape shape, DLDataType dtype,
-                                     ffi::String scope) {
+NDArray StorageObj::AllocNDArrayScoped(int64_t offset, ffi::Shape shape, DLDataType dtype,
+                                       String scope) {
   if (scope == "global" || scope.empty()) {
-    return AllocTensor(offset, shape, dtype);
+    return AllocNDArray(offset, shape, dtype);
   }
   VerifyDataType(dtype);
 
@@ -71,7 +70,7 @@ Tensor StorageObj::AllocTensorScoped(int64_t offset, ffi::Shape shape, DLDataTyp
    public:
     explicit StorageScopedAlloc(Storage storage) : storage_(storage) {}
 
-    void AllocData(DLTensor* tensor, const ffi::Shape& shape, const ffi::String& scope,
+    void AllocData(DLTensor* tensor, const ffi::Shape& shape, const String& scope,
                    int64_t byte_offset) {
       tensor->data = storage_->allocator->CreateView(storage_->buffer, shape, tensor->dtype, scope);
       tensor->byte_offset = byte_offset;
@@ -87,11 +86,11 @@ Tensor StorageObj::AllocTensorScoped(int64_t offset, ffi::Shape shape, DLDataTyp
       << "storage allocation failure, attempted to allocate " << needed_size << " at offset "
       << offset << " in region that is " << this->buffer.size << "bytes";
 
-  return Tensor::FromNDAlloc(StorageScopedAlloc(ffi::GetRef<Storage>(this)), shape, dtype,
-                             this->buffer.device, shape, scope, offset);
+  return NDArray::FromNDAlloc(StorageScopedAlloc(GetRef<Storage>(this)), shape, dtype,
+                              this->buffer.device, shape, scope, offset);
 }
 
-Tensor StorageObj::AllocTensor(int64_t offset, ffi::Shape shape, DLDataType dtype) {
+NDArray StorageObj::AllocNDArray(int64_t offset, ffi::Shape shape, DLDataType dtype) {
   VerifyDataType(dtype);
 
   size_t needed_size = ffi::GetDataSize(shape.Product(), dtype);
@@ -120,8 +119,8 @@ Tensor StorageObj::AllocTensor(int64_t offset, ffi::Shape shape, DLDataType dtyp
     Storage storage_;
   };
 
-  return Tensor::FromNDAlloc(StorageAlloc(ffi::GetRef<Storage>(this)), shape, dtype,
-                             this->buffer.device, offset);
+  return NDArray::FromNDAlloc(StorageAlloc(GetRef<Storage>(this)), shape, dtype,
+                              this->buffer.device, offset);
 }
 
 MemoryManager* MemoryManager::Global() {
@@ -213,8 +212,8 @@ void MemoryManager::Clear() {
   }
 }
 
-Tensor Allocator::Empty(ffi::Shape shape, DLDataType dtype, DLDevice dev,
-                        ffi::Optional<ffi::String> mem_scope) {
+NDArray Allocator::Empty(ffi::Shape shape, DLDataType dtype, DLDevice dev,
+                         Optional<String> mem_scope) {
   VerifyDataType(dtype);
 
   class BufferAlloc {
@@ -234,12 +233,12 @@ Tensor Allocator::Empty(ffi::Shape shape, DLDataType dtype, DLDevice dev,
   size_t size = ffi::GetDataSize(shape.Product(), dtype);
 
   Buffer buffer;
-  if (!mem_scope.has_value() || (*mem_scope).empty() || (*mem_scope) == "global") {
+  if (!mem_scope.defined() || mem_scope.value().empty() || mem_scope.value() == "global") {
     buffer = this->Alloc(dev, size, alignment, dtype);
   } else {
-    buffer = this->Alloc(dev, shape, dtype, *mem_scope);
+    buffer = this->Alloc(dev, shape, dtype, mem_scope.value());
   }
-  return Tensor::FromNDAlloc(BufferAlloc(buffer), shape, dtype, dev);
+  return NDArray::FromNDAlloc(BufferAlloc(buffer), shape, dtype, dev);
 }
 
 bool Allocator::AllowMemoryScope(const std::string& mem_scope) const {
@@ -265,10 +264,7 @@ void Allocator::Clear() {
   // Pooled allocator will override this method.
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("vm.builtin.memory_manager.clear", MemoryManager::Clear);
-}
+TVM_FFI_REGISTER_GLOBAL("vm.builtin.memory_manager.clear").set_body_typed(MemoryManager::Clear);
 
 }  // namespace memory
 }  // namespace runtime

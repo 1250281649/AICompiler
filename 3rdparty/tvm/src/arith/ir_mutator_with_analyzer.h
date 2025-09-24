@@ -74,8 +74,7 @@ class IRMutatorWithAnalyzer : public tir::StmtExprMutator {
    * \brief Use internal bound information to perform inter map simplification of indices.
    * \note Only do this during layout remapping
    */
-  ffi::Array<PrimExpr> IterMapSimplifyWithContext(const ffi::Array<PrimExpr>& indices,
-                                                  bool non_trivial_only);
+  Array<PrimExpr> IterMapSimplifyWithContext(const Array<PrimExpr>& indices, bool non_trivial_only);
 
   /*! \brief internal analyzer field. */
   Analyzer* analyzer_;
@@ -84,9 +83,9 @@ class IRMutatorWithAnalyzer : public tir::StmtExprMutator {
   // expensive and we only encourage doing them during
   // necessary cases like layout remapping
   /*! \brief Recorded loop iterators */
-  ffi::Map<Var, Range> iter_vars_;
+  Map<Var, Range> iter_vars_;
   /*! \brief iterator predicates */
-  ffi::Array<PrimExpr> iter_predicates_;
+  Array<PrimExpr> iter_predicates_;
   /*!
    * \brief Run callback while trying to record iter predicate
    * \param conditon Condition to be checked.
@@ -95,7 +94,7 @@ class IRMutatorWithAnalyzer : public tir::StmtExprMutator {
   template <typename FLambda>
   void WithRecordIterPredicate(PrimExpr condition, FLambda callback) {
     auto f_use_itervar = [this](const tir::VarNode* v) {
-      return iter_vars_.count(ffi::GetRef<tir::Var>(v));
+      return iter_vars_.count(GetRef<tir::Var>(v));
     };
     // simple heuristics for detecting predicate
     if (tir::UsesVar(condition, f_use_itervar)) {

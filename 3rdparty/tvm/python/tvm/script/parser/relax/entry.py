@@ -35,7 +35,7 @@ from tvm.relax import (
     TupleStructInfo,
 )
 from tvm.relax.expr import Var
-from tvm.runtime import ObjectConvertible
+from tvm.runtime import ObjectGeneric
 from tvm.tir import PrimExpr
 
 from .._core import doc, parse, utils
@@ -147,7 +147,7 @@ def macro(*args, hygienic: bool = True) -> _Callable:
 ############################# Struct Info ##############################
 
 
-class StructInfoProxy(ObjectConvertible):
+class StructInfoProxy(ObjectGeneric):
     def as_struct_info(self, dict_globals: Optional[Dict[str, Any]] = None) -> StructInfo:
         raise NotImplementedError()
 

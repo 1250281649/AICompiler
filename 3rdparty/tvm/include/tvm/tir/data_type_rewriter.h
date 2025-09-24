@@ -106,7 +106,7 @@ class IndexDataTypeRewriter : public DataTypeLegalizer {
   Stmt VisitStmt_(const BufferStoreNode* op) override;
   Stmt VisitStmt_(const AttrStmtNode* op) override;
   PrimExpr VisitExpr_(const BufferLoadNode* op) override;
-  ffi::Array<PrimExpr> VisitIndices(ffi::Array<PrimExpr> indices);
+  Array<PrimExpr> VisitIndices(Array<PrimExpr> indices);
   Stmt VisitStmt_(const IfThenElseNode* op) override;
   Stmt VisitStmt_(const DeclBufferNode* op) override;
   Stmt VisitStmt_(const AllocateNode* op) override;
@@ -124,8 +124,7 @@ class IndexDataTypeRewriter : public DataTypeLegalizer {
 
   Buffer VisitBuffer(const Buffer& buffer);
   Buffer GetRemappedBuffer(const Buffer& buffer);
-  ffi::Map<ffi::String, ffi::Any> VisitBlockAnnotations(
-      const ffi::Map<ffi::String, ffi::Any>& annotations);
+  Map<String, ffi::Any> VisitBlockAnnotations(const Map<String, ffi::Any>& annotations);
   BufferRegion VisitBufferRegion(const BufferRegion& region);
   IterVar VisitIterVar(const IterVar& iter_var);
   // indicator of index expr to rewrite
@@ -133,7 +132,7 @@ class IndexDataTypeRewriter : public DataTypeLegalizer {
   // indicator of condition
   bool is_condition_{false};
 
-  ffi::Map<Buffer, Buffer> buffer_remap_;
+  Map<Buffer, Buffer> buffer_remap_;
 };
 
 /*!

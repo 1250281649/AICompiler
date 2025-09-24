@@ -17,7 +17,6 @@
  * under the License.
  */
 
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/relax/analysis.h>
 #include <tvm/relax/expr_functor.h>
 #include <tvm/relax/transform.h>
@@ -51,11 +50,11 @@ struct CalleeAnalysis {
    *
    * \return The arguments to be used for the modified function
    */
-  std::function<ffi::Array<Expr>(ffi::Array<Expr>)> arg_updater;
+  std::function<Array<Expr>(Array<Expr>)> arg_updater;
 };
 
 std::optional<CalleeAnalysis> AnalyzeCallee(Function func) {
-  bool is_exposed = func->attrs.GetAttr<ffi::String>(tvm::attr::kGlobalSymbol).has_value();
+  bool is_exposed = func->attrs.GetAttr<String>(tvm::attr::kGlobalSymbol).defined();
   if (is_exposed) return std::nullopt;
 
   auto free_relax_vars = [&]() -> PSet<Var> {
@@ -66,7 +65,7 @@ std::optional<CalleeAnalysis> AnalyzeCallee(Function func) {
   std::vector<bool> parameter_mask;
   parameter_mask.reserve(func->params.size());
 
-  ffi::Array<Var> params;
+  Array<Var> params;
   for (const auto& param : func->params) {
     bool is_used = free_relax_vars.count(param);
     parameter_mask.push_back(is_used);
@@ -93,7 +92,7 @@ std::optional<CalleeAnalysis> AnalyzeCallee(Function func) {
   }();
 
   // Use an array to define the order of the symbolic variables
-  ffi::Array<tir::Var> free_tir_vars;
+  Array<tir::Var> free_tir_vars;
   for (const auto& tir_var : FreeSymbolicVars(func->body)) {
     if (!defined_tir_params.count(tir_var)) {
       free_tir_vars.push_back(tir_var);
@@ -110,12 +109,12 @@ std::optional<CalleeAnalysis> AnalyzeCallee(Function func) {
                            Downcast<FuncStructInfo>(func->struct_info_)->purity);
 
   auto arg_updater = [parameter_mask, old_relax_params = func->params,
-                      free_tir_vars](ffi::Array<Expr> old_args) -> ffi::Array<Expr> {
+                      free_tir_vars](Array<Expr> old_args) -> Array<Expr> {
     ICHECK_EQ(old_args.size(), parameter_mask.size())
         << "Call provides " << old_args.size() << ", but the callee accepts "
         << parameter_mask.size() << " parameters";
 
-    ffi::Array<Expr> new_args;
+    Array<Expr> new_args;
     for (size_t i = 0; i < old_args.size(); i++) {
       if (parameter_mask.at(i)) {
         new_args.push_back(old_args[i]);
@@ -123,7 +122,7 @@ std::optional<CalleeAnalysis> AnalyzeCallee(Function func) {
     }
 
     if (free_tir_vars.size()) {
-      ffi::Map<Var, Expr> old_binding;
+      Map<Var, Expr> old_binding;
       for (size_t i = 0; i < old_relax_params.size(); i++) {
         old_binding.Set(old_relax_params[i], old_args[i]);
       }
@@ -251,10 +250,8 @@ Pass RemoveUnusedParameters() {
   return CreateModulePass(pass_func, 0, "RemoveUnusedParameters", {});
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("relax.transform.RemoveUnusedParameters", RemoveUnusedParameters);
-}
+TVM_FFI_REGISTER_GLOBAL("relax.transform.RemoveUnusedParameters")
+    .set_body_typed(RemoveUnusedParameters);
 
 }  // namespace transform
 

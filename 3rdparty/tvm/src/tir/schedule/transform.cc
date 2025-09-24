@@ -17,8 +17,6 @@
  * under the License.
  */
 
-#include <tvm/ffi/reflection/registry.h>
-
 #include "../transforms/ir_utils.h"
 #include "./utils.h"
 
@@ -27,19 +25,18 @@ namespace tir {
 
 /******** Annotation ********/
 
-Block WithAnnotation(const BlockNode* block, const ffi::String& attr_key,
-                     const ObjectRef& attr_value) {
-  ffi::Map<ffi::String, Any> annotations = block->annotations;
+Block WithAnnotation(const BlockNode* block, const String& attr_key, const ObjectRef& attr_value) {
+  Map<String, Any> annotations = block->annotations;
   annotations.Set(attr_key, attr_value);
-  ObjectPtr<BlockNode> new_block = ffi::make_object<BlockNode>(*block);
+  ObjectPtr<BlockNode> new_block = make_object<BlockNode>(*block);
   new_block->annotations = std::move(annotations);
   return Block(new_block);
 }
 
 /******** Buffer Related ********/
-Buffer WithScope(const Buffer& buffer, const ffi::String& scope) {
-  ObjectPtr<BufferNode> new_buffer = ffi::make_object<BufferNode>(*buffer.get());
-  ObjectPtr<VarNode> new_var = ffi::make_object<VarNode>(*buffer->data.get());
+Buffer WithScope(const Buffer& buffer, const String& scope) {
+  ObjectPtr<BufferNode> new_buffer = make_object<BufferNode>(*buffer.get());
+  ObjectPtr<VarNode> new_var = make_object<VarNode>(*buffer->data.get());
   const auto* ptr_type = TVM_TYPE_AS(buffer->data->type_annotation, PointerTypeNode);
   new_var->type_annotation = PointerType(ptr_type->element_type, scope);
   new_buffer->data = Var(new_var->name_hint + "_" + scope, new_var->type_annotation);
@@ -48,7 +45,7 @@ Buffer WithScope(const Buffer& buffer, const ffi::String& scope) {
 }
 
 Buffer WithDType(const Buffer& buffer, const DataType& dtype) {
-  ObjectPtr<BufferNode> new_buffer = ffi::make_object<BufferNode>(*buffer.get());
+  ObjectPtr<BufferNode> new_buffer = make_object<BufferNode>(*buffer.get());
   new_buffer->dtype = dtype;
   const auto* ptr_type = TVM_TYPE_AS(buffer->data->type_annotation, PointerTypeNode);
   new_buffer->data =
@@ -57,11 +54,11 @@ Buffer WithDType(const Buffer& buffer, const DataType& dtype) {
   return Buffer(new_buffer);
 }
 
-ffi::Array<BufferRegion> ReplaceBuffer(ffi::Array<BufferRegion> regions, const Buffer& source,
-                                       const Buffer& target) {
+Array<BufferRegion> ReplaceBuffer(Array<BufferRegion> regions, const Buffer& source,
+                                  const Buffer& target) {
   regions.MutateByApply([&source, &target](BufferRegion region) -> BufferRegion {
     if (region->buffer.same_as(source)) {
-      ObjectPtr<BufferRegionNode> n = ffi::make_object<BufferRegionNode>(*region.get());
+      ObjectPtr<BufferRegionNode> n = make_object<BufferRegionNode>(*region.get());
       n->buffer = target;
       return BufferRegion(n);
     }
@@ -70,11 +67,11 @@ ffi::Array<BufferRegion> ReplaceBuffer(ffi::Array<BufferRegion> regions, const B
   return regions;
 }
 
-ffi::Array<BufferRegion> ReplaceBuffer(ffi::Array<BufferRegion> regions,
-                                       const ffi::Map<Buffer, Buffer>& buffer_map) {
+Array<BufferRegion> ReplaceBuffer(Array<BufferRegion> regions,
+                                  const Map<Buffer, Buffer>& buffer_map) {
   regions.MutateByApply([&buffer_map](BufferRegion region) -> BufferRegion {
     if (buffer_map.count(region->buffer)) {
-      ObjectPtr<BufferRegionNode> n = ffi::make_object<BufferRegionNode>(*region.get());
+      ObjectPtr<BufferRegionNode> n = make_object<BufferRegionNode>(*region.get());
       n->buffer = buffer_map[region->buffer];
       return BufferRegion(n);
     }
@@ -83,24 +80,22 @@ ffi::Array<BufferRegion> ReplaceBuffer(ffi::Array<BufferRegion> regions,
   return regions;
 }
 
-ffi::Array<MatchBufferRegion> ReplaceBuffer(ffi::Array<MatchBufferRegion> match_buffers,
-                                            const Buffer& source, const Buffer& target) {
-  match_buffers.MutateByApply(
-      [&source, &target](MatchBufferRegion match_buffer) -> MatchBufferRegion {
-        if (match_buffer->source->buffer.same_as(source)) {
-          ObjectPtr<MatchBufferRegionNode> n =
-              ffi::make_object<MatchBufferRegionNode>(*match_buffer.get());
-          n->source = BufferRegion(target, n->source->region);
-          return MatchBufferRegion(n);
-        }
-        return match_buffer;
-      });
+Array<MatchBufferRegion> ReplaceBuffer(Array<MatchBufferRegion> match_buffers, const Buffer& source,
+                                       const Buffer& target) {
+  match_buffers.MutateByApply([&source,
+                               &target](MatchBufferRegion match_buffer) -> MatchBufferRegion {
+    if (match_buffer->source->buffer.same_as(source)) {
+      ObjectPtr<MatchBufferRegionNode> n = make_object<MatchBufferRegionNode>(*match_buffer.get());
+      n->source = BufferRegion(target, n->source->region);
+      return MatchBufferRegion(n);
+    }
+    return match_buffer;
+  });
   return match_buffers;
 }
 
-ffi::Array<BufferRegion> ReplaceBufferRegion(ffi::Array<BufferRegion> regions,
-                                             const Buffer& source_buffer,
-                                             const BufferRegion& target) {
+Array<BufferRegion> ReplaceBufferRegion(Array<BufferRegion> regions, const Buffer& source_buffer,
+                                        const BufferRegion& target) {
   regions.MutateByApply([&source_buffer, &target](const BufferRegion& region) -> BufferRegion {
     if (region->buffer.same_as(source_buffer)) {
       return target;
@@ -110,31 +105,30 @@ ffi::Array<BufferRegion> ReplaceBufferRegion(ffi::Array<BufferRegion> regions,
   return regions;
 }
 
-ffi::Array<MatchBufferRegion> ReplaceBufferRegion(ffi::Array<MatchBufferRegion> match_buffers,
-                                                  const Buffer& source_buffer,
-                                                  const BufferRegion& target) {
-  match_buffers.MutateByApply(
-      [&source_buffer, &target](const MatchBufferRegion& match_buffer) -> MatchBufferRegion {
-        if (match_buffer->source->buffer.same_as(source_buffer)) {
-          ObjectPtr<MatchBufferRegionNode> n =
-              ffi::make_object<MatchBufferRegionNode>(*match_buffer.get());
-          n->source = target;
-          return MatchBufferRegion(n);
-        }
-        return match_buffer;
-      });
+Array<MatchBufferRegion> ReplaceBufferRegion(Array<MatchBufferRegion> match_buffers,
+                                             const Buffer& source_buffer,
+                                             const BufferRegion& target) {
+  match_buffers.MutateByApply([&source_buffer, &target](
+                                  const MatchBufferRegion& match_buffer) -> MatchBufferRegion {
+    if (match_buffer->source->buffer.same_as(source_buffer)) {
+      ObjectPtr<MatchBufferRegionNode> n = make_object<MatchBufferRegionNode>(*match_buffer.get());
+      n->source = target;
+      return MatchBufferRegion(n);
+    }
+    return match_buffer;
+  });
   return match_buffers;
 }
 
 /******** ReplaceBufferMutator ********/
 ReplaceBufferMutator::ReplaceBufferMutator(const Buffer& old_buffer, Buffer new_buffer,
-                                           ffi::Map<Block, Block>* block_sref_reuse)
+                                           Map<Block, Block>* block_sref_reuse)
     : block_sref_reuse_(block_sref_reuse) {
   buffer_var_map_[old_buffer->data.get()] = std::move(new_buffer);
 }
 
-ReplaceBufferMutator::ReplaceBufferMutator(const ffi::Map<Buffer, Buffer>& buffer_map,
-                                           ffi::Map<Block, Block>* block_sref_reuse)
+ReplaceBufferMutator::ReplaceBufferMutator(const Map<Buffer, Buffer>& buffer_map,
+                                           Map<Block, Block>* block_sref_reuse)
     : block_sref_reuse_(block_sref_reuse) {
   for (const auto& [old_buffer, new_buffer] : buffer_map) {
     buffer_var_map_[old_buffer->data.get()] = new_buffer;
@@ -143,7 +137,7 @@ ReplaceBufferMutator::ReplaceBufferMutator(const ffi::Map<Buffer, Buffer>& buffe
 
 PrimExpr ReplaceBufferMutator::VisitExpr_(const VarNode* var) {
   auto it = buffer_var_map_.find(var);
-  return it != buffer_var_map_.end() ? it->second->data : ffi::GetRef<Var>(var);
+  return it != buffer_var_map_.end() ? it->second->data : GetRef<Var>(var);
 }
 
 Stmt ReplaceBufferMutator::VisitStmt_(const BufferStoreNode* op) {
@@ -207,12 +201,12 @@ Stmt ReplaceBufferMutator::VisitStmt_(const BlockNode* block) {
   };
 
   // Step 1. Mutate `match_buffers`. If an old buffer appears as a source of MatchBufferRegion,
-  ffi::Array<MatchBufferRegion> match_buffers = block->match_buffers.Map(f_mutate_match_buffer);
+  Array<MatchBufferRegion> match_buffers = block->match_buffers.Map(f_mutate_match_buffer);
   // Step 2. Mutate the read/write region.
-  ffi::Array<BufferRegion> reads = block->reads.Map(f_mutate_read_write_region);
-  ffi::Array<BufferRegion> writes = block->writes.Map(f_mutate_read_write_region);
+  Array<BufferRegion> reads = block->reads.Map(f_mutate_read_write_region);
+  Array<BufferRegion> writes = block->writes.Map(f_mutate_read_write_region);
   // Step 3. Mutate `alloc_buffers` for the old buffer allocated in this block.
-  ffi::Array<Buffer> alloc_buffers = block->alloc_buffers.Map(f_mutate_alloc_buffers);
+  Array<Buffer> alloc_buffers = block->alloc_buffers.Map(f_mutate_alloc_buffers);
   // Step 4. Recursively mutate the block.
   Block mutated_block = Downcast<Block>(StmtMutator::VisitStmt_(block));
 
@@ -220,7 +214,7 @@ Stmt ReplaceBufferMutator::VisitStmt_(const BlockNode* block) {
       writes.same_as(mutated_block->writes) &&
       alloc_buffers.same_as(mutated_block->alloc_buffers) &&
       match_buffers.same_as(mutated_block->match_buffers)) {
-    return ffi::GetRef<Block>(block);
+    return GetRef<Block>(block);
   } else {
     ObjectPtr<BlockNode> n = CopyOnWrite(mutated_block.get());
     n->reads = std::move(reads);
@@ -230,7 +224,7 @@ Stmt ReplaceBufferMutator::VisitStmt_(const BlockNode* block) {
 
     Block new_block(n);
     if (block_sref_reuse_ != nullptr) {
-      block_sref_reuse_->Set(ffi::GetRef<Block>(block), new_block);
+      block_sref_reuse_->Set(GetRef<Block>(block), new_block);
     }
     return new_block;
   }
@@ -245,17 +239,17 @@ void LeafBlockRemovalPlan(const ScheduleState& self, const StmtSRef& leaf_block_
     explicit OnlyLeafError(IRModule mod, Block leaf_block, Block scope_root)
         : mod_(mod), leaf_block_(leaf_block), scope_root_(scope_root) {}
 
-    ffi::String FastErrorString() const final {
+    String FastErrorString() const final {
       return "ScheduleError: Cannot remove the only leaf in the scope";
     }
 
-    ffi::String DetailRenderTemplate() const final {
+    String DetailRenderTemplate() const final {
       return "Block {0} is the only leaf in the scope {1}, which cannot be removed; Otherwise the "
              "scope will be empty.";
     }
 
     IRModule mod() const final { return mod_; }
-    ffi::Array<ObjectRef> LocationsOfInterest() const final { return {leaf_block_, scope_root_}; }
+    Array<ObjectRef> LocationsOfInterest() const final { return {leaf_block_, scope_root_}; }
 
     IRModule mod_;
     Block leaf_block_;
@@ -299,21 +293,21 @@ void LeafBlockRemovalPlan(const ScheduleState& self, const StmtSRef& leaf_block_
     }
 
     if (const auto* seq = body.as<SeqStmtNode>()) {
-      ObjectPtr<BlockNode> n = ffi::make_object<BlockNode>(*block);
-      auto new_seq = RemoveFromSeqStmt(ffi::GetRef<SeqStmt>(seq), ffi::GetRef<Stmt>(last_stmt));
+      ObjectPtr<BlockNode> n = make_object<BlockNode>(*block);
+      auto new_seq = RemoveFromSeqStmt(GetRef<SeqStmt>(seq), GetRef<Stmt>(last_stmt));
       // Re-attach AllocateConst nodes
       auto new_body = MergeNest(allocs, new_seq);
       n->body = new_body;
-      *src_stmt = ffi::GetRef<Stmt>(block);
+      *src_stmt = GetRef<Stmt>(block);
       *tgt_stmt = Stmt(std::move(n));
       return;
     }
   }
   if (const auto* loop = sref->StmtAs<ForNode>()) {
     if (const auto* seq = loop->body.as<SeqStmtNode>()) {
-      ObjectPtr<ForNode> n = ffi::make_object<ForNode>(*loop);
-      n->body = RemoveFromSeqStmt(ffi::GetRef<SeqStmt>(seq), ffi::GetRef<Stmt>(last_stmt));
-      *src_stmt = ffi::GetRef<Stmt>(loop);
+      ObjectPtr<ForNode> n = make_object<ForNode>(*loop);
+      n->body = RemoveFromSeqStmt(GetRef<SeqStmt>(seq), GetRef<Stmt>(last_stmt));
+      *src_stmt = GetRef<Stmt>(loop);
       *tgt_stmt = Stmt(std::move(n));
       return;
     }
@@ -321,12 +315,12 @@ void LeafBlockRemovalPlan(const ScheduleState& self, const StmtSRef& leaf_block_
   ICHECK(sref != nullptr && sref->stmt != nullptr);
   const auto* leaf_block = TVM_SREF_TO_BLOCK(leaf_block_sref);
   const auto* scope_block = TVM_SREF_TO_BLOCK(sref);
-  throw OnlyLeafError(self->mod, ffi::GetRef<Block>(leaf_block), ffi::GetRef<Block>(scope_block));
+  throw OnlyLeafError(self->mod, GetRef<Block>(leaf_block), GetRef<Block>(scope_block));
 }
 
-ffi::Optional<LoopRV> TileWithTensorIntrin(const tir::Schedule& sch, const tir::BlockRV& block_rv,
-                                           const ffi::String& intrin_name, bool allow_padding) {
-  ffi::Optional<tir::TensorizeInfo> opt_tensorize_info =
+Optional<LoopRV> TileWithTensorIntrin(const tir::Schedule& sch, const tir::BlockRV& block_rv,
+                                      const String& intrin_name, bool allow_padding) {
+  Optional<tir::TensorizeInfo> opt_tensorize_info =
       GetTensorizeLoopMapping(sch->state(), sch->GetSRef(block_rv),
                               tir::TensorIntrin::Get(intrin_name).value()->desc, allow_padding);
   if (!opt_tensorize_info) return std::nullopt;
@@ -346,7 +340,7 @@ ffi::Optional<LoopRV> TileWithTensorIntrin(const tir::Schedule& sch, const tir::
     sch->PadEinsum(block_rv, info->block_iter_paddings.value());
 
     // Now we need to find out all the padded Block's.
-    ffi::Array<BlockRV> inlined_producers, inlined_consumers;
+    Array<BlockRV> inlined_producers, inlined_consumers;
     for (const auto& producer : sch->GetProducers(block_rv)) {
       // PadEinsum will not modify the producer if it does not need padding.
       if (original_producers.count(sch->GetSRef(producer).get())) {
@@ -391,9 +385,9 @@ ffi::Optional<LoopRV> TileWithTensorIntrin(const tir::Schedule& sch, const tir::
     }
   }
   // Construct a mapping from tir loops back to LoopRVs
-  ffi::Map<tir::StmtSRef, LoopRV> loop2rv;
+  Map<tir::StmtSRef, LoopRV> loop2rv;
   {
-    ffi::Array<LoopRV> loop_rvs = sch->GetLoops(block_rv);
+    Array<LoopRV> loop_rvs = sch->GetLoops(block_rv);
     for (const LoopRV& loop_rv : loop_rvs) {
       loop2rv.Set(sch->GetSRef(loop_rv), loop_rv);
     }
@@ -421,18 +415,17 @@ ffi::Optional<LoopRV> TileWithTensorIntrin(const tir::Schedule& sch, const tir::
     ICHECK_EQ(total % inner, 0);
     // Do the split. Leave the outer extent as std::nullopt (unspecified) so that the split factors
     // can be used for different extents (needed during tuning).
-    ffi::Array<LoopRV> split =
-        sch->Split(loop2rv.at(block_loop_sref), {std::nullopt, Integer(inner)});
+    Array<LoopRV> split = sch->Split(loop2rv.at(block_loop_sref), {std::nullopt, Integer(inner)});
     ICHECK_EQ(split.size(), 2);
     inner_loops.insert(sch->GetSRef(split[1]).operator->());
     // The inner split will be reordered to the loop domain that is tensorized
-    int desc_loop_index = info->desc_loop_indexer.at(ffi::GetRef<tir::For>(desc_loop)).IntValue();
+    int desc_loop_index = info->desc_loop_indexer.at(GetRef<tir::For>(desc_loop)).IntValue();
     reorder_suffix[desc_loop_index] = split[1];
   }
   // Reorder the loops
   std::vector<LoopRV> reorder_list;
   bool meet = false;
-  ffi::Array<LoopRV> all_loops = sch->GetLoops(block_rv);
+  Array<LoopRV> all_loops = sch->GetLoops(block_rv);
   for (const LoopRV& loop : all_loops) {
     if (inner_loops.count(sch->GetSRef(loop).operator->())) {
       meet = true;
@@ -446,17 +439,13 @@ ffi::Optional<LoopRV> TileWithTensorIntrin(const tir::Schedule& sch, const tir::
   return reorder_suffix[0];
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("tir.schedule.TileWithTensorIntrin", TileWithTensorIntrin);
-}
+TVM_FFI_REGISTER_GLOBAL("tir.schedule.TileWithTensorIntrin").set_body_typed(TileWithTensorIntrin);
 
 /******** BlockBufferAccessSimplifier ********/
-void BlockBufferAccessSimplifier::SimplifyAccessRegion(
-    ffi::Array<BufferRegion>* old_access_regions) {
+void BlockBufferAccessSimplifier::SimplifyAccessRegion(Array<BufferRegion>* old_access_regions) {
   auto fmutate = [this](const BufferRegion& buffer_region) {
-    ffi::Array<Range> new_buffer_region;
-    ffi::Array<PrimExpr> simplified_min;
+    Array<Range> new_buffer_region;
+    Array<PrimExpr> simplified_min;
     for (const auto& range : buffer_region->region) {
       simplified_min.push_back(range->min);
     }
@@ -472,7 +461,7 @@ void BlockBufferAccessSimplifier::SimplifyAccessRegion(
   (*old_access_regions).MutateByApply(fmutate);
 }
 
-void BlockBufferAccessSimplifier::SimplifyBufferIndices(ffi::Array<PrimExpr>* indices) {
+void BlockBufferAccessSimplifier::SimplifyBufferIndices(Array<PrimExpr>* indices) {
   *indices = this->IterMapSimplifyWithContext(*indices, true);
 }
 
@@ -498,8 +487,8 @@ PrimExpr BlockBufferAccessSimplifier::VisitExpr_(const BufferLoadNode* op) {
 
 /******** PrimFunc-level analysis and transformation ********/
 
-void GetLeafBlocksHelper(Schedule sch, BlockRV cur_block_rv, ffi::Array<BlockRV>* leaf_blocks) {
-  ffi::Array<BlockRV> blocks = sch->GetChildBlocks(cur_block_rv);
+void GetLeafBlocksHelper(Schedule sch, BlockRV cur_block_rv, Array<BlockRV>* leaf_blocks) {
+  Array<BlockRV> blocks = sch->GetChildBlocks(cur_block_rv);
   if (blocks.empty()) {
     leaf_blocks->push_back(cur_block_rv);
   } else {
@@ -509,14 +498,14 @@ void GetLeafBlocksHelper(Schedule sch, BlockRV cur_block_rv, ffi::Array<BlockRV>
   }
 }
 
-ffi::Optional<ObjectRef> NormalizePrimFunc(Schedule sch) {
+Optional<ObjectRef> NormalizePrimFunc(Schedule sch) {
   BlockRV root_block = sch->GetBlock("root");
-  ffi::Array<BlockRV> leaf_blocks;
+  Array<BlockRV> leaf_blocks;
   GetLeafBlocksHelper(sch, root_block, &leaf_blocks);
   for (const BlockRV& block : leaf_blocks) {
     StmtSRef block_sref = sch->GetSRef(block);
-    ffi::Array<StmtSRef> loops = GetLoops(block_sref);
-    ffi::Array<PrimExpr> binds = GetBlockRealize(sch->state(), block_sref)->iter_values;
+    Array<StmtSRef> loops = GetLoops(block_sref);
+    Array<PrimExpr> binds = GetBlockRealize(sch->state(), block_sref)->iter_values;
     if (loops.size() == 0) continue;
     if (loops.size() != binds.size()) {
       return std::nullopt;
@@ -532,14 +521,14 @@ ffi::Optional<ObjectRef> NormalizePrimFunc(Schedule sch) {
     }
   }
 
-  ffi::Array<ffi::Array<LoopRV>> block_loops;
-  ffi::Array<ffi::Array<IterVar>> block_iters;
-  ffi::Array<IntImm> block_is_reduction;
+  Array<Array<LoopRV>> block_loops;
+  Array<Array<IterVar>> block_iters;
+  Array<IntImm> block_is_reduction;
   for (const BlockRV& block : leaf_blocks) {
-    ffi::Array<IterVar> iters = sch->Get(block)->iter_vars;
+    Array<IterVar> iters = sch->Get(block)->iter_vars;
     bool has_spatial_iter = false;
-    ffi::Array<Var> index_map_inputs;
-    ffi::Array<PrimExpr> index_map_outputs;
+    Array<Var> index_map_inputs;
+    Array<PrimExpr> index_map_outputs;
     for (const IterVar& iter : sch->Get(block)->iter_vars) {
       Var var = iter->var.copy_with_suffix("");
       index_map_inputs.push_back(var);
@@ -565,13 +554,10 @@ ffi::Optional<ObjectRef> NormalizePrimFunc(Schedule sch) {
                                          sch->GetSRef(root_block));
     block_is_reduction.push_back(Bool(is_reduction));
   }
-  return ffi::Array<ObjectRef>{leaf_blocks, block_loops, block_iters, block_is_reduction};
+  return Array<ObjectRef>{leaf_blocks, block_loops, block_iters, block_is_reduction};
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("tir.schedule.NormalizePrimFunc", NormalizePrimFunc);
-}
+TVM_FFI_REGISTER_GLOBAL("tir.schedule.NormalizePrimFunc").set_body_typed(NormalizePrimFunc);
 
 }  // namespace tir
 }  // namespace tvm

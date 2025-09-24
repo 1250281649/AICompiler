@@ -31,7 +31,7 @@ namespace relax {
 
 /*! \brief Attributes for search operators */
 struct ArgmaxArgminAttrs : public AttrsNodeReflAdapter<ArgmaxArgminAttrs> {
-  ffi::Optional<int64_t> axis;
+  Optional<int64_t> axis;
   bool keepdims;
 
   static void RegisterReflection() {
@@ -44,8 +44,9 @@ struct ArgmaxArgminAttrs : public AttrsNodeReflAdapter<ArgmaxArgminAttrs> {
                 "with size "
                 "one.");
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("relax.attrs.ArgmaxArgminAttrs", ArgmaxArgminAttrs,
-                                    BaseAttrsNode);
+
+  static constexpr const char* _type_key = "relax.attrs.ArgmaxArgminAttrs";
+  TVM_FFI_DECLARE_FINAL_OBJECT_INFO(ArgmaxArgminAttrs, BaseAttrsNode);
 };  // struct ArgmaxArgminAttrs
 
 /*! \brief Attributes for bucketize operator */
@@ -61,7 +62,9 @@ struct BucketizeAttrs : public tvm::AttrsNodeReflAdapter<BucketizeAttrs> {
         .def_ro("right", &BucketizeAttrs::right,
                 "Determines the behavior for values in boundaries");
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("relax.attrs.BucketizeAttrs", BucketizeAttrs, BaseAttrsNode);
+
+  static constexpr const char* _type_key = "relax.attrs.BucketizeAttrs";
+  TVM_FFI_DECLARE_FINAL_OBJECT_INFO(BucketizeAttrs, BaseAttrsNode);
 };  // struct BucketizeAttrs
 
 }  // namespace relax

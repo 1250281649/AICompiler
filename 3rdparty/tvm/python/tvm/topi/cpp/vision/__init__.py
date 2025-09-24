@@ -16,8 +16,8 @@
 # under the License.
 
 """FFI for vision TOPI ops and schedules"""
-import tvm_ffi
+import tvm.ffi
 
 from . import yolo
 
-tvm_ffi.init_ffi_api("topi.vision", "tvm.topi.cpp.vision")
+tvm.ffi._init_api("topi.vision", "tvm.topi.cpp.vision")

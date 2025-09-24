@@ -31,17 +31,16 @@ namespace relax {
 
 /*! \brief Attributes used in take operator */
 struct TakeAttrs : public AttrsNodeReflAdapter<TakeAttrs> {
-  ffi::Optional<int64_t> axis;
-  ffi::String mode;
+  Optional<int64_t> axis;
 
   static void RegisterReflection() {
     namespace refl = tvm::ffi::reflection;
-    refl::ObjectDef<TakeAttrs>()
-        .def_ro("axis", &TakeAttrs::axis, "The axis over which to select values.")
-        .def_ro("mode", &TakeAttrs::mode, "The mode for handling out-of-bounds indices.",
-                refl::DefaultValue("fast"));
+    refl::ObjectDef<TakeAttrs>().def_ro("axis", &TakeAttrs::axis,
+                                        "The axis over which to select values.");
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("relax.attrs.TakeAttrs", TakeAttrs, BaseAttrsNode);
+
+  static constexpr const char* _type_key = "relax.attrs.TakeAttrs";
+  TVM_FFI_DECLARE_FINAL_OBJECT_INFO(TakeAttrs, BaseAttrsNode);
 };  // struct TakeAttrs
 
 /*! \brief Attributes used in strided_slice operator */
@@ -56,8 +55,9 @@ struct StridedSliceAttrs : public AttrsNodeReflAdapter<StridedSliceAttrs> {
         "out of bound indices will be clipped to the bound.",
         refl::DefaultValue(true));
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("relax.attrs.StridedSliceAttrs", StridedSliceAttrs,
-                                    BaseAttrsNode);
+
+  static constexpr const char* _type_key = "relax.attrs.StridedSliceAttrs";
+  TVM_FFI_DECLARE_FINAL_OBJECT_INFO(StridedSliceAttrs, BaseAttrsNode);
 };  // struct StridedSliceAttrs
 
 }  // namespace relax

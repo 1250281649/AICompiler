@@ -17,7 +17,6 @@
  * under the License.
  */
 
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/relax/analysis.h>
 #include <tvm/relax/expr.h>
 #include <tvm/relax/expr_functor.h>
@@ -35,8 +34,7 @@ namespace {
 
 class FunctionInliner : public ExprMutator {
  public:
-  explicit FunctionInliner(
-      const ffi::Map<ffi::Variant<ffi::String, GlobalVar>, Function>& replacements)
+  explicit FunctionInliner(const Map<Variant<String, GlobalVar>, Function>& replacements)
       : replacements_(replacements) {}
 
   using ExprMutator::VisitExpr_;
@@ -81,7 +79,7 @@ class FunctionInliner : public ExprMutator {
   }
 
  private:
-  ffi::Optional<Function> GetFunction(const GlobalVar& gvar) const {
+  Optional<Function> GetFunction(const GlobalVar& gvar) const {
     if (auto opt = replacements_.Get(gvar)) {
       return opt;
     } else if (auto opt = replacements_.Get(gvar->name_hint)) {
@@ -91,14 +89,14 @@ class FunctionInliner : public ExprMutator {
     }
   }
 
-  Expr InlinedCall(Function func, const ffi::Array<Expr>& args) const {
+  Expr InlinedCall(Function func, const Array<Expr>& args) const {
     // Ensures that the inlined instance does not have duplicate usage
     // with other inlined copies, or with the original callee.
     func = CopyWithNewVars(std::move(func));
 
-    ffi::Array<Binding> param_bindings;
+    Array<Binding> param_bindings;
 
-    ffi::Map<Var, Expr> param_map;
+    Map<Var, Expr> param_map;
     for (size_t i = 0; i < args.size(); i++) {
       // Option 1: Use tvm::relax::Bind to substitute arguments into
       // the body.  If the arguments contain DataflowVar instances,
@@ -139,7 +137,7 @@ class FunctionInliner : public ExprMutator {
     return SeqExpr({binding_block}, body);
   }
 
-  const ffi::Map<ffi::Variant<ffi::String, GlobalVar>, Function>& replacements_;
+  const Map<Variant<String, GlobalVar>, Function>& replacements_;
   std::unordered_set<GlobalVar, ObjectPtrHash, ObjectPtrEqual> inline_stack_;
 };
 }  // namespace
@@ -150,8 +148,8 @@ class FunctionInliner : public ExprMutator {
  * \param params params dict
  * \return Function
  */
-Function FunctionInlineFunctions(
-    Function func, const ffi::Map<ffi::Variant<ffi::String, GlobalVar>, Function>& replacements) {
+Function FunctionInlineFunctions(Function func,
+                                 const Map<Variant<String, GlobalVar>, Function>& replacements) {
   for (const auto& [key, func] : replacements) {
     if (auto ptr = key.as<GlobalVarNode>()) {
       CHECK(!replacements.count(ptr->name_hint))
@@ -166,20 +164,17 @@ Function FunctionInlineFunctions(
   return Downcast<Function>(mutator(std::move(func)));
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("relax.FunctionInlineFunctions", FunctionInlineFunctions);
-}
+TVM_FFI_REGISTER_GLOBAL("relax.FunctionInlineFunctions").set_body_typed(FunctionInlineFunctions);
 
 namespace transform {
 
 Pass InlinePrivateFunctions() {
   auto pass_func = [=](IRModule mod, PassContext pc) {
-    ffi::Map<ffi::Variant<ffi::String, GlobalVar>, Function> replacements;
+    Map<Variant<String, GlobalVar>, Function> replacements;
     for (const auto& [gvar, base_func] : mod->functions) {
       if (auto opt = base_func.as<relax::Function>()) {
         auto func = opt.value();
-        bool is_private = !func->GetAttr<ffi::String>(tvm::attr::kGlobalSymbol).has_value();
+        bool is_private = !func->GetAttr<String>(tvm::attr::kGlobalSymbol).defined();
         if (is_private) {
           replacements.Set(gvar, func);
         }
@@ -224,10 +219,8 @@ Pass InlinePrivateFunctions() {
   return tvm::transform::CreateModulePass(pass_func, 0, "InlinePrivateFunctions", {});
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("relax.transform.InlinePrivateFunctions", InlinePrivateFunctions);
-}
+TVM_FFI_REGISTER_GLOBAL("relax.transform.InlinePrivateFunctions")
+    .set_body_typed(InlinePrivateFunctions);
 
 }  // namespace transform
 

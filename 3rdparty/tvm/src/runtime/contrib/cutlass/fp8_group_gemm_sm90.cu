@@ -19,10 +19,8 @@
 
 #include <cuda_fp16.h>
 #include <float.h>
-#include <tvm/ffi/extra/c_env_api.h>
 #include <tvm/ffi/function.h>
-#include <tvm/ffi/reflection/registry.h>
-#include <tvm/runtime/tensor.h>
+#include <tvm/runtime/ndarray.h>
 
 #include "fp16_group_gemm_runner_sm90.cuh"
 
@@ -42,11 +40,12 @@ namespace tvm {
 namespace runtime {
 
 template <typename ElementA, typename ElementB, typename ElementC>
-void tvm_cutlass_fp8_group_gemm(Tensor x, Tensor weight, Tensor indptr, Tensor workspace,
-                                Tensor alpha, Tensor out) {
+void tvm_cutlass_fp8_group_gemm(NDArray x, NDArray weight, NDArray indptr, NDArray workspace,
+                                NDArray alpha, NDArray out) {
   // Workspace is used for storing device-side group gemm arguments and cutlass internal workspace.
   // Recommened size is 4MB.
-  cudaStream_t stream = static_cast<cudaStream_t>(TVMFFIEnvGetStream(kDLCUDA, x->device.device_id));
+  static auto func = tvm::ffi::Function::GetGlobalRequired("runtime.get_cuda_stream");
+  cudaStream_t stream = static_cast<cudaStream_t>(func().cast<void*>());
   CHECK_EQ(x->ndim, 2);
   CHECK_EQ(weight->ndim, 3);
   CHECK_EQ(indptr->ndim, 1);
@@ -67,19 +66,17 @@ void tvm_cutlass_fp8_group_gemm(Tensor x, Tensor weight, Tensor indptr, Tensor w
                           static_cast<ElementC*>(out->data), stream);
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef()
-      .def(
-          "cutlass.group_gemm_e5m2_e5m2_fp16",
-          tvm_cutlass_fp8_group_gemm<cutlass::float_e5m2_t, cutlass::float_e5m2_t, cutlass::half_t>)
-      .def(
-          "cutlass.group_gemm_e5m2_e4m3_fp16",
-          tvm_cutlass_fp8_group_gemm<cutlass::float_e5m2_t, cutlass::float_e4m3_t, cutlass::half_t>)
-      .def("cutlass.group_gemm_e4m3_e4m3_fp16",
-           tvm_cutlass_fp8_group_gemm<cutlass::float_e4m3_t, cutlass::float_e4m3_t,
-                                      cutlass::half_t>);
-}
+TVM_FFI_REGISTER_GLOBAL("cutlass.group_gemm_e5m2_e5m2_fp16")
+    .set_body_typed(
+        tvm_cutlass_fp8_group_gemm<cutlass::float_e5m2_t, cutlass::float_e5m2_t, cutlass::half_t>);
+
+TVM_FFI_REGISTER_GLOBAL("cutlass.group_gemm_e5m2_e4m3_fp16")
+    .set_body_typed(
+        tvm_cutlass_fp8_group_gemm<cutlass::float_e5m2_t, cutlass::float_e4m3_t, cutlass::half_t>);
+
+TVM_FFI_REGISTER_GLOBAL("cutlass.group_gemm_e4m3_e4m3_fp16")
+    .set_body_typed(
+        tvm_cutlass_fp8_group_gemm<cutlass::float_e4m3_t, cutlass::float_e4m3_t, cutlass::half_t>);
 
 }  // namespace runtime
 }  // namespace tvm

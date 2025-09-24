@@ -33,7 +33,7 @@ namespace te {
 /*!
  * \brief data structure of Operation->Tensors it reads
  */
-using ReadGraph = ffi::Map<Operation, ffi::Array<Tensor>>;
+using ReadGraph = Map<Operation, Array<Tensor>>;
 
 /*!
  * \brief Get read graph of each operation to all the
@@ -43,7 +43,7 @@ using ReadGraph = ffi::Map<Operation, ffi::Array<Tensor>>;
  * \param roots The root operation.
  * \return The result map.
  */
-ReadGraph CreateReadGraph(const ffi::Array<Operation>& roots);
+ReadGraph CreateReadGraph(const Array<Operation>& roots);
 
 /*!
  * \brief Get a post DFS ordered of operations in the graph.
@@ -54,7 +54,7 @@ ReadGraph CreateReadGraph(const ffi::Array<Operation>& roots);
  * \note PostDFSOrder is a special case of Topoligical order,
  *   and can be used when topoligical order is needed.
  */
-ffi::Array<Operation> PostDFSOrder(const ffi::Array<Operation>& roots, const ReadGraph& g);
+Array<Operation> PostDFSOrder(const Array<Operation>& roots, const ReadGraph& g);
 
 }  // namespace te
 }  // namespace tvm

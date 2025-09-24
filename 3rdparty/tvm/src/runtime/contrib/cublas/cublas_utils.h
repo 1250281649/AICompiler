@@ -75,7 +75,7 @@ struct CuBlasThreadEntry {
   CuBlasThreadEntry();
   ~CuBlasThreadEntry();
   cublasHandle_t handle{nullptr};
-  static CuBlasThreadEntry* ThreadLocal(DLDevice curr_device);
+  static CuBlasThreadEntry* ThreadLocal();
 };  // CuBlasThreadEntry
 
 struct CuBlasLtThreadEntry {
@@ -89,7 +89,7 @@ struct CuBlasLtThreadEntry {
   // https://docs.nvidia.com/cuda/cublas/index.html#cublassetworkspace.
   static constexpr const size_t workspace_size = 33554432;
 
-  static CuBlasLtThreadEntry* ThreadLocal(DLDevice curr_device);
+  static CuBlasLtThreadEntry* ThreadLocal();
 };  // CuBlasLtThreadEntry
 
 inline cudaDataType_t GetCudaDataType(DLDataType type) {

@@ -68,7 +68,7 @@ struct HipBlasThreadEntry {
   HipBlasThreadEntry();
   ~HipBlasThreadEntry();
   hipblasHandle_t handle{nullptr};
-  static HipBlasThreadEntry* ThreadLocal(DLDevice curr_device);
+  static HipBlasThreadEntry* ThreadLocal();
 };  // HipBlasThreadEntry
 
 struct HipBlasLtThreadEntry {
@@ -82,7 +82,7 @@ struct HipBlasLtThreadEntry {
   // https://docs.nvidia.com/cuda/cublas/index.html#cublassetworkspace.
   static constexpr const size_t workspace_size = 33554432;
 
-  static HipBlasLtThreadEntry* ThreadLocal(DLDevice curr_device);
+  static HipBlasLtThreadEntry* ThreadLocal();
 };  // HipBlasLtThreadEntry
 
 inline hipDataType GetHipDataType(DLDataType type) {

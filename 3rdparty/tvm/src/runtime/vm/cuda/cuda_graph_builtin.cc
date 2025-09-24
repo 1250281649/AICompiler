@@ -23,9 +23,7 @@
  */
 
 #include <tvm/ffi/container/array.h>
-#include <tvm/ffi/extra/c_env_api.h>
 #include <tvm/ffi/function.h>
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/runtime/vm/vm.h>
 
 #include "../../../support/utils.h"
@@ -44,7 +42,7 @@ struct CUDAGraphCaptureKey {
   // identified by this shape tuple. This is default constructed as an empty tuple.
   ffi::Shape shape_expr;
 
-  CUDAGraphCaptureKey(int64_t index, const ffi::Optional<ffi::Shape>& shape_expr) : index(index) {
+  CUDAGraphCaptureKey(int64_t index, const Optional<ffi::Shape>& shape_expr) : index(index) {
     if (shape_expr) {
       this->shape_expr = shape_expr.value();
     }
@@ -115,20 +113,18 @@ class ScopedCUDAStream {
 
 class CUDACaptureStream {
  public:
-  explicit CUDACaptureStream(cudaGraph_t* graph) : output_graph_(graph) {
-    CUDA_CALL(cudaGetDevice(&device_id_));
-    TVM_FFI_CHECK_SAFE_CALL(
-        TVMFFIEnvSetStream(kDLCUDA, device_id_, capture_stream_,
-                           reinterpret_cast<TVMFFIStreamHandle*>(&prev_default_stream_)));
+  explicit CUDACaptureStream(cudaGraph_t* graph)
+      : prev_default_stream_(CUDAThreadEntry::ThreadLocal()->stream), output_graph_(graph) {
+    CUDAThreadEntry::ThreadLocal()->stream = capture_stream_;
+
     CUDA_CALL(cudaStreamBeginCapture(capture_stream_, cudaStreamCaptureModeGlobal));
   }
-  ~CUDACaptureStream() noexcept(false) {
+  ~CUDACaptureStream() {
     cudaStreamEndCapture(capture_stream_, output_graph_);
-    TVM_FFI_CHECK_SAFE_CALL(TVMFFIEnvSetStream(kDLCUDA, device_id_, prev_default_stream_, nullptr));
+    CUDAThreadEntry::ThreadLocal()->stream = prev_default_stream_;
   }
 
  private:
-  int device_id_;
   cudaStream_t prev_default_stream_;
   ScopedCUDAStream capture_stream_;
 
@@ -140,6 +136,8 @@ class CUDACaptureStream {
 /*! \brief The VM extension of CUDA graph. */
 class CUDAGraphExtensionNode : public VMExtensionNode {
  public:
+  TVM_DECLARE_FINAL_OBJECT_INFO(CUDAGraphExtensionNode, VMExtensionNode);
+
   /*!
    * \brief Launch the cuda graph if it has been cached, otherwise execute it in capture mode.
    * \param vm The virtual machine.
@@ -150,21 +148,18 @@ class CUDAGraphExtensionNode : public VMExtensionNode {
    * \param entry_index The unique index of the capture function used for lookup.
    * \return The return value of the capture function.
    */
-  ObjectRef RunOrCapture(VirtualMachine* vm, const ObjectRef& capture_func, Any args,
-                         int64_t entry_index, ffi::Optional<ffi::Shape> shape_expr) {
+  ObjectRef RunOrCapture(VirtualMachine* vm, const ObjectRef& capture_func, ObjectRef args,
+                         int64_t entry_index, Optional<ffi::Shape> shape_expr) {
     CUDAGraphCaptureKey entry_key{entry_index, shape_expr};
     if (auto it = capture_cache_.find(entry_key); it != capture_cache_.end()) {
       // Launch CUDA graph
       const auto& [states, exec] = it->second;
-      int device_id;
-      CUDA_CALL(cudaGetDevice(&device_id));
-      CUDA_CALL(
-          cudaGraphLaunch(exec, static_cast<cudaStream_t>(TVMFFIEnvGetStream(kDLCUDA, device_id))));
+      CUDA_CALL(cudaGraphLaunch(exec, CUDAThreadEntry::ThreadLocal()->stream));
       return states;
     }
 
     // Set up arguments for the graph execution
-    ffi::Array<Any> tuple_args = args.cast<ffi::Array<Any>>();
+    Array<ObjectRef> tuple_args = Downcast<Array<ObjectRef>>(args);
     int nargs = static_cast<int>(tuple_args.size());
 
     std::vector<AnyView> packed_args(nargs);
@@ -218,9 +213,7 @@ class CUDAGraphExtensionNode : public VMExtensionNode {
     return alloc_result;
   }
 
-  static constexpr const bool _type_mutable = true;
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("vm.CUDAGraphExtension", CUDAGraphExtensionNode,
-                                    VMExtensionNode);
+  static constexpr const char* _type_key = "vm.CUDAGraphExtension";
 
  private:
   /*!
@@ -240,41 +233,37 @@ class CUDAGraphExtensionNode : public VMExtensionNode {
 /*! Managed reference to CUDAGraphExtensionNode */
 class CUDAGraphExtension : public VMExtension {
  public:
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(CUDAGraphExtension, VMExtension,
-                                             CUDAGraphExtensionNode);
+  TVM_DEFINE_MUTABLE_OBJECT_REF_METHODS(CUDAGraphExtension, VMExtension, CUDAGraphExtensionNode);
   static CUDAGraphExtension Create() {
-    auto data_ = ffi::make_object<CUDAGraphExtensionNode>();
+    auto data_ = make_object<CUDAGraphExtensionNode>();
     return CUDAGraphExtension(std::move(data_));
   }
 };
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef()
-      .def_packed("vm.builtin.cuda_graph.run_or_capture",
-                  [](ffi::PackedArgs args, ffi::Any* rv) {
-                    ICHECK(args.size() == 5 || args.size() == 4);
-                    VirtualMachine* vm = VirtualMachine::GetContextPtr(args[0]);
-                    auto extension = vm->GetOrCreateExtension<CUDAGraphExtension>();
-                    auto capture_func = args[1].cast<ObjectRef>();
-                    Any func_args = args[2];
-                    int64_t entry_index = args[3].cast<int64_t>();
-                    ffi::Optional<ffi::Shape> shape_expr = std::nullopt;
-                    if (args.size() == 5) {
-                      shape_expr = args[4].cast<ffi::Shape>();
-                    }
-                    *rv = extension->RunOrCapture(vm, capture_func, func_args, entry_index,
-                                                  shape_expr);
-                  })
-      .def_packed("vm.builtin.cuda_graph.get_cached_alloc", [](ffi::PackedArgs args, ffi::Any* rv) {
-        ICHECK_EQ(args.size(), 3);
-        VirtualMachine* vm = VirtualMachine::GetContextPtr(args[0]);
-        auto extension = vm->GetOrCreateExtension<CUDAGraphExtension>();
-        auto alloc_func = args[1].cast<ObjectRef>();
-        int64_t entry_index = args[2].cast<int64_t>();
-        *rv = extension->GetCachedAllocation(vm, alloc_func, entry_index);
-      });
-}
+TVM_FFI_REGISTER_GLOBAL("vm.builtin.cuda_graph.run_or_capture")
+    .set_body_packed([](ffi::PackedArgs args, ffi::Any* rv) {
+      ICHECK(args.size() == 5 || args.size() == 4);
+      VirtualMachine* vm = VirtualMachine::GetContextPtr(args[0]);
+      auto extension = vm->GetOrCreateExtension<CUDAGraphExtension>();
+      auto capture_func = args[1].cast<ObjectRef>();
+      auto func_args = args[2].cast<ObjectRef>();
+      int64_t entry_index = args[3].cast<int64_t>();
+      Optional<ffi::Shape> shape_expr = std::nullopt;
+      if (args.size() == 5) {
+        shape_expr = args[4].cast<ffi::Shape>();
+      }
+      *rv = extension->RunOrCapture(vm, capture_func, func_args, entry_index, shape_expr);
+    });
+
+TVM_FFI_REGISTER_GLOBAL("vm.builtin.cuda_graph.get_cached_alloc")
+    .set_body_packed([](ffi::PackedArgs args, ffi::Any* rv) {
+      ICHECK_EQ(args.size(), 3);
+      VirtualMachine* vm = VirtualMachine::GetContextPtr(args[0]);
+      auto extension = vm->GetOrCreateExtension<CUDAGraphExtension>();
+      auto alloc_func = args[1].cast<ObjectRef>();
+      int64_t entry_index = args[2].cast<int64_t>();
+      *rv = extension->GetCachedAllocation(vm, alloc_func, entry_index);
+    });
 
 }  // namespace vm
 }  // namespace runtime

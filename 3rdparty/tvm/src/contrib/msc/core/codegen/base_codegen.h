@@ -53,41 +53,41 @@ class BaseOpCode {
    * \brief The constructor of BaseOpCode
    * \param func_name the function name for the node.
    */
-  explicit BaseOpCode(const ffi::String& func_name) : func_name_(func_name) {}
+  explicit BaseOpCode(const String& func_name) : func_name_(func_name) {}
 
   virtual ~BaseOpCode() = default;
 
   /*! \brief Config the BaseOpCode*/
   void Config(const MSCJoint& node, const std::shared_ptr<ConfigType> config,
-              const ffi::Map<ffi::String, ffi::String>& prims) {
+              const Map<String, String>& prims) {
     node_ = node;
     config_ = config;
     prims_ = prims;
   }
 
   /*! \brief Get docs for the node*/
-  virtual const ffi::Array<Doc> GetDocs() = 0;
+  virtual const Array<Doc> GetDocs() = 0;
 
   /*! \brief Get return describe for default node*/
-  virtual const ffi::String IdxNode() { return IdxNodeBase(node_); }
+  virtual const String IdxNode() { return IdxNodeBase(node_); }
 
   /*! \brief Get describe for default node input*/
-  const ffi::String IdxInput(int idx = 0, bool process = true) {
+  const String IdxInput(int idx = 0, bool process = true) {
     return IdxInputBase(node_, idx, process);
   }
 
   /*! \brief Get describe for default node output*/
-  const ffi::String IdxOutput(int idx = 0) { return IdxOutputBase(node_, idx); }
+  const String IdxOutput(int idx = 0) { return IdxOutputBase(node_, idx); }
 
   /*! \brief Get describe for default node weight*/
-  const ffi::String IdxWeight(const ffi::String& wtype, bool process = true) {
+  const String IdxWeight(const String& wtype, bool process = true) {
     return IdxWeightBase(node_, wtype, process);
   }
 
   /*! \brief Get the node attr as doc*/
-  const ExprDoc GetAttrDoc(const ffi::String& key, const ffi::String& type) {
+  const ExprDoc GetAttrDoc(const String& key, const String& type) {
     if (StringUtils::StartsWith(type, "list")) {
-      const ffi::String& ele_type =
+      const String& ele_type =
           StringUtils::Replace(StringUtils::Replace(type, "list(", ""), ")", "");
       if (ele_type == "bool") {
         return DocUtils::ToList(node_->GetTypeArrayAttr<bool>(key));
@@ -115,16 +115,16 @@ class BaseOpCode {
   }
 
   /*! \brief Get comment for default node*/
-  const ffi::String Comment() { return Comment(node_); }
+  const String Comment() { return Comment(node_); }
 
   /*! \brief Get func_name for the default node*/
-  const ffi::String func_name() { return func_name_; }
+  const String func_name() { return func_name_; }
 
   /*! \brief Get valid func name for the default node*/
-  virtual const ffi::String callee_name() { return func_name(); }
+  virtual const String callee_name() { return func_name(); }
 
   /*! \brief Get valid return name for the default node*/
-  virtual const ffi::String ret_name() { return IdxNode(); }
+  virtual const String ret_name() { return IdxNode(); }
 
   /*! \brief Get the default node*/
   const MSCJoint node() { return node_; }
@@ -132,7 +132,7 @@ class BaseOpCode {
   CODEGEN_MEMBERS;
 
  private:
-  ffi::String func_name_;
+  String func_name_;
   MSCJoint node_;
 };
 
@@ -170,8 +170,7 @@ class BaseCodeGen {
   virtual ~BaseCodeGen() = default;
 
   /*! \brief Get sources*/
-  virtual const ffi::Map<ffi::String, ffi::String> GetSources(
-      const std::string& print_options = "") = 0;
+  virtual const Map<String, String> GetSources(const std::string& print_options = "") = 0;
 
   CODEGEN_MEMBERS;
 
@@ -211,7 +210,7 @@ class BaseCodeGen {
   }
 
   /*! \brief Get the optype for op codegen*/
-  const ffi::String GetOpType(const MSCJoint& node) {
+  const String GetOpType(const MSCJoint& node) {
     if (config_->use_plugin && IsPlugin(node->optype)) {
       return "plugin";
     }
@@ -219,10 +218,10 @@ class BaseCodeGen {
   }
 
   /*! \brief Get the docs for the op*/
-  virtual const ffi::Array<Doc> GetOpCodes(const MSCJoint& node) = 0;
+  virtual const Array<Doc> GetOpCodes(const MSCJoint& node) = 0;
 
   /*! \brief Describe the prim*/
-  virtual const ffi::String DescribePrim(const MSCPrim& prim) {
+  virtual const String DescribePrim(const MSCPrim& prim) {
     if (prim->optype == "Int") {
       return prim->GetTypeAttr<std::string>("value");
     }
@@ -248,14 +247,14 @@ class BaseCodeGen {
   const MSCGraph graph() const { return graph_; }
 
   /*! \brief Get the scopes*/
-  const std::stack<ffi::Array<ffi::String>> scopes() const { return scopes_; }
+  const std::stack<Array<String>> scopes() const { return scopes_; }
 
   /*! \brief The stack of codes*/
   CodeStack stack_;
 
  private:
   MSCGraph graph_;
-  std::stack<ffi::Array<ffi::String>> scopes_;
+  std::stack<Array<String>> scopes_;
 };
 
 }  // namespace msc

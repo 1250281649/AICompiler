@@ -16,13 +16,13 @@
 # under the License.
 # pylint: disable=invalid-name
 """Primitive operators in the TVM IR."""
-import tvm_ffi
+import tvm.ffi
 
 from . import _ffi_api
 from .expr import RelaxExpr
 
 
-@tvm_ffi.register_object("ir.Op")
+@tvm.ffi.register_object("ir.Op")
 class Op(RelaxExpr):
     """Primitive operator in the IR."""
 

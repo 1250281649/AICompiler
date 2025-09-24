@@ -4,7 +4,7 @@ CuTe
 ====================
 
 .. toctree::
-  :maxdepth: 1
+  :maxdepth: 2
 
   00_quickstart<00_quickstart.md>
   01_layout<01_layout.md>

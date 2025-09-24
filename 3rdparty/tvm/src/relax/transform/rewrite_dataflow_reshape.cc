@@ -21,7 +21,6 @@
  * \brief Transform all reshape within dataflow block to a relax.reshape operator
  */
 #include <tvm/arith/analyzer.h>
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/relax/analysis.h>
 #include <tvm/relax/expr_functor.h>
 #include <tvm/relax/transform.h>
@@ -69,7 +68,7 @@ class DataflowReshapeRewriter : public ExprMutator {
     // We only rewrite the bindings that are not dataflow output (which means they are not
     // externally referenced)
     if (!binding->var->IsInstance<DataflowVarNode>()) {
-      this->builder_->EmitNormalized(ffi::GetRef<VarBinding>(binding));
+      this->builder_->EmitNormalized(GetRef<VarBinding>(binding));
     } else {
       ExprMutator::VisitBinding_(binding);
     }
@@ -78,7 +77,7 @@ class DataflowReshapeRewriter : public ExprMutator {
   Expr VisitExpr_(const CallNode* call) final {
     static const Op& call_tir_op = Op::Get("relax.call_tir");
     if (call->op != call_tir_op) {
-      return ffi::GetRef<Call>(call);
+      return GetRef<Call>(call);
     }
 
     // We bring the calls of reshape PrimFunc back to calls of high-level
@@ -94,13 +93,13 @@ class DataflowReshapeRewriter : public ExprMutator {
     // then flattens the tuple input so that the fused TIR reshape function ends up having
     // multiple input buffers. But only one of them should be accessed and reshaped.
     if (used_tensor_arg_indices.size() != 1) {
-      return ffi::GetRef<Call>(call);
+      return GetRef<Call>(call);
     }
 
     auto arg = arg_tuple[used_tensor_arg_indices[0]];
 
     if (!IsCallingTIRReshape(call, arg)) {
-      return ffi::GetRef<Call>(call);
+      return GetRef<Call>(call);
     }
 
     TensorStructInfo res_sinfo = Downcast<TensorStructInfo>(call->struct_info_.value());
@@ -111,7 +110,7 @@ class DataflowReshapeRewriter : public ExprMutator {
     const GlobalVar& global_var = Downcast<GlobalVar>(call->args[0]);
     const auto* func = mod_->functions.Get(global_var).value().as<tir::PrimFuncNode>();
     ICHECK_NOTNULL(func);
-    if (!HasReshapePattern(ffi::GetRef<tir::PrimFunc>(func))) {
+    if (!HasReshapePattern(GetRef<tir::PrimFunc>(func))) {
       return false;
     }
 
@@ -130,7 +129,7 @@ class DataflowReshapeRewriter : public ExprMutator {
     if (inp_sinfo->IsUnknownNdim() || res_sinfo->IsUnknownNdim()) {
       return false;
     }
-    auto product = [](ffi::Array<PrimExpr> args) -> PrimExpr {
+    auto product = [](Array<PrimExpr> args) -> PrimExpr {
       PrimExpr p;
       if (args.empty()) {
         // Scalar tensors may be empty indicating a single element.
@@ -166,10 +165,8 @@ Pass RewriteDataflowReshape() {
   return CreateFunctionPass(pass_func, 0, "RewriteDataflowReshape", {});
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("relax.transform.RewriteDataflowReshape", RewriteDataflowReshape);
-}
+TVM_FFI_REGISTER_GLOBAL("relax.transform.RewriteDataflowReshape")
+    .set_body_typed(RewriteDataflowReshape);
 
 }  // namespace transform
 

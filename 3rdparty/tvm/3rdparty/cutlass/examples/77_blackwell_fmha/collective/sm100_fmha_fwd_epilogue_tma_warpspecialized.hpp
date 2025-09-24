@@ -42,8 +42,7 @@ template<
   class ElementAcc,
   class TileShape,  // Q, D, _
   class StrideO,    // Q, D, B
-  class StrideLSE_,   // Q, B
-  class OrderLoadEpilogue = cute::false_type
+  class StrideLSE   // Q, B
 >
 struct Sm100FmhaFwdEpilogueTmaWarpspecialized {
     
@@ -55,12 +54,7 @@ struct Sm100FmhaFwdEpilogueTmaWarpspecialized {
 //  using SmemLayoutAtomO = decltype(make_ordered_layout(select<0,1>(TileShape{}), Step<_1, _0>{}));
   using SmemLayoutO = decltype(tile_to_shape(SmemLayoutAtomO{}, replace<2>(TileShape{}, _2{}), Step<_2, _1, _3>{}));
   using SmemLayoutO_ = SmemLayoutO;
-  using StrideLSE = StrideLSE_;
-  using ElementOut = Element;
-
-  static const int NumWarpsEpilogue = 1;
-  static const int NumWarpsLoad = 1;
-
+  
   struct TensorStorage {
 
     using SmemLayoutO = SmemLayoutO_;
@@ -85,23 +79,7 @@ struct Sm100FmhaFwdEpilogueTmaWarpspecialized {
 
   struct Params {
     TMA_O tma_store_o;
-
-    ElementAcc* ptr_LSE;
-    StrideLSE dLSE;
   };
-
-  // FMHA and MLA have different input ProblemShapes; 
-  // get problem_shape_O according to the input ProblemShape.
-  template<class ProblemShape>
-  CUTLASS_DEVICE static constexpr
-  auto get_problem_shape_O (
-    ProblemShape const& problem_shape) {
-    if constexpr (rank_v<decltype(get<2>(ProblemShape{}))> == 2) {
-      return replace<1>(select<0,2,3>(problem_shape), get<2, 0>(problem_shape));
-    } else {
-      return select<0,2,3>(problem_shape);
-    }
-  }
 
   template<class ProblemShape>
   static Params to_underlying_arguments(
@@ -111,8 +89,7 @@ struct Sm100FmhaFwdEpilogueTmaWarpspecialized {
 
     auto ptr_O = args.ptr_O;
     StrideO dO = args.dO;
-
-    auto problem_shape_O = get_problem_shape_O(problem_shape);
+    auto problem_shape_O = select<0,2,3>(problem_shape);
 
     if constexpr (is_variable_length_v<tuple_element_t<0, ProblemShape>>) {
       auto cumulative_length_q = get<0>(problem_shape).cumulative_length;
@@ -133,9 +110,7 @@ struct Sm100FmhaFwdEpilogueTmaWarpspecialized {
     );
 
     return {
-      tma_store_o,
-      args.ptr_LSE,
-      args.dLSE
+      tma_store_o
     };
   }
 
@@ -143,10 +118,6 @@ struct Sm100FmhaFwdEpilogueTmaWarpspecialized {
   static void prefetch_tma_descriptors(Params const& params) {
     cute::prefetch_tma_descriptor(params.tma_store_o.get_tma_descriptor());
   }
-
-  const Params& params;
-
-  CUTLASS_DEVICE Sm100FmhaFwdEpilogueTmaWarpspecialized(const Params& params) : params(params) {}
 
   template<class BlkCoord, class ProblemShape, class ParamsProblemShape>
   CUTLASS_DEVICE auto
@@ -164,7 +135,7 @@ struct Sm100FmhaFwdEpilogueTmaWarpspecialized {
     int o0_index = 2 * get<0>(blk_coord);
     int o1_index = 2 * get<0>(blk_coord) + 1;
 
-    Tensor mO_qdl_p = params.tma_store_o.get_tma_tensor(get_problem_shape_O(problem_shape));
+    Tensor mO_qdl_p = params.tma_store_o.get_tma_tensor(select<0,2,3>(problem_shape));
     // offset mode 0 by (max_length - real_length)
     // offset mode 3,1 by cumulative_length + real_length
     // the ptr is already offset by - max_length
@@ -218,11 +189,6 @@ struct Sm100FmhaFwdEpilogueTmaWarpspecialized {
     ++pipeline_release_state;
 
     tma_store_wait<0>();
-
-    if constexpr (cute::is_same_v<OrderLoadEpilogue, cute::true_type>) {
-      cutlass::arch::NamedBarrier::arrive((NumWarpsLoad + NumWarpsEpilogue) * NumThreadsPerWarp, 
-                                          cutlass::arch::ReservedNamedBarriers::EpilogueBarrier);
-    }
 
     pipeline.consumer_release(pipeline_release_state);
     ++pipeline_release_state;

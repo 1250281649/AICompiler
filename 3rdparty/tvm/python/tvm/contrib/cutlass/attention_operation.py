@@ -147,7 +147,8 @@ def instantiate_attention_template(attrs):
   }
 
   CHECK(Attention::check_supported(p));
-  cudaStream_t stream = static_cast<cudaStream_t>(TVMFFIEnvGetStream(kDLCUDA, ${query}->device.device_id));
+  auto func = tvm::ffi::Function::GetGlobalRequired("runtime.get_cuda_stream");
+  cudaStream_t stream = static_cast<cudaStream_t>(func().cast<void*>());
 
   kernel_fn<<<p.getBlocksGrid(), p.getThreadsGrid(), smem_bytes, stream>>>(p);
 
@@ -185,7 +186,8 @@ def instantiate_flash_attention_template(attrs):
     int v_batch_stride = v_row_stride * ${num_keys};
     int o_batch_stride = o_row_stride * ${num_queries};
 
-    cudaStream_t stream = static_cast<cudaStream_t>(TVMFFIEnvGetStream(kDLCUDA, ${query}->device.device_id));
+    auto func = tvm::ffi::Function::GetGlobalRequired("runtime.get_cuda_stream");
+    cudaStream_t stream = static_cast<cudaStream_t>(func().cast<void*>());
 
     flash_attn::flash_attention_forward(
                             static_cast<const cutlass::half_t*>(${query}->data),
@@ -235,7 +237,8 @@ def instantiate_flash_attention_template(attrs):
     int v_batch_stride = v_row_stride * ${num_keys};
     int o_batch_stride = o_row_stride * ${num_queries};
 
-    cudaStream_t stream = static_cast<cudaStream_t>(TVMFFIEnvGetStream(kDLCUDA, ${query}->device.device_id));
+    auto func = tvm::ffi::Function::GetGlobalRequired("runtime.get_cuda_stream");
+    cudaStream_t stream = static_cast<cudaStream_t>(func().cast<void*>());
 
     flash_attn::flash_attention_forward(
                             static_cast<const cutlass::half_t*>(${qkv}->data),
@@ -291,7 +294,8 @@ def instantiate_flash_attention_var_len_template(attrs):
     int v_row_stride = v_head_stride * ${num_kv_heads};
     int o_row_stride = o_head_stride * ${num_q_heads};
 
-    cudaStream_t stream = static_cast<cudaStream_t>(TVMFFIEnvGetStream(kDLCUDA, ${query}->device.device_id));
+    auto func = tvm::ffi::Function::GetGlobalRequired("runtime.get_cuda_stream");
+    cudaStream_t stream = static_cast<cudaStream_t>(func().cast<void*>());
 
     flash_attn::flash_attention_var_len_forward(
                             static_cast<const cutlass::half_t*>(${query}->data),

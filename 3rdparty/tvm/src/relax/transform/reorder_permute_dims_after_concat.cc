@@ -22,7 +22,6 @@
  * \brief Reorder concat(permute_dims(A), permute_dims(B)) into permute_dims(concat(A,B))
  */
 
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/relax/analysis.h>
 #include <tvm/relax/dataflow_matcher.h>
 #include <tvm/relax/expr.h>
@@ -41,7 +40,7 @@ namespace tvm {
 namespace relax {
 
 namespace {
-std::tuple<DFPattern, ffi::TypedFunction<Expr(Expr, ffi::Map<DFPattern, Expr>)>> CreatePatterns() {
+std::tuple<DFPattern, ffi::TypedFunction<Expr(Expr, Map<DFPattern, Expr>)>> CreatePatterns() {
   // TODO(Lunderberg): Allow pattern-matching to handle a flexible
   // number of arguments, each of which matches the same type of
   // pattern.
@@ -73,7 +72,7 @@ std::tuple<DFPattern, ffi::TypedFunction<Expr(Expr, ffi::Map<DFPattern, Expr>)>>
   auto make_pattern_with_num_concat = [&](size_t num_concat) -> DFPattern {
     ICHECK_LT(num_concat, pat_permute_dims.size());
     auto concat_tuple = TuplePattern(
-        ffi::Array<DFPattern>(pat_permute_dims.begin(), pat_permute_dims.begin() + num_concat));
+        Array<DFPattern>(pat_permute_dims.begin(), pat_permute_dims.begin() + num_concat));
     return IsOp("relax.concat")(concat_tuple);
   };
 
@@ -82,7 +81,7 @@ std::tuple<DFPattern, ffi::TypedFunction<Expr(Expr, ffi::Map<DFPattern, Expr>)>>
     pat_concat = pat_concat | make_pattern_with_num_concat(i);
   }
 
-  auto get_permute_dims_optional_axes = [](const Expr& expr) -> ffi::Optional<ffi::Array<Integer>> {
+  auto get_permute_dims_optional_axes = [](const Expr& expr) -> Optional<Array<Integer>> {
     auto call = expr.as<CallNode>();
     ICHECK(call);
     auto attrs = call->attrs.as<PermuteDimsAttrs>();
@@ -92,12 +91,12 @@ std::tuple<DFPattern, ffi::TypedFunction<Expr(Expr, ffi::Map<DFPattern, Expr>)>>
   };
 
   auto get_permute_dims_axes =
-      [get_permute_dims_optional_axes](const Expr& expr) -> ffi::Array<Integer> {
+      [get_permute_dims_optional_axes](const Expr& expr) -> Array<Integer> {
     if (auto opt_axes = get_permute_dims_optional_axes(expr)) {
       return opt_axes.value();
     } else {
       auto call = Downcast<Call>(expr);
-      ffi::Array<Integer> permutation;
+      Array<Integer> permutation;
       auto arg_sinfo = call->args[0]->struct_info_.as<TensorStructInfoNode>();
       CHECK(arg_sinfo) << "Expected permute_dims to have a single tensor argument, "
                        << "but argument " << call->args[0] << " has struct info "
@@ -111,7 +110,7 @@ std::tuple<DFPattern, ffi::TypedFunction<Expr(Expr, ffi::Map<DFPattern, Expr>)>>
     }
   };
 
-  auto permute_dims_axes_are_compatible = [&](const ffi::Array<Expr>& permute_dims) -> bool {
+  auto permute_dims_axes_are_compatible = [&](const Array<Expr>& permute_dims) -> bool {
     auto first_axes = get_permute_dims_axes(permute_dims[0]);
     for (size_t i_arg = 1; i_arg < permute_dims.size(); i_arg++) {
       auto i_axes = get_permute_dims_axes(permute_dims[i_arg]);
@@ -127,9 +126,9 @@ std::tuple<DFPattern, ffi::TypedFunction<Expr(Expr, ffi::Map<DFPattern, Expr>)>>
     return true;
   };
 
-  auto rewriter = [=](Expr expr, ffi::Map<DFPattern, Expr> matches) -> Expr {
-    ffi::Array<Expr> args;
-    ffi::Array<Expr> all_permute_dims;
+  auto rewriter = [=](Expr expr, Map<DFPattern, Expr> matches) -> Expr {
+    Array<Expr> args;
+    Array<Expr> all_permute_dims;
     for (size_t i = 0; i < max_concat; i++) {
       if (auto permute_dim_expr = matches.Get(pat_permute_dims[i])) {
         all_permute_dims.push_back(permute_dim_expr.value());
@@ -145,8 +144,7 @@ std::tuple<DFPattern, ffi::TypedFunction<Expr(Expr, ffi::Map<DFPattern, Expr>)>>
     if (!permute_dims_axes_are_compatible(all_permute_dims)) {
       return expr;
     }
-    ffi::Optional<ffi::Array<Integer>> permute_axes =
-        get_permute_dims_optional_axes(all_permute_dims[0]);
+    Optional<Array<Integer>> permute_axes = get_permute_dims_optional_axes(all_permute_dims[0]);
 
     Call concat_call = Downcast<Call>(matches[pat_concat]);
     auto concat_attrs = concat_call->attrs.as<ConcatAttrs>();
@@ -175,11 +173,8 @@ Pass ReorderPermuteDimsAfterConcat() {
   return CreateFunctionPass(pass_func, 1, "ReorderPermuteDimsAfterConcat", {});
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("relax.transform.ReorderPermuteDimsAfterConcat",
-                        ReorderPermuteDimsAfterConcat);
-}
+TVM_FFI_REGISTER_GLOBAL("relax.transform.ReorderPermuteDimsAfterConcat")
+    .set_body_typed(ReorderPermuteDimsAfterConcat);
 
 }  // namespace transform
 }  // namespace relax

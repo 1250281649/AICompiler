@@ -22,7 +22,6 @@
  */
 #include <dmlc/thread_local.h>
 #include <tvm/ffi/function.h>
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/runtime/device_api.h>
 #include <tvm/runtime/logging.h>
 
@@ -151,12 +150,9 @@ void CPUDeviceAPI::FreeWorkspace(Device dev, void* data) {
   dmlc::ThreadLocalStore<CPUWorkspacePool>::Get()->FreeWorkspace(dev, data);
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def_packed("device_api.cpu", [](ffi::PackedArgs args, ffi::Any* rv) {
-    DeviceAPI* ptr = CPUDeviceAPI::Global();
-    *rv = static_cast<void*>(ptr);
-  });
-}
+TVM_FFI_REGISTER_GLOBAL("device_api.cpu").set_body_packed([](ffi::PackedArgs args, ffi::Any* rv) {
+  DeviceAPI* ptr = CPUDeviceAPI::Global();
+  *rv = static_cast<void*>(ptr);
+});
 }  // namespace runtime
 }  // namespace tvm

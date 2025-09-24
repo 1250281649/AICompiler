@@ -20,7 +20,6 @@
 from typing import Any, Callable, Dict, List, Optional, Sequence, Union
 
 import tvm
-import tvm_ffi
 from tvm import relax as rx
 from tvm import tir
 from tvm.ir.module import IRModule
@@ -101,7 +100,7 @@ class TestingScope(object):
         self._bb.end_scope()
 
 
-@tvm_ffi.register_object("relax.BlockBuilder")
+@tvm.ffi.register_object("relax.BlockBuilder")
 class BlockBuilder(Object):
     """A builder to build Relax IR for testing and dev.
 

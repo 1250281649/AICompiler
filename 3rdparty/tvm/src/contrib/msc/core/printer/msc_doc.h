@@ -24,7 +24,7 @@
 #ifndef TVM_CONTRIB_MSC_CORE_PRINTER_MSC_DOC_H_
 #define TVM_CONTRIB_MSC_CORE_PRINTER_MSC_DOC_H_
 
-#include <tvm/ffi/reflection/registry.h>
+#include <tvm/ffi/reflection/reflection.h>
 #include <tvm/script/printer/doc.h>
 
 #include <string>
@@ -43,11 +43,11 @@ using namespace tvm::script::printer;
 class DeclareDocNode : public ExprDocNode {
  public:
   /*! \brief The type of the variable */
-  ffi::Optional<ExprDoc> type;
+  Optional<ExprDoc> type;
   /*! \brief The variable */
-  ExprDoc variable{ffi::UnsafeInit{}};
+  ExprDoc variable{nullptr};
   /*! \brief The init arguments for the variable. */
-  ffi::Array<ExprDoc> init_args;
+  Array<ExprDoc> init_args;
   /*! \brief Whether to use constructor(otherwise initializer) */
   bool use_constructor{true};
 
@@ -59,7 +59,9 @@ class DeclareDocNode : public ExprDocNode {
         .def_ro("init_args", &DeclareDocNode::init_args)
         .def_ro("use_constructor", &DeclareDocNode::use_constructor);
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("msc.script.printer.DeclareDoc", DeclareDocNode, ExprDocNode);
+
+  static constexpr const char* _type_key = "msc.script.printer.DeclareDoc";
+  TVM_DECLARE_FINAL_OBJECT_INFO(DeclareDocNode, ExprDocNode);
 };
 
 /*!
@@ -76,9 +78,9 @@ class DeclareDoc : public ExprDoc {
    * \param init_args The init arguments of the variable.
    * \param use_constructor Whether to use constructor(otherwise initializer).
    */
-  explicit DeclareDoc(ffi::Optional<ExprDoc> type, ExprDoc variable, ffi::Array<ExprDoc> init_args,
+  explicit DeclareDoc(Optional<ExprDoc> type, ExprDoc variable, Array<ExprDoc> init_args,
                       bool use_constructor);
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NOTNULLABLE(DeclareDoc, ExprDoc, DeclareDocNode);
+  TVM_DEFINE_NOTNULLABLE_OBJECT_REF_METHODS(DeclareDoc, ExprDoc, DeclareDocNode);
 };
 
 /*!
@@ -99,8 +101,9 @@ class StrictListDocNode : public ExprDocNode {
         .def_ro("list", &StrictListDocNode::list)
         .def_ro("allow_empty", &StrictListDocNode::allow_empty);
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("msc.script.printer.StrictListDoc", StrictListDocNode,
-                                    ExprDocNode);
+
+  static constexpr const char* _type_key = "msc.script.printer.StrictListDoc";
+  TVM_DECLARE_FINAL_OBJECT_INFO(StrictListDocNode, ExprDocNode);
 };
 
 /*!
@@ -116,7 +119,7 @@ class StrictListDoc : public ExprDoc {
    * \param allow_empty Whether to allow empty.
    */
   explicit StrictListDoc(ListDoc list, bool allow_empty);
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NOTNULLABLE(StrictListDoc, ExprDoc, StrictListDocNode);
+  TVM_DEFINE_NOTNULLABLE_OBJECT_REF_METHODS(StrictListDoc, ExprDoc, StrictListDocNode);
 };
 
 /*!
@@ -127,13 +130,15 @@ class StrictListDoc : public ExprDoc {
 class PointerDocNode : public ExprDocNode {
  public:
   /*! \brief The name of the identifier */
-  ffi::String name;
+  String name;
 
   static void RegisterReflection() {
     namespace refl = tvm::ffi::reflection;
     refl::ObjectDef<PointerDocNode>().def_ro("name", &PointerDocNode::name);
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("msc.script.printer.PointerDoc", PointerDocNode, ExprDocNode);
+
+  static constexpr const char* _type_key = "msc.script.printer.PointerDoc";
+  TVM_DECLARE_FINAL_OBJECT_INFO(PointerDocNode, ExprDocNode);
 };
 
 /*!
@@ -147,8 +152,8 @@ class PointerDoc : public ExprDoc {
    * \brief Constructor of PointerDoc.
    * \param name The name of identifier.
    */
-  explicit PointerDoc(ffi::String name);
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NOTNULLABLE(PointerDoc, ExprDoc, PointerDocNode);
+  explicit PointerDoc(String name);
+  TVM_DEFINE_NOTNULLABLE_OBJECT_REF_METHODS(PointerDoc, ExprDoc, PointerDocNode);
 };
 
 /*!
@@ -159,11 +164,11 @@ class PointerDoc : public ExprDoc {
 class StructDocNode : public StmtDocNode {
  public:
   /*! \brief The name of class. */
-  IdDoc name{ffi::UnsafeInit{}};
+  IdDoc name{nullptr};
   /*! \brief Decorators of class. */
-  ffi::Array<ExprDoc> decorators;
+  Array<ExprDoc> decorators;
   /*! \brief The body of class. */
-  ffi::Array<StmtDoc> body;
+  Array<StmtDoc> body;
 
   static void RegisterReflection() {
     namespace refl = tvm::ffi::reflection;
@@ -172,7 +177,9 @@ class StructDocNode : public StmtDocNode {
         .def_ro("decorators", &StructDocNode::decorators)
         .def_ro("body", &StructDocNode::body);
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("msc.script.printer.StructDoc", StructDocNode, StmtDocNode);
+
+  static constexpr const char* _type_key = "msc.script.printer.StructDoc";
+  TVM_DECLARE_FINAL_OBJECT_INFO(StructDocNode, StmtDocNode);
 };
 
 /*!
@@ -188,8 +195,8 @@ class StructDoc : public StmtDoc {
    * \param decorators The decorator of class.
    * \param body The body of class.
    */
-  explicit StructDoc(IdDoc name, ffi::Array<ExprDoc> decorators, ffi::Array<StmtDoc> body);
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NOTNULLABLE(StructDoc, StmtDoc, StructDocNode);
+  explicit StructDoc(IdDoc name, Array<ExprDoc> decorators, Array<StmtDoc> body);
+  TVM_DEFINE_NOTNULLABLE_OBJECT_REF_METHODS(StructDoc, StmtDoc, StructDocNode);
 };
 
 /*!
@@ -200,7 +207,7 @@ class StructDoc : public StmtDoc {
 class ConstructorDocNode : public StmtDocNode {
  public:
   /*! \brief The name of function. */
-  IdDoc name{ffi::UnsafeInit{}};
+  IdDoc name{nullptr};
   /*!
    * \brief The arguments of function.
    *
@@ -208,9 +215,9 @@ class ConstructorDocNode : public StmtDocNode {
    * `annotation` means argument type,
    * and `rhs` means default value.
    */
-  ffi::Array<AssignDoc> args;
+  Array<AssignDoc> args;
   /*! \brief The body of function. */
-  ffi::Array<StmtDoc> body;
+  Array<StmtDoc> body;
 
   static void RegisterReflection() {
     namespace refl = tvm::ffi::reflection;
@@ -219,8 +226,9 @@ class ConstructorDocNode : public StmtDocNode {
         .def_ro("args", &ConstructorDocNode::args)
         .def_ro("body", &ConstructorDocNode::body);
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("msc.script.printer.ConstructorDoc", ConstructorDocNode,
-                                    StmtDocNode);
+
+  static constexpr const char* _type_key = "msc.script.printer.ConstructorDoc";
+  TVM_DECLARE_FINAL_OBJECT_INFO(ConstructorDocNode, StmtDocNode);
 };
 
 /*!
@@ -236,8 +244,8 @@ class ConstructorDoc : public StmtDoc {
    * \param args The arguments of function.
    * \param body The body of function.
    */
-  explicit ConstructorDoc(IdDoc name, ffi::Array<AssignDoc> args, ffi::Array<StmtDoc> body);
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NOTNULLABLE(ConstructorDoc, StmtDoc, ConstructorDocNode);
+  explicit ConstructorDoc(IdDoc name, Array<AssignDoc> args, Array<StmtDoc> body);
+  TVM_DEFINE_NOTNULLABLE_OBJECT_REF_METHODS(ConstructorDoc, StmtDoc, ConstructorDocNode);
 };
 
 /*!
@@ -248,11 +256,11 @@ class ConstructorDoc : public StmtDoc {
 class SwitchDocNode : public StmtDocNode {
  public:
   /*! \brief The predicates of the switch statement. */
-  ffi::Array<ExprDoc> predicates;
+  Array<ExprDoc> predicates;
   /*! \brief The branchs of the switch statement. */
-  ffi::Array<ffi::Array<StmtDoc>> branchs;
+  Array<Array<StmtDoc>> branchs;
   /*! \brief The default_branch of the switch statement. */
-  ffi::Array<StmtDoc> default_branch;
+  Array<StmtDoc> default_branch;
 
   static void RegisterReflection() {
     namespace refl = tvm::ffi::reflection;
@@ -261,7 +269,9 @@ class SwitchDocNode : public StmtDocNode {
         .def_ro("branchs", &SwitchDocNode::branchs)
         .def_ro("default_branch", &SwitchDocNode::default_branch);
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("msc.script.printer.SwitchDoc", SwitchDocNode, StmtDocNode);
+
+  static constexpr const char* _type_key = "msc.script.printer.SwitchDoc";
+  TVM_DECLARE_FINAL_OBJECT_INFO(SwitchDocNode, StmtDocNode);
 };
 
 /*!
@@ -277,9 +287,9 @@ class SwitchDoc : public StmtDoc {
    * \param branchs The branchs of the switch statement.
    * \param default_branch The default_branch of the switch statement.
    */
-  explicit SwitchDoc(ffi::Array<ExprDoc> predicates, ffi::Array<ffi::Array<StmtDoc>> branchs,
-                     ffi::Array<StmtDoc> default_branch);
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NOTNULLABLE(SwitchDoc, StmtDoc, SwitchDocNode);
+  explicit SwitchDoc(Array<ExprDoc> predicates, Array<Array<StmtDoc>> branchs,
+                     Array<StmtDoc> default_branch);
+  TVM_DEFINE_NOTNULLABLE_OBJECT_REF_METHODS(SwitchDoc, StmtDoc, SwitchDocNode);
 };
 
 /*!
@@ -290,7 +300,7 @@ class SwitchDoc : public StmtDoc {
 class LambdaDocNode : public StmtDocNode {
  public:
   /*! \brief The name of lambda. */
-  IdDoc name{ffi::UnsafeInit{}};
+  IdDoc name{nullptr};
   /*!
    * \brief The arguments of lambda.
    *
@@ -298,11 +308,11 @@ class LambdaDocNode : public StmtDocNode {
    * `annotation` means argument type,
    * and `rhs` means default value.
    */
-  ffi::Array<AssignDoc> args;
+  Array<AssignDoc> args;
   /*! \brief References of lambda. */
-  ffi::Array<ExprDoc> refs;
+  Array<ExprDoc> refs;
   /*! \brief The body of lambda. */
-  ffi::Array<StmtDoc> body;
+  Array<StmtDoc> body;
 
   static void RegisterReflection() {
     namespace refl = tvm::ffi::reflection;
@@ -312,7 +322,9 @@ class LambdaDocNode : public StmtDocNode {
         .def_ro("refs", &LambdaDocNode::refs)
         .def_ro("body", &LambdaDocNode::body);
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("msc.script.printer.LambdaDoc", LambdaDocNode, StmtDocNode);
+
+  static constexpr const char* _type_key = "msc.script.printer.LambdaDoc";
+  TVM_DECLARE_FINAL_OBJECT_INFO(LambdaDocNode, StmtDocNode);
 };
 
 /*!
@@ -329,9 +341,8 @@ class LambdaDoc : public StmtDoc {
    * \param refs The references of lambda.
    * \param body The body of lambda.
    */
-  explicit LambdaDoc(IdDoc name, ffi::Array<AssignDoc> args, ffi::Array<ExprDoc> refs,
-                     ffi::Array<StmtDoc> body);
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NOTNULLABLE(LambdaDoc, StmtDoc, LambdaDocNode);
+  explicit LambdaDoc(IdDoc name, Array<AssignDoc> args, Array<ExprDoc> refs, Array<StmtDoc> body);
+  TVM_DEFINE_NOTNULLABLE_OBJECT_REF_METHODS(LambdaDoc, StmtDoc, LambdaDocNode);
 };
 
 }  // namespace msc

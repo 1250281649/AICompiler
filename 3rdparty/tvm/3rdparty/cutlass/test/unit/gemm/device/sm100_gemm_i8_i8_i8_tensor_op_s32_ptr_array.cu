@@ -54,7 +54,7 @@
 
 using namespace cute;
 
-#if (defined(CUTLASS_ARCH_MMA_SM100_SUPPORTED) && !defined(CUTLASS_SM100_FAMILY_ARCHS_ENABLED))
+#if defined(CUTLASS_ARCH_MMA_SM100_SUPPORTED)
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////// 128x64x128 Cluster1x1x1 TMEM 4x1 ////////////////////////////////////////////
@@ -263,5 +263,5 @@ TEST(SM100_Device_Gemm_s8t_s8n_s8n_tensorop_2cta_s32_ptr_array, 128x1024x128_2x4
   EXPECT_TRUE(pass);
 }
 
-#endif // defined(CUTLASS_ARCH_MMA_SM100_SUPPORTED) && !defined(CUTLASS_SM100_FAMILY_ARCHS_ENABLED)
+#endif // #if defined(CUTLASS_ARCH_MMA_SM100_SUPPORTED)
 

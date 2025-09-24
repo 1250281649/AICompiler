@@ -56,13 +56,13 @@ class RelaxCodeGen : public PyCodeGen<RelaxCodeGenConfig, RelaxCodeGenHelper> {
   void CodeGenInference() final;
 
   /*! \brief Describe the prim*/
-  const ffi::String DescribePrim(const MSCPrim& prim) final;
+  const String DescribePrim(const MSCPrim& prim) final;
 
   /*! \brief Get the docs for the op*/
-  const ffi::Array<Doc> GetOpCodes(const MSCJoint& node) final;
+  const Array<Doc> GetOpCodes(const MSCJoint& node) final;
 
   /*! \brief Get tensor type of the framework*/
-  const ffi::String TensorType() const final { return "relax.Expr"; }
+  const String TensorType() const final { return "relax.Expr"; }
 };
 
 }  // namespace msc

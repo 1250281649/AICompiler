@@ -22,10 +22,8 @@
  * \brief A simple JSON runtime for CUDNN.
  */
 
-#include <tvm/ffi/extra/c_env_api.h>
 #include <tvm/ffi/function.h>
-#include <tvm/ffi/reflection/registry.h>
-#include <tvm/runtime/tensor.h>
+#include <tvm/runtime/ndarray.h>
 
 #include <cstddef>
 #include <string>
@@ -49,10 +47,10 @@ using namespace tvm::runtime::json;
 class cuDNNJSONRuntime : public JSONRuntimeBase {
  public:
   cuDNNJSONRuntime(const std::string& symbol_name, const std::string& graph_json,
-                   const ffi::Array<ffi::String> const_names)
+                   const Array<String> const_names)
       : JSONRuntimeBase(symbol_name, graph_json, const_names) {}
 
-  void Init(const ffi::Array<Tensor>& consts) override {
+  void Init(const Array<NDArray>& consts) override {
     op_execs_.resize(nodes_.size());
     // get some config from the graph
     for (size_t i = 0; i < nodes_.size(); ++i) {
@@ -70,7 +68,7 @@ class cuDNNJSONRuntime : public JSONRuntimeBase {
     }
   }
 
-  const char* kind() const override { return "cudnn_json"; }  // May be overridden
+  const char* type_key() const override { return "cudnn_json"; }  // May be overridden
 
   void Run() override {
     for (const auto& f : op_execs_) {
@@ -101,9 +99,7 @@ class cuDNNJSONRuntime : public JSONRuntimeBase {
   }
 
   std::function<void()> GetConv2DExec(const JSONGraphNode& node) {
-    int device_id;
-    CUDA_CALL(cudaGetDevice(&device_id));
-    auto* entry_ptr = tvm::contrib::CuDNNThreadEntry::ThreadLocal(DLDevice{kDLCUDA, device_id});
+    auto* entry_ptr = tvm::contrib::CuDNNThreadEntry::ThreadLocal();
     auto op_name = node.GetOpName();
 
     std::vector<int> input_dims, kernel_dims, output_dims;
@@ -162,9 +158,7 @@ class cuDNNJSONRuntime : public JSONRuntimeBase {
 
     int algo = best_algo.cast<int>();
     std::function<void()> op_exec = [=]() {
-      int device_id;
-      CUDA_CALL(cudaGetDevice(&device_id));
-      cudaStream_t stream = static_cast<cudaStream_t>(TVMFFIEnvGetStream(kDLCUDA, device_id));
+      auto stream = static_cast<cudaStream_t>(GetCUDAStream());
       CUDNN_CALL(cudnnSetStream(entry_ptr->handle, stream));
 
       auto get_inputs = [this](const JSONGraphNode& node, bool has_bias) {
@@ -237,19 +231,16 @@ class cuDNNJSONRuntime : public JSONRuntimeBase {
   std::vector<std::function<void()>> op_execs_;
 };
 
-ffi::Module cuDNNJSONRuntimeCreate(ffi::String symbol_name, ffi::String graph_json,
-                                   const ffi::Array<ffi::String>& const_names) {
-  auto n = ffi::make_object<cuDNNJSONRuntime>(symbol_name, graph_json, const_names);
-  return ffi::Module(n);
+runtime::Module cuDNNJSONRuntimeCreate(String symbol_name, String graph_json,
+                                       const Array<String>& const_names) {
+  auto n = make_object<cuDNNJSONRuntime>(symbol_name, graph_json, const_names);
+  return runtime::Module(n);
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef()
-      .def("runtime.cuDNNJSONRuntimeCreate", cuDNNJSONRuntimeCreate)
-      .def("ffi.Module.load_from_bytes.cudnn_json",
-           JSONRuntimeBase::LoadFromBytes<cuDNNJSONRuntime>);
-}
+TVM_FFI_REGISTER_GLOBAL("runtime.cuDNNJSONRuntimeCreate").set_body_typed(cuDNNJSONRuntimeCreate);
+
+TVM_FFI_REGISTER_GLOBAL("runtime.module.loadbinary_cudnn_json")
+    .set_body_typed(JSONRuntimeBase::LoadFromBinary<cuDNNJSONRuntime>);
 
 }  // namespace contrib
 }  // namespace runtime

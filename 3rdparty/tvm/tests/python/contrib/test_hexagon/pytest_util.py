@@ -140,7 +140,7 @@ TensorContentDtypeMin = collections.namedtuple("TensorContentDtypeMin", [])
 TensorContentDtypeMax = collections.namedtuple("TensorContentDtypeMax", [])
 
 
-def create_populated_numpy_tensor(
+def create_populated_numpy_ndarray(
     input_shape: Union[list, tuple], dtype: str, input_tensor_populator
 ) -> np.ndarray:
     """

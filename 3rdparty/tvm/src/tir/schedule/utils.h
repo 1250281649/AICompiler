@@ -56,12 +56,12 @@ namespace tir {
  * \param loop_srefs The loop StmtSRefs to be converted
  * \return The conversion result loops
  */
-inline ffi::Array<For> LoopSRefs2Loops(const ffi::Array<StmtSRef>& loop_srefs) {
-  ffi::Array<For> loops;
+inline Array<For> LoopSRefs2Loops(const Array<StmtSRef>& loop_srefs) {
+  Array<For> loops;
   loops.reserve(loop_srefs.size());
   for (StmtSRef loop_sref : loop_srefs) {
     const ForNode* loop = TVM_SREF_TO_FOR(loop_sref);
-    loops.push_back(ffi::GetRef<For>(loop));
+    loops.push_back(GetRef<For>(loop));
   }
   return loops;
 }
@@ -72,9 +72,8 @@ inline ffi::Array<For> LoopSRefs2Loops(const ffi::Array<StmtSRef>& loop_srefs) {
  * \param block_rvs The random variables to be converted
  * \return The conversion result srefs
  */
-inline ffi::Array<StmtSRef> BlockRVs2StmtSRefs(const Schedule& sch,
-                                               const ffi::Array<BlockRV>& block_rvs) {
-  ffi::Array<StmtSRef> block_srefs;
+inline Array<StmtSRef> BlockRVs2StmtSRefs(const Schedule& sch, const Array<BlockRV>& block_rvs) {
+  Array<StmtSRef> block_srefs;
   block_srefs.reserve(block_rvs.size());
   for (const BlockRV& block_rv : block_rvs) {
     block_srefs.push_back(sch->GetSRef(block_rv));
@@ -111,7 +110,7 @@ inline bool CanRelaxStorageUnderThread(const runtime::StorageScope& storage_scop
  */
 inline Stmt RemoveFromSeqStmt(const SeqStmt& seq, const Stmt& to_remove) {
   ICHECK_GT(seq->size(), 1);
-  ffi::Array<Stmt> new_stmts;
+  Array<Stmt> new_stmts;
   new_stmts.reserve(seq->size());
   for (const Stmt& stmt : seq->seq) {
     if (to_remove.same_as(stmt)) {
@@ -133,7 +132,7 @@ inline Stmt RemoveFromSeqStmt(const SeqStmt& seq, const Stmt& to_remove) {
  * \return If the Stmt is SeqStmt, then returns the sequence;
  * Otherwise, returns a single-element Array with the Stmt inside.
  */
-inline ffi::Array<Stmt> AsArray(const Stmt& stmt) {
+inline Array<Stmt> AsArray(const Stmt& stmt) {
   if (const auto* seq_stmt = stmt.as<SeqStmtNode>()) {
     return seq_stmt->seq;
   }
@@ -161,7 +160,7 @@ inline bool IsSingleStmt(const Stmt& stmt) {
  * \param iter_var_type The type of the new IterVar
  * \return The newly created IterVar
  */
-inline IterVar IterVarFromLoop(const For& loop, ffi::String name, IterVarType iter_var_type) {
+inline IterVar IterVarFromLoop(const For& loop, String name, IterVarType iter_var_type) {
   return IterVar(Range::FromMinExtent(loop->min, loop->extent),
                  Var(std::move(name), loop->loop_var.dtype()), iter_var_type);
 }
@@ -222,11 +221,10 @@ inline const int64_t* GetLoopIntExtent(const StmtSRef& loop_sref) {
  * \return The single variable in the expression, or std::nullopt if the expression is neither a
  * variable or a constant shift from a variable
  */
-inline ffi::Optional<Var> AnalyzeVarWithShift(const PrimExpr& expr,
-                                              ffi::Optional<IntImm>* constant) {
+inline Optional<Var> AnalyzeVarWithShift(const PrimExpr& expr, Optional<IntImm>* constant) {
   if (const auto* var = expr.as<VarNode>()) {
     *constant = std::nullopt;
-    return ffi::GetRef<Var>(var);
+    return GetRef<Var>(var);
   }
   arith::PVar<Var> var;
   arith::PVar<IntImm> shift;
@@ -254,8 +252,8 @@ inline ffi::Optional<Var> AnalyzeVarWithShift(const PrimExpr& expr,
  * \return std::nullopt if not found; otherwise the annotation value
  */
 template <class TObjectRef, class TStmtNode>
-inline ffi::Optional<TObjectRef> GetAnn(const TStmtNode* stmt, const ffi::String& ann_key) {
-  const ffi::Map<ffi::String, ffi::Any>* annotations = &stmt->annotations;
+inline Optional<TObjectRef> GetAnn(const TStmtNode* stmt, const String& ann_key) {
+  const Map<String, ffi::Any>* annotations = &stmt->annotations;
   for (const auto& ann : *annotations) {
     if (ann.first == ann_key) {
       return Downcast<TObjectRef>(ann.second);
@@ -272,7 +270,7 @@ inline ffi::Optional<TObjectRef> GetAnn(const TStmtNode* stmt, const ffi::String
  * \return std::nullopt if not found; otherwise the annotation value
  */
 template <class TObjectRef>
-inline ffi::Optional<TObjectRef> GetAnn(const StmtSRef& sref, const ffi::String& ann_key) {
+inline Optional<TObjectRef> GetAnn(const StmtSRef& sref, const String& ann_key) {
   if (const auto* loop = sref->StmtAs<ForNode>()) {
     return GetAnn<TObjectRef, ForNode>(loop, ann_key);
   } else if (const auto* block = sref->StmtAs<BlockNode>()) {
@@ -290,9 +288,9 @@ inline ffi::Optional<TObjectRef> GetAnn(const StmtSRef& sref, const ffi::String&
  * \param ann_val The annotation value to be checked
  * \return Whether a Block/For has a specific pair of annotation key and values
  */
-inline bool HasAnn(const StmtSRef& sref, const ffi::String& ann_key, const ffi::String& ann_val) {
-  ffi::Optional<ffi::String> result = GetAnn<ffi::String>(sref, ann_key);
-  return result.has_value() && result.value() == ann_val;
+inline bool HasAnn(const StmtSRef& sref, const String& ann_key, const String& ann_val) {
+  Optional<String> result = GetAnn<String>(sref, ann_key);
+  return result.defined() && result.value() == ann_val;
 }
 
 /*!
@@ -302,8 +300,8 @@ inline bool HasAnn(const StmtSRef& sref, const ffi::String& ann_key, const ffi::
  * \param ann_val The boolean annotation value to be checked
  * \return Whether a Block/For has a specific pair of annotation key and values
  */
-inline bool HasAnn(const StmtSRef& sref, const ffi::String& ann_key, bool ann_val) {
-  ffi::Optional<Bool> result = GetAnn<Bool>(sref, ann_key);
+inline bool HasAnn(const StmtSRef& sref, const String& ann_key, bool ann_val) {
+  Optional<Bool> result = GetAnn<Bool>(sref, ann_key);
   return result.defined() && result.value() == ann_val;
 }
 
@@ -321,13 +319,13 @@ inline bool HasAnn(const StmtSRef& sref, const ffi::String& ann_key, bool ann_va
 inline void ReorderAndFuseReductionLoops(const tir::Schedule& sch, const tir::BlockRV& block_rv,
                                          tir::LoopRV* fused_reduce_loop,
                                          size_t* num_spatial_loops) {
-  ffi::Array<tir::LoopRV> loops = sch->GetLoops(block_rv);
-  ffi::Array<tir::StmtSRef> loop_srefs;
+  Array<tir::LoopRV> loops = sch->GetLoops(block_rv);
+  Array<tir::StmtSRef> loop_srefs;
   for (const tir::LoopRV& loop_rv : loops) {
     loop_srefs.push_back(sch->GetSRef(loop_rv));
   }
 
-  ffi::Array<tir::LoopRV> new_order;
+  Array<tir::LoopRV> new_order;
   // Step 1. Add spatial loops.
   *num_spatial_loops = 0;
   for (size_t i = 0; i < loops.size(); ++i) {
@@ -337,7 +335,7 @@ inline void ReorderAndFuseReductionLoops(const tir::Schedule& sch, const tir::Bl
     }
   }
   // Step 2. Add reduction loops.
-  ffi::Array<tir::LoopRV> reduction_loops;
+  Array<tir::LoopRV> reduction_loops;
   for (size_t i = 0; i < loops.size(); ++i) {
     if (GetLoopIterType(loop_srefs[i]) == tir::kCommReduce) {
       new_order.push_back(loops[i]);
@@ -368,7 +366,7 @@ inline void ReorderAndFuseReductionLoops(const tir::Schedule& sch, const tir::Bl
  * \param buffer_index_type The BufferIndexType value to convert
  * \return The string representation of BufferIndexType
  */
-inline ffi::String BufferIndexType2Str(BufferIndexType buffer_index_type) {
+inline String BufferIndexType2Str(BufferIndexType buffer_index_type) {
   if (buffer_index_type == BufferIndexType::kRead) {
     return "read";
   } else {
@@ -411,8 +409,8 @@ inline bool HasBlock(const Schedule& sch, const std::string& block_name) {
  * \param rv_map The substitution map for variables.
  * \return The transformed objects.
  */
-ffi::Array<Any> TranslateInputRVs(const ffi::Array<Any>& inputs,
-                                  const std::unordered_map<const Object*, const Object*>& rv_map);
+Array<Any> TranslateInputRVs(const Array<Any>& inputs,
+                             const std::unordered_map<const Object*, const Object*>& rv_map);
 
 /*!
  * \brief Update the variable substitution map according to the new outputs.
@@ -420,7 +418,7 @@ ffi::Array<Any> TranslateInputRVs(const ffi::Array<Any>& inputs,
  * \param new_outputs The new outputs of the same schedule instruction.
  * \param rv_map The substitution map for variables.
  */
-void TranslateAddOutputRVs(const ffi::Array<Any>& old_outputs, const ffi::Array<Any>& new_outputs,
+void TranslateAddOutputRVs(const Array<Any>& old_outputs, const Array<Any>& new_outputs,
                            std::unordered_map<const Object*, const Object*>* rv_map);
 
 /*!
@@ -429,7 +427,7 @@ void TranslateAddOutputRVs(const ffi::Array<Any>& old_outputs, const ffi::Array<
  * \param remove_postproc If postprocessing instructions are removed.
  * \return Number of instructions.
  */
-int GetNumValidInstructions(const ffi::Array<Instruction>& insts, bool remove_postproc);
+int GetNumValidInstructions(const Array<Instruction>& insts, bool remove_postproc);
 
 }  // namespace tir
 }  // namespace tvm

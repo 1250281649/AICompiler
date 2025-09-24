@@ -45,7 +45,7 @@ public class TVMValue {
     throw new UnsupportedOperationException();
   }
 
-  public TensorBase asTensor() {
+  public NDArrayBase asNDArray() {
     throw new UnsupportedOperationException();
   }
 

@@ -20,7 +20,6 @@
  * \file src/relax/transform/to_non_dataflow.cc
  * \brief Transform all dataflow structure to non-dataflow version.
  */
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/relax/expr_functor.h>
 #include <tvm/relax/struct_info.h>
 #include <tvm/relax/transform.h>
@@ -62,10 +61,7 @@ Pass ToNonDataflow() {
   return CreateFunctionPass(pass_func, 0, "ToNonDataflow", {});
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("relax.transform.ToNonDataflow", ToNonDataflow);
-}
+TVM_FFI_REGISTER_GLOBAL("relax.transform.ToNonDataflow").set_body_typed(ToNonDataflow);
 
 }  // namespace transform
 

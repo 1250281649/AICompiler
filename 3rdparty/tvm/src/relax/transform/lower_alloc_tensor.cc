@@ -20,7 +20,6 @@
  * \file src/relax/transform/lower_alloc_tensor.cc
  * \brief Lower any relax.builtin.alloc_tensor remaining after static planning
  */
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/relax/expr_functor.h>
 #include <tvm/relax/transform.h>
 
@@ -38,14 +37,14 @@ class Mutator : public ExprMutator {
     if (op->op.same_as(alloc_tensor_op)) {
       CHECK_EQ(op->args.size(), 4) << "Op " << op->op << " should have three arguments, "
                                    << "[shape, dtype, runtime_device_index, storage_scope].  "
-                                   << "However, received " << ffi::GetRef<Call>(op);
+                                   << "However, received " << GetRef<Call>(op);
 
       auto shape_arg = op->args[0];
       auto dtype = Downcast<DataTypeImm>(op->args[1]);
       PrimValue runtime_device_index = Downcast<PrimValue>(op->args[2]);
       StringImm storage_scope = Downcast<StringImm>(op->args[3]);
 
-      auto shape = [&]() -> ffi::Array<PrimExpr> {
+      auto shape = [&]() -> Array<PrimExpr> {
         if (auto ptr = shape_arg.as<ShapeExprNode>()) {
           return ptr->values;
         }
@@ -100,10 +99,7 @@ Pass LowerAllocTensor() {
   return CreateFunctionPass(pass_func, /*opt_level=*/0, "LowerAllocTensor", {});
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("relax.transform.LowerAllocTensor", LowerAllocTensor);
-}
+TVM_FFI_REGISTER_GLOBAL("relax.transform.LowerAllocTensor").set_body_typed(LowerAllocTensor);
 
 }  // namespace transform
 }  // namespace relax

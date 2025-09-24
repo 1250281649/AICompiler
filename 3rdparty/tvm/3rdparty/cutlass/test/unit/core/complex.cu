@@ -33,8 +33,7 @@
 */
 
 #include <complex>
-#include "cutlass/cutlass.h"
-#include CUDA_STD_HEADER(complex)
+#include <cuda/std/complex>
 
 #include "../common/cutlass_unit_test.h"
 

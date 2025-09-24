@@ -158,18 +158,18 @@ class DirectSubexpr : public ExprVisitor {
 class UsesVarName : public StmtExprVisitor {
  public:
   // Toplevel (static) methods
-  static bool ExprUsesVarName(const PrimExpr& expr, ffi::String var_name);
-  static bool StmtUsesVarName(const Stmt& stmt, ffi::String var_name);
+  static bool ExprUsesVarName(const PrimExpr& expr, String var_name);
+  static bool StmtUsesVarName(const Stmt& stmt, String var_name);
 
  protected:
   // Constructor
-  explicit UsesVarName(ffi::String var_name);
+  explicit UsesVarName(String var_name);
 
   void VisitExpr(const PrimExpr& expr) override;
   void VisitStmt(const Stmt& stmt) override;
 
  private:
-  ffi::String var_name_;
+  String var_name_;
   bool uses_var_name_ = false;
 };
 

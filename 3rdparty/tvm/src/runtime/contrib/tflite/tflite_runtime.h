@@ -27,9 +27,9 @@
 
 #include <dlpack/dlpack.h>
 #include <tensorflow/lite/interpreter.h>
-#include <tvm/ffi/extra/module.h>
 #include <tvm/ffi/function.h>
-#include <tvm/runtime/tensor.h>
+#include <tvm/runtime/module.h>
+#include <tvm/runtime/ndarray.h>
 
 #include <memory>
 #include <string>
@@ -46,7 +46,7 @@ namespace runtime {
  *  This runtime can be accessed in various language via
  *  TVM runtime ffi::Function API.
  */
-class TFLiteRuntime : public ffi::ModuleObj {
+class TFLiteRuntime : public ModuleNode {
  public:
   /*!
    * \brief Get member function to front-end.
@@ -54,15 +54,15 @@ class TFLiteRuntime : public ffi::ModuleObj {
    * \param sptr_to_self The pointer to the module node.
    * \return The corresponding member function.
    */
-  virtual ffi::Optional<ffi::Function> GetFunction(const ffi::String& name);
+  virtual ffi::Function GetFunction(const String& name, const ObjectPtr<Object>& sptr_to_self);
 
   /*!
    * \return The type key of the executor.
    */
-  const char* kind() const { return "TFLiteRuntime"; }
+  const char* type_key() const { return "TFLiteRuntime"; }
 
   /*! \brief Get the property of the runtime module .*/
-  int GetPropertyMask() const final { return ffi::Module::kRunnable; };
+  int GetPropertyMask() const final { return ModulePropertyMask::kRunnable; };
 
   /*!
    * \brief Invoke the internal tflite interpreter and run the whole model in
@@ -84,19 +84,19 @@ class TFLiteRuntime : public ffi::ModuleObj {
    */
   void SetInput(int index, DLTensor* data_in);
   /*!
-   * \brief Return Tensor for given input index.
+   * \brief Return NDArray for given input index.
    * \param index The input index.
    *
-   * \return Tensor corresponding to given input node index.
+   * \return NDArray corresponding to given input node index.
    */
-  Tensor GetInput(int index) const;
+  NDArray GetInput(int index) const;
   /*!
-   * \brief Return Tensor for given output index.
+   * \brief Return NDArray for given output index.
    * \param index The output index.
    *
-   * \return Tensor corresponding to given output node index.
+   * \return NDArray corresponding to given output node index.
    */
-  Tensor GetOutput(int index) const;
+  NDArray GetOutput(int index) const;
   /*!
    * \brief Set the number of threads available to the interpreter.
    * \param num_threads The number of threads to be set.

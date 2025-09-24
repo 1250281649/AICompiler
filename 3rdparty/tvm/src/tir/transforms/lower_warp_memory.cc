@@ -28,7 +28,6 @@
 #include <tvm/arith/analyzer.h>
 #include <tvm/arith/pattern.h>
 #include <tvm/ffi/function.h>
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/target/target.h>
 #include <tvm/tir/analysis.h>
 #include <tvm/tir/builtin.h>
@@ -150,7 +149,7 @@ class WarpStoreCoeffFinder : private StmtExprVisitor {
   }
 
   void UpdatePattern(const PrimExpr& index) {
-    ffi::Array<PrimExpr> m = arith::DetectLinearEquation(index, {warp_index_});
+    Array<PrimExpr> m = arith::DetectLinearEquation(index, {warp_index_});
     ICHECK_EQ(m.size(), 2U)
         << "LowerWarpMemory failed. Could not simplify the store index `" << index
         << "` into the form ax + by + cz + ... Warp memory is approximated by storing values in "
@@ -254,7 +253,7 @@ class WarpAccessRewriter : protected StmtExprMutator {
 
  protected:
   PrimExpr RewriteIndicesAt(const CallNode* op, const std::vector<int>& indices) {
-    ffi::Array<PrimExpr> new_args = op->args;
+    Array<PrimExpr> new_args = op->args;
     for (int i : indices) {
       if (op->args[i].get() == buffer_) {
         PrimExpr local_index = SplitIndexByGroup(op->args[i + 1]).first;
@@ -426,7 +425,7 @@ class WarpMemoryRewriter : private StmtMutator {
     return stmt;
   }
 
-  std::unordered_map<const VarNode*, ffi::String> new_storage_scopes_;
+  std::unordered_map<const VarNode*, String> new_storage_scopes_;
 
  private:
   Stmt VisitStmt_(const AllocateNode* op) {
@@ -462,10 +461,7 @@ Pass LowerWarpMemory() {
   return CreatePrimFuncPass(pass_func, 0, "tir.LowerWarpMemory", {});
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("tir.transform.LowerWarpMemory", LowerWarpMemory);
-}
+TVM_FFI_REGISTER_GLOBAL("tir.transform.LowerWarpMemory").set_body_typed(LowerWarpMemory);
 
 }  // namespace transform
 

@@ -22,7 +22,6 @@
  */
 #include "./emit_te.h"
 
-#include <tvm/ffi/reflection/registry.h>
 #include <tvm/relax/struct_info.h>
 #include <tvm/tir/stmt_functor.h>
 
@@ -36,10 +35,12 @@ TVM_STATIC_IR_FUNCTOR(ReprPrinter, vtable)
       p->stream << "rxplaceholder(" << op->name << ", " << op << ")";
     });
 
-TVM_FFI_STATIC_INIT_BLOCK() { RXPlaceholderOpNode::RegisterReflection(); }
+TVM_FFI_STATIC_INIT_BLOCK({ RXPlaceholderOpNode::RegisterReflection(); });
 
-te::Tensor TETensor(Expr value, ffi::Map<tir::Var, PrimExpr> tir_var_map, std::string name) {
-  auto n = ffi::make_object<RXPlaceholderOpNode>();
+TVM_REGISTER_NODE_TYPE(RXPlaceholderOpNode);
+
+te::Tensor TETensor(Expr value, Map<tir::Var, PrimExpr> tir_var_map, std::string name) {
+  auto n = make_object<RXPlaceholderOpNode>();
   n->name = name;
   n->value = value;
 
@@ -51,7 +52,7 @@ te::Tensor TETensor(Expr value, ffi::Map<tir::Var, PrimExpr> tir_var_map, std::s
 
     int ndim = constant->data->ndim;
     ffi::Shape shape_tuple = constant->data.Shape();
-    ffi::Array<PrimExpr> shape;
+    Array<PrimExpr> shape;
     shape.reserve(ndim);
     for (int i = 0; i < ndim; ++i) {
       shape.push_back(IntImm(DataType::Int(64), shape_tuple[i]));
@@ -73,10 +74,7 @@ te::Tensor TETensor(Expr value, ffi::Map<tir::Var, PrimExpr> tir_var_map, std::s
   return te::PlaceholderOp(n).output(0);
 }
 
-TVM_FFI_STATIC_INIT_BLOCK() {
-  namespace refl = tvm::ffi::reflection;
-  refl::GlobalDef().def("relax.TETensor", TETensor);
-}
+TVM_FFI_REGISTER_GLOBAL("relax.TETensor").set_body_typed(TETensor);
 
 }  // namespace relax
 }  // namespace tvm

@@ -27,7 +27,7 @@
 #include <tvm/ffi/container/map.h>
 #include <tvm/ffi/container/variant.h>
 #include <tvm/ir/function.h>
-#include <tvm/runtime/tensor.h>
+#include <tvm/runtime/ndarray.h>
 #include <tvm/tir/buffer.h>
 #include <tvm/tir/expr.h>
 #include <tvm/tir/stmt.h>
@@ -48,7 +48,9 @@ namespace tir {
 class PrimFuncNode : public BaseFuncNode {
  public:
   /*! \brief Function parameters */
-  ffi::Array<tir::Var> params;
+  Array<tir::Var> params;
+  /*! \brief The body of the function */
+  tir::Stmt body;
   /*! \brief The return type of the function. */
   Type ret_type;
   /*!
@@ -96,19 +98,31 @@ class PrimFuncNode : public BaseFuncNode {
    *  all usage in the body of the function is done through a
    *  flattened alias of the buffer.
    */
-  ffi::Map<tir::Var, Buffer> buffer_map;
-  /*! \brief The body of the function */
-  tir::Stmt body;
+  Map<tir::Var, Buffer> buffer_map;
 
   static void RegisterReflection() {
     namespace refl = tvm::ffi::reflection;
     refl::ObjectDef<PrimFuncNode>()
-        .def_ro("params", &PrimFuncNode::params, refl::AttachFieldFlag::SEqHashDef())
+        .def_ro("params", &PrimFuncNode::params)
+        .def_ro("body", &PrimFuncNode::body)
         .def_ro("ret_type", &PrimFuncNode::ret_type)
-        .def_ro("buffer_map", &PrimFuncNode::buffer_map)
-        .def_ro("body", &PrimFuncNode::body);
+        .def_ro("buffer_map", &PrimFuncNode::buffer_map);
   }
 
+  bool SEqualReduce(const PrimFuncNode* other, SEqualReducer equal) const {
+    // visit params and buffer_map first as they contains defs.
+    return equal.DefEqual(params, other->params) && equal(buffer_map, other->buffer_map) &&
+           equal(ret_type, other->ret_type) && equal(body, other->body) &&
+           equal(attrs, other->attrs);
+  }
+
+  void SHashReduce(SHashReducer hash_reduce) const {
+    hash_reduce.DefHash(params);
+    hash_reduce(buffer_map);
+    hash_reduce(ret_type);
+    hash_reduce(body);
+    hash_reduce(attrs);
+  }
   /*!
    * \brief Return the derived function annotation of this function.
    *
@@ -119,7 +133,9 @@ class PrimFuncNode : public BaseFuncNode {
   TVM_DLL FuncType func_type_annotation() const;
 
   TVM_OBJECT_ENABLE_SCRIPT_PRINTER();
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("tir.PrimFunc", PrimFuncNode, BaseFuncNode);
+
+  static constexpr const char* _type_key = "tir.PrimFunc";
+  TVM_DECLARE_FINAL_OBJECT_INFO(PrimFuncNode, BaseFuncNode);
 };
 
 /*!
@@ -146,11 +162,11 @@ class PrimFunc : public BaseFunc {
    *
    * \param span The location of this object in the source code.
    */
-  TVM_DLL PrimFunc(ffi::Array<tir::Var> params, Stmt body, Type ret_type = VoidType(),
-                   ffi::Map<tir::Var, Buffer> buffer_map = ffi::Map<tir::Var, Buffer>(),
+  TVM_DLL PrimFunc(Array<tir::Var> params, Stmt body, Type ret_type = VoidType(),
+                   Map<tir::Var, Buffer> buffer_map = Map<tir::Var, Buffer>(),
                    DictAttrs attrs = DictAttrs(), Span span = Span());
 
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(PrimFunc, BaseFunc, PrimFuncNode);
+  TVM_DEFINE_OBJECT_REF_METHODS(PrimFunc, BaseFunc, PrimFuncNode);
   TVM_DEFINE_OBJECT_REF_COW_METHOD(PrimFuncNode);
 };
 
@@ -170,7 +186,9 @@ class TensorIntrinNode : public Object {
         .def_ro("desc", &TensorIntrinNode::desc)
         .def_ro("impl", &TensorIntrinNode::impl);
   }
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("tir.TensorIntrin", TensorIntrinNode, Object);
+
+  static constexpr const char* _type_key = "tir.TensorIntrin";
+  TVM_DECLARE_FINAL_OBJECT_INFO(TensorIntrinNode, Object);
 };
 
 /*!
@@ -194,7 +212,7 @@ class TensorIntrin : public ObjectRef {
    * \throws This method throws an exception if the TensorIntrin with the specified name already
    *         exists.
    */
-  TVM_DLL static void Register(ffi::String name, TensorIntrin intrin, bool override = false);
+  TVM_DLL static void Register(String name, TensorIntrin intrin, bool override = false);
 
   /*!
    * \brief Look up TensorIntrin by name. Raises an exception if not found.
@@ -205,9 +223,9 @@ class TensorIntrin : public ObjectRef {
    * \throws This method throws an exception if the TensorIntrin does not exist and allow_missing is
    * false.
    */
-  TVM_DLL static ffi::Optional<TensorIntrin> Get(ffi::String name, bool allow_missing = false);
+  TVM_DLL static Optional<TensorIntrin> Get(String name, bool allow_missing = false);
 
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(TensorIntrin, ObjectRef, TensorIntrinNode);
+  TVM_DEFINE_OBJECT_REF_METHODS(TensorIntrin, ObjectRef, TensorIntrinNode);
 };
 
 /*!
@@ -248,7 +266,7 @@ class TensorIntrin : public ObjectRef {
  *              B[vi, vj] = A[vi, vj]
  * \endcode
  */
-PrimFunc Specialize(PrimFunc func, const ffi::Map<Var, ffi::Variant<Buffer, PrimExpr>>& param_map);
+PrimFunc Specialize(PrimFunc func, const Map<Var, Variant<Buffer, PrimExpr>>& param_map);
 
 /*!
  * \brief PrimFunc specific attribute names.
@@ -260,7 +278,7 @@ namespace attr {
 /*!
  * \brief List of thread IterVar that a DeviceLaunch function corresponds to.
  *
- * Type: ffi::Array<ffi::String>
+ * Type: Array<String>
  *
  * We call a device kernel launch function f using the following convention:
  *

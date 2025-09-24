@@ -276,7 +276,7 @@ class TransitiveComparisonAnalyzer::Impl {
    * Tracked separatedly to handle the `allow_override` option used by
    * all sub-analyzers when binding variables.
    */
-  ffi::Map<Var, Range> prev_bindings_;
+  Map<Var, Range> prev_bindings_;
 
   /*! \brief Known comparisons based on definitionally-true statements
    *

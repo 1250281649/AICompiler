@@ -22,12 +22,13 @@
 #include <tvm/ffi/container/array.h>
 #include <tvm/ffi/function.h>
 #include <tvm/ffi/optional.h>
-#include <tvm/ffi/reflection/registry.h>
+#include <tvm/ffi/reflection/reflection.h>
 #include <tvm/meta_schedule/arg_info.h>
 #include <tvm/meta_schedule/cost_model.h>
 #include <tvm/meta_schedule/database.h>
 #include <tvm/meta_schedule/measure_candidate.h>
 #include <tvm/meta_schedule/runner.h>
+#include <tvm/node/reflection.h>
 #include <tvm/runtime/object.h>
 #include <tvm/tir/schedule/schedule.h>
 
@@ -98,9 +99,9 @@ class SearchStrategyNode : public runtime::Object {
    *  and reset the search strategy.
    */
   virtual void PreTuning(int max_trials, int num_trials_per_iter,
-                         const ffi::Array<tir::Schedule>& design_spaces,
-                         const ffi::Optional<Database>& database,
-                         const ffi::Optional<CostModel>& cost_model) = 0;
+                         const Array<tir::Schedule>& design_spaces,
+                         const Optional<Database>& database,
+                         const Optional<CostModel>& cost_model) = 0;
 
   /*!
    * \brief Post-tuning for the search strategy.
@@ -113,15 +114,15 @@ class SearchStrategyNode : public runtime::Object {
    * \brief Generate measure candidates from design spaces for measurement.
    * \return The measure candidates generated, nullptr if finished.
    */
-  virtual ffi::Optional<ffi::Array<MeasureCandidate>> GenerateMeasureCandidates() = 0;
+  virtual Optional<Array<MeasureCandidate>> GenerateMeasureCandidates() = 0;
 
   /*!
    * \brief Update the search strategy with measurement results.
    * \param measure_candidates The candidates to be measured.
    * \param results The measurement results from the runner.
    */
-  virtual void NotifyRunnerResults(const ffi::Array<MeasureCandidate>& measure_candidates,
-                                   const ffi::Array<RunnerResult>& results) = 0;
+  virtual void NotifyRunnerResults(const Array<MeasureCandidate>& measure_candidates,
+                                   const Array<RunnerResult>& results) = 0;
 
   /*!
    * \brief Clone the search strategy.
@@ -129,8 +130,8 @@ class SearchStrategyNode : public runtime::Object {
    */
   virtual SearchStrategy Clone() const = 0;
 
-  static constexpr const bool _type_mutable = true;
-  TVM_FFI_DECLARE_OBJECT_INFO("meta_schedule.SearchStrategy", SearchStrategyNode, Object);
+  static constexpr const char* _type_key = "meta_schedule.SearchStrategy";
+  TVM_DECLARE_BASE_OBJECT_INFO(SearchStrategyNode, Object);
 };
 
 /*!
@@ -147,23 +148,22 @@ class SearchStrategy : public runtime::ObjectRef {
   /*!
    * \brief The function type of `PreTuning` method.
    */
-  using FPreTuning = ffi::TypedFunction<void(
-      int max_trials, int num_trials_per_iter, const ffi::Array<tir::Schedule>&,
-      const ffi::Optional<Database>&, const ffi::Optional<CostModel>&)>;
+  using FPreTuning =
+      ffi::TypedFunction<void(int max_trials, int num_trials_per_iter, const Array<tir::Schedule>&,
+                              const Optional<Database>&, const Optional<CostModel>&)>;
   /*! \brief The function type of `PostTuning` method. */
   using FPostTuning = ffi::TypedFunction<void()>;
   /*!
    * \brief The function type of `GenerateMeasureCandidates` method.
    * \return The measure candidates generated, nullptr if finished.
    */
-  using FGenerateMeasureCandidates =
-      ffi::TypedFunction<ffi::Optional<ffi::Array<MeasureCandidate>>()>;
+  using FGenerateMeasureCandidates = ffi::TypedFunction<Optional<Array<MeasureCandidate>>()>;
   /*!
    * \brief The function type of `NotifyRunnerResults` method.
    * \param results The measurement results from the runner.
    */
-  using FNotifyRunnerResults = ffi::TypedFunction<void(const ffi::Array<MeasureCandidate>&,
-                                                       const ffi::Array<RunnerResult>&)>;
+  using FNotifyRunnerResults =
+      ffi::TypedFunction<void(const Array<MeasureCandidate>&, const Array<RunnerResult>&)>;
   /*!
    * \brief The function type of `Clone` method.
    * \return The cloned search strategy.
@@ -216,7 +216,7 @@ class SearchStrategy : public runtime::ObjectRef {
                                                    int genetic_max_fail_count,  //
                                                    double eps_greedy);
 
-  TVM_FFI_DEFINE_OBJECT_REF_METHODS_NULLABLE(SearchStrategy, ObjectRef, SearchStrategyNode);
+  TVM_DEFINE_MUTABLE_OBJECT_REF_METHODS(SearchStrategy, ObjectRef, SearchStrategyNode);
 };
 
 /*! \brief The python side customizable class for measure candidate generation */
@@ -252,17 +252,16 @@ class PySearchStrategyNode : public SearchStrategyNode {
   }
 
   void InitializeWithTuneContext(const TuneContext& context) final;
-  void PreTuning(int max_trials, int num_trials_per_iter,
-                 const ffi::Array<tir::Schedule>& design_spaces,
-                 const ffi::Optional<Database>& database,
-                 const ffi::Optional<CostModel>& cost_model) final;
+  void PreTuning(int max_trials, int num_trials_per_iter, const Array<tir::Schedule>& design_spaces,
+                 const Optional<Database>& database, const Optional<CostModel>& cost_model) final;
   void PostTuning() final;
-  ffi::Optional<ffi::Array<MeasureCandidate>> GenerateMeasureCandidates() final;
-  void NotifyRunnerResults(const ffi::Array<MeasureCandidate>& measure_candidates,
-                           const ffi::Array<RunnerResult>& results);
+  Optional<Array<MeasureCandidate>> GenerateMeasureCandidates() final;
+  void NotifyRunnerResults(const Array<MeasureCandidate>& measure_candidates,
+                           const Array<RunnerResult>& results);
   SearchStrategy Clone() const final;
-  TVM_FFI_DECLARE_OBJECT_INFO_FINAL("meta_schedule.PySearchStrategy", PySearchStrategyNode,
-                                    SearchStrategyNode);
+
+  static constexpr const char* _type_key = "meta_schedule.PySearchStrategy";
+  TVM_DECLARE_FINAL_OBJECT_INFO(PySearchStrategyNode, SearchStrategyNode);
 };
 
 }  // namespace meta_schedule

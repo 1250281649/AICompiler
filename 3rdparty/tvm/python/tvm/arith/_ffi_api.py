@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 """FFI APIs for tvm.arith"""
-import tvm_ffi
+import tvm.ffi
 
 
-tvm_ffi.init_ffi_api("arith", __name__)
+tvm.ffi._init_api("arith", __name__)

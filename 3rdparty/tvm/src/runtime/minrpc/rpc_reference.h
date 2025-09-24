@@ -24,8 +24,6 @@
 #ifndef TVM_RUNTIME_MINRPC_RPC_REFERENCE_H_
 #define TVM_RUNTIME_MINRPC_RPC_REFERENCE_H_
 
-#include <tvm/ffi/container/tensor.h>
-
 namespace tvm {
 namespace ffi {
 // Forward declare TVM Object to use `Object*` in RPC protocol.
@@ -74,7 +72,7 @@ enum class RPCCode : int {
 enum class RPCServerStatus : int {
   kSuccess = 0,
   kInvalidTypeCodeObject,
-  kInvalidTypeCodeTensor,
+  kInvalidTypeCodeNDArray,
   kInvalidDLTensorFieldStride,
   kInvalidDLTensorFieldByteOffset,
   kUnknownTypeIndex,
@@ -146,8 +144,8 @@ inline const char* RPCServerStatusToString(RPCServerStatus status) {
       return "kSuccess";
     case RPCServerStatus::kInvalidTypeCodeObject:
       return "kInvalidTypeCodeObject";
-    case RPCServerStatus::kInvalidTypeCodeTensor:
-      return "kInvalidTypeCodeTensor";
+    case RPCServerStatus::kInvalidTypeCodeNDArray:
+      return "kInvalidTypeCodeNDArray";
     case RPCServerStatus::kInvalidDLTensorFieldStride:
       return "kInvalidDLTensorFieldStride";
     case RPCServerStatus::kInvalidDLTensorFieldByteOffset: {
@@ -202,7 +200,7 @@ struct RPCReference {
       num_bytes_ += sizeof(T) * num;
     }
 
-    void WriteFFIAny(const TVMFFIAny* obj) { num_bytes_ += channel_->GetFFIAnyProtocolBytes(obj); }
+    void WriteObject(ffi::Object* obj) { num_bytes_ += channel_->GetObjectBytes(obj); }
 
     void ThrowError(RPCServerStatus status) { channel_->ThrowError(status); }
 
@@ -247,7 +245,7 @@ struct RPCReference {
   static void SendDLTensor(TChannelPtr channel, DLTensor* arr) {
     DLDevice dev;
     uint64_t data;
-    // When we return Tensor, we directly return
+    // When we return NDArray, we directly return
     // the space and the context
     // The client will be further wrapping
     dev = arr->device;
@@ -257,7 +255,7 @@ struct RPCReference {
     channel->Write(arr->ndim);
     channel->Write(arr->dtype);
     channel->WriteArray(arr->shape, arr->ndim);
-    if (!ffi::IsContiguous(*arr)) {
+    if (arr->strides != nullptr) {
       channel->ThrowError(RPCServerStatus::kInvalidDLTensorFieldStride);
     }
     channel->Write(arr->byte_offset);
@@ -351,8 +349,8 @@ struct RPCReference {
           break;
         }
 
-        case ffi::TypeIndex::kTVMFFITensor: {
-          channel->ThrowError(RPCServerStatus::kInvalidTypeCodeTensor);
+        case ffi::TypeIndex::kTVMFFINDArray: {
+          channel->ThrowError(RPCServerStatus::kInvalidTypeCodeNDArray);
           break;
         }
         case ffi::TypeIndex::kTVMFFIDLTensorPtr: {
@@ -375,7 +373,11 @@ struct RPCReference {
           break;
         }
         default: {
-          channel->WriteFFIAny(&(packed_args[i]));
+          if (type_index >= ffi::TypeIndex::kTVMFFIStaticObjectBegin) {
+            channel->WriteObject(reinterpret_cast<ffi::Object*>(packed_args[i].v_obj));
+          } else {
+            channel->ThrowError(RPCServerStatus::kUnknownTypeIndex);
+          }
           break;
         }
       }
@@ -410,9 +412,6 @@ struct RPCReference {
       int32_t type_index;
       channel->Read(&type_index);
       packed_args[i].type_index = type_index;
-      packed_args[i].zero_padding = 0;
-      // clear to ensure compact for 32 bit platform
-      packed_args[i].v_int64 = 0;
       switch (type_index) {
         case ffi::TypeIndex::kTVMFFINone: {
           break;
@@ -472,10 +471,8 @@ struct RPCReference {
           break;
         }
         default: {
-          if (type_index >= ffi::TypeIndex::kTVMFFIStaticObjectBegin ||
-              type_index == ffi::TypeIndex::kTVMFFISmallStr ||
-              type_index == ffi::TypeIndex::kTVMFFISmallBytes) {
-            channel->ReadFFIAny(&(packed_args[i]));
+          if (type_index >= ffi::TypeIndex::kTVMFFIStaticObjectBegin) {
+            channel->ReadObject(&(packed_args[i]));
           } else {
             channel->ThrowError(RPCServerStatus::kUnknownTypeIndex);
           }

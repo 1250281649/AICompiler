@@ -20,7 +20,7 @@ import ctypes
 import numpy as np
 import tvm
 
-import tvm_ffi
+import tvm.ffi
 from tvm import te
 
 # algos can be read from cudnn.h
@@ -123,7 +123,7 @@ def _get_np_int32_array_handle(arr):
 
     Parameters
     ----------
-    arr: numpy.Tensor
+    arr: numpy.NDArray
         source numpy array
 
     Returns
@@ -349,7 +349,7 @@ def _conv_find_algo(
         dims - 2, pad, stride, dilation, x_shape, w_shape
     )
     yshape = np.array(y_shape, dtype=np.int32)
-    func = tvm_ffi.get_global_func(func_name)
+    func = tvm.ffi.get_global_func(func_name)
     return func(
         tensor_format,
         dims - 2,

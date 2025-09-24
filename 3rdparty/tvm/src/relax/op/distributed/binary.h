@@ -36,8 +36,7 @@ namespace distributed {
 template <typename FType>
 StructInfo InferDistStructInfoBroadcast(const Call& call, const BlockBuilder& ctx,
                                         FType f_compute_out_dtype) {
-  ffi::Array<distributed::DTensorStructInfo> input_dtensor_sinfos =
-      GetInputDTensorStructInfo(call, ctx);
+  Array<distributed::DTensorStructInfo> input_dtensor_sinfos = GetInputDTensorStructInfo(call, ctx);
   TensorStructInfo x1_sinfo, x2_sinfo;
   x1_sinfo = input_dtensor_sinfos[0]->tensor_sinfo;
   x2_sinfo = input_dtensor_sinfos[1]->tensor_sinfo;
@@ -56,7 +55,7 @@ StructInfo InferDistStructInfoBroadcast(const Call& call, const BlockBuilder& ct
   // Shapes and ndims
   if (x1_shape && x2_shape) {
     // If all inputs have shapes, directly infer shapes
-    ffi::Optional<ffi::Array<PrimExpr>> output_shape =
+    Optional<Array<PrimExpr>> output_shape =
         InferBinaryBroadcastShape(call, ctx, x1_shape->values, x2_shape->values);
     if (!output_shape.defined()) {
       output_tensor_sinfo = TensorStructInfo(output_dtype, /*ndim=*/output_ndim);

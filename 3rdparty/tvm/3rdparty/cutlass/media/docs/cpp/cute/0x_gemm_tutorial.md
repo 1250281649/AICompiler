@@ -206,8 +206,8 @@ With the static smem layouts, the `gemm_device` kernel can allocate the required
 
 ```cpp
   // Shared memory buffers
-  __shared__ TA smemA[cosize_v<ASmemLayout>];
-  __shared__ TB smemB[cosize_v<BSmemLayout>];
+  __shared__ TA smemA[cosize_v<ABlockLayout>];
+  __shared__ TB smemB[cosize_v<BBlockLayout>];
   Tensor sA = make_tensor(make_smem_ptr(smemA), sA_layout);  // (BLK_M,BLK_K)
   Tensor sB = make_tensor(make_smem_ptr(smemB), sB_layout);  // (BLK_N,BLK_K)
 ```
@@ -334,7 +334,9 @@ These thread layouts are then used to partition the tiles of data in global memo
 ```
 where we've used the same projection-style interface to avoid applying the `N`-mode of `tC` to the `(BLK_M,BLK_K)` shape of `sA` and avoid applying the `M`-mode of `tC` to the `(BLK_N,BLK_K)` shape of `sB`.
 
-![tC_partitioning.png](../../../images/cute/tC_partitioning.png)
+<p align="center">
+  <img src="../../../images/cute/tC_partitioning.png" alt="tC_partitioning.png" height="300"/>
+</p>
 This diagram shows a `tC` layout, highlights two threads in green and blue, shows the projections of the `tC` layout, and finally highlights the subtensors within `sA`, `sB`, and `gC` that `tCsA`, `tCsB`, and `tCgC` represent.
 
 With the data partitioned across the threads, *every thread* can now participate in the compute step by writing
@@ -388,7 +390,9 @@ As a first example, lets look at the `TiledCopy` that `gemm_nt` generates.
   print_latex(copyA);
 ```
 The easiest way to see what this `TiledCopy` does is to look at the partition pattern in LaTeX.
-![TiledCopyA.png](../../../images/cute/TiledCopyA.png)
+<p align="center">
+  <img src="../../../images/cute/TiledCopyA.png" alt="TiledCopyA.png" height="300"/>
+</p>
 On the left is the source-tensor partitioning and on the right is the destination-tensor partitioning. The partition patterns are the same for this case, but there exist PTX instructions which require different patterns in the source and destination. The diagram shows that each thread reads 4x1 `TA` elements and there are 32x8 threads. The `UniversalCopy<uint128_t>` forces the instruction to use a 128-bit copy instruction. If the partition (of `sA` or `gA` in this case) does not result in 4 `TA` elements that cannot be vectorized to a 128-bit load/store, then CuTe will statically fail with an error message to that effect.
 
 To use the `TiledCopy`, the kernel writes
@@ -417,7 +421,9 @@ As a first example, lets look at the `TiledMMA` that `gemm_nt` generates.
   print_latex(mmaC);
 ```
 The easiest way to see what this `TiledMMA` does is to look at the partition pattern in LaTeX.
-![TiledMmaC.png](../../../images/cute/TiledMmaC.png)
+<p align="center">
+  <img src="../../../images/cute/TiledMmaC.png" alt="TiledMmaC.png" height="300"/>
+</p>
 On the left is the A-tensor partitioning, on the top is the B-tensor partitioning, and in the middle is the C-tensor partitioning.Because the `UniversalFMA` is a 1x1x1 MMA instruction, a 16x16x1 tiling of them results in a 16x16x1 `TiledMMA`. Other MMA instructions will have different threads involved and have different instruction sizes. In this case, all threads will read a single element from `A`, `B`, and `C` each.
 
 To use the `TiledMMA`, the kernel writes

@@ -42,10 +42,12 @@
 */
 
 #pragma once
-#include "cutlass/cutlass.h"
-#include CUDA_STD_HEADER(cassert)
+
+#include <cuda/std/cassert>
+
 #include "cutlass/aligned_buffer.h"
 #include "cutlass/array.h"
+#include "cutlass/cutlass.h"
 #include "cutlass/functional.h"
 #include "cutlass/layout/tensor.h"
 #include "cutlass/layout/vector.h"

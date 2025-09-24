@@ -29,9 +29,8 @@
 #import <Foundation/Foundation.h>
 
 #include <dlpack/dlpack.h>
-#include <tvm/ffi/extra/module.h>
 #include <tvm/ffi/function.h>
-#include <tvm/runtime/tensor.h>
+#include <tvm/runtime/ndarray.h>
 
 #include <memory>
 #include <string>
@@ -67,12 +66,12 @@ class CoreMLModel {
    */
   void SetInput(const std::string& key, DLTensor* data_in);
   /*!
-   * \brief Return Tensor for given output index.
+   * \brief Return NDArray for given output index.
    * \param index The output index.
    *
-   * \return Tensor corresponding to given output node index.
+   * \return NDArray corresponding to given output node index.
    */
-  Tensor GetOutput(int index) const;
+  NDArray GetOutput(int index) const;
   /*!
    * \brief Return the number of outputs
    *
@@ -96,7 +95,7 @@ class CoreMLModel {
  *  This runtime can be accessed in various language via
  *  TVM runtime ffi::Function API.
  */
-class CoreMLRuntime : public ffi::ModuleObj {
+class CoreMLRuntime : public ModuleNode {
  public:
   /*!
    * \brief Get member function to front-end.
@@ -104,11 +103,11 @@ class CoreMLRuntime : public ffi::ModuleObj {
    * \param sptr_to_self The pointer to the module node.
    * \return The corresponding member function.
    */
-  virtual ffi::Optional<ffi::Function> GetFunction(const ffi::String& name);
+  virtual ffi::Function GetFunction(const String& name, const ObjectPtr<Object>& sptr_to_self);
 
   /*! \brief Get the property of the runtime module .*/
   int GetPropertyMask() const final {
-    return ffi::Module::kBinarySerializable | ffi::Module::kRunnable;
+    return ModulePropertyMask::kBinarySerializable | ModulePropertyMask::kRunnable;
   }
 
   /*!
@@ -116,12 +115,12 @@ class CoreMLRuntime : public ffi::ModuleObj {
    *        binary stream.
    * \param stream The binary stream to save to.
    */
-  ffi::Bytes SaveToBytes() const final;
+  void SaveToBinary(dmlc::Stream* stream) final;
 
   /*!
    * \return The type key of the executor.
    */
-  const char* kind() const { return "coreml"; }
+  const char* type_key() const { return "coreml"; }
 
   /*!
    * \brief Initialize the coreml runtime with coreml model and context.

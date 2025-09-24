@@ -153,10 +153,7 @@ then be registered with the following steps.
 
 #. Register the function to the tvm registry::
 
-     TVM_FFI_STATIC_INIT_BLOCK() {
-       namespace refl = tvm::ffi::reflection;
-       refl::GlobalDef().def("device_api.foo", FooDeviceAPI::Global);
-     }
+     TVM_FFI_REGISTER_GLOBAL("device_api.foo").set_body_typed(FooDeviceAPI::Global);
 
 .. _base.h: https://github.com/apache/tvm/blob/main/include/tvm/runtime/base.h
 
@@ -167,9 +164,9 @@ then be registered with the following steps.
 
 #. Add a case in ``DeviceName`` in `device_api.h`_ to convert from the
    enum value to a string representation.  This string representation
-   should match the name given to ``GlobalDef().def``.
+   should match the name given to ``TVM_FFI_REGISTER_GLOBAL``.
 
-#. Add entries to the ``_DEVICE_TYPE_TO_NAME`` and ``_DEVICE_NAME_TO_TYPE`` dictionaries of
+#. Add entries to the ``DEVICE_TYPE_TO_NAME`` and ``DEVICE_NAME_TO_TYPE`` dictionaries of
    :py:class:`tvm.runtime.Device` for the new enum value.
 
 
@@ -228,10 +225,7 @@ the same name as was used in the ``TVM_REGISTER_TARGET_KIND``
 definition above. ::
 
   tvm::runtime::Module GeneratorFooCode(IRModule mod, Target target);
-  TVM_FFI_STATIC_INIT_BLOCK() {
-    namespace refl = tvm::ffi::reflection;
-    refl::GlobalDef().def("target.build.foo", GeneratorFooCode);
-  }
+  TVM_FFI_REGISTER_GLOBAL("target.build.foo").set_body_typed(GeneratorFooCode);
 
 The code generator takes two arguments.  The first is the ``IRModule``
 to compile, and the second is the ``Target`` that describes the device

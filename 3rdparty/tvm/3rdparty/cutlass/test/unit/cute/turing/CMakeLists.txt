@@ -29,5 +29,4 @@
 cutlass_test_unit_add_executable(
   cutlass_test_unit_cute_turing
   cooperative_gemm.cu
-  movm.cu
 )

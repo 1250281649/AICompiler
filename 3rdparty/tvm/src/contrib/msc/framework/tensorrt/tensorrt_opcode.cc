@@ -31,7 +31,7 @@ namespace tvm {
 namespace contrib {
 namespace msc {
 
-const ffi::Array<Doc> TensorRTOpCode::GetDocs() {
+const Array<Doc> TensorRTOpCode::GetDocs() {
   stack_.Config(this);
   CodeGenBuild();
   if (node()->optype == "tuple") {
@@ -52,7 +52,7 @@ const ffi::Array<Doc> TensorRTOpCode::GetDocs() {
   return stack_.GetDocs();
 }
 
-void TensorRTOpCode::SetPadding(const ffi::String& key) {
+void TensorRTOpCode::SetPadding(const String& key) {
   const auto& padding = node()->GetTypeArrayAttr<int>("padding");
   if (padding.size() == 1) {
     SetLayerByDimsValue("Padding", std::vector<int>{padding[0], padding[0]}, false);
@@ -67,8 +67,8 @@ void TensorRTOpCode::SetPadding(const ffi::String& key) {
   }
 }
 
-const ffi::String TensorRTOpCode::DeclareInputs(bool simplify) {
-  const ffi::String& inputs_ref = "inputs_" + std::to_string(node()->index);
+const String TensorRTOpCode::DeclareInputs(bool simplify) {
+  const String& inputs_ref = "inputs_" + std::to_string(node()->index);
   if (node()->parents.size() == 1 && simplify) {
     const auto& idx_input = StringUtils::Replace(IdxInput(), "*", "");
     stack_.declare("std::vector<ITensor*>", inputs_ref + "_vec")
@@ -85,10 +85,9 @@ const ffi::String TensorRTOpCode::DeclareInputs(bool simplify) {
   return inputs_ref;
 }
 
-const ffi::String TensorRTOpCode::DType(const DataType& dtype) {
-  const ffi::String& dtype_name =
-      BaseOpCode<TensorRTCodeGenConfig, TensorRTCodeGenHelper>::DType(dtype);
-  ffi::String dtype_enum;
+const String TensorRTOpCode::DType(const DataType& dtype) {
+  const String& dtype_name = BaseOpCode<TensorRTCodeGenConfig, TensorRTCodeGenHelper>::DType(dtype);
+  String dtype_enum;
   if (dtype_name == "int8") {
     dtype_enum = "DataType::kINT8";
   } else if (dtype_name == "int32") {
@@ -106,11 +105,11 @@ const ffi::String TensorRTOpCode::DType(const DataType& dtype) {
 }
 
 template <typename T>
-const ffi::String TensorRTOpCode::ToDims(const std::vector<T>& dims, bool use_ndim) {
+const String TensorRTOpCode::ToDims(const std::vector<T>& dims, bool use_ndim) {
   if (dims.size() == 2 && !use_ndim) {
     return "DimsHW{" + std::to_string(dims[0]) + "," + std::to_string(dims[1]) + "}";
   }
-  ffi::String dims_str = "Dims({" + std::to_string(dims.size()) + ",{";
+  String dims_str = "Dims({" + std::to_string(dims.size()) + ",{";
   for (size_t i = 0; i < dims.size(); i++) {
     dims_str = dims_str + std::to_string(dims[i]) + (i < dims.size() - 1 ? "," : "");
   }
@@ -118,7 +117,7 @@ const ffi::String TensorRTOpCode::ToDims(const std::vector<T>& dims, bool use_nd
   return dims_str;
 }
 
-const ffi::String TensorRTOpCode::ToDims(const ffi::Array<Integer>& dims, bool use_ndim) {
+const String TensorRTOpCode::ToDims(const Array<Integer>& dims, bool use_ndim) {
   std::vector<int64_t> int_dims;
   for (const auto& d : dims) {
     int_dims.push_back(d->value);
@@ -126,7 +125,7 @@ const ffi::String TensorRTOpCode::ToDims(const ffi::Array<Integer>& dims, bool u
   return ToDims(int_dims, use_ndim);
 }
 
-const ffi::String TensorRTOpCode::AttrToDims(const ffi::String& key, bool use_ndim) {
+const String TensorRTOpCode::AttrToDims(const String& key, bool use_ndim) {
   const auto& dims = node()->GetTypeArrayAttr<int>(key);
   return ToDims(dims, use_ndim);
 }
@@ -140,7 +139,7 @@ const size_t TensorRTOpCode::ToReduceAxis(const std::vector<int>& axes, size_t n
   return reduce_axis;
 }
 
-const size_t TensorRTOpCode::AttrToReduceAxis(const ffi::String& key, size_t ndim) {
+const size_t TensorRTOpCode::AttrToReduceAxis(const String& key, size_t ndim) {
   std::vector<int> axes;
   if (node()->GetAttr(key, &axes)) {
     return ToReduceAxis(axes, ndim);
@@ -150,57 +149,56 @@ const size_t TensorRTOpCode::AttrToReduceAxis(const ffi::String& key, size_t ndi
   return ToReduceAxis(std::vector<int>{axis}, ndim);
 }
 
-const size_t TensorRTOpCode::AttrToAxis(const ffi::String& key, size_t ndim) {
+const size_t TensorRTOpCode::AttrToAxis(const String& key, size_t ndim) {
   size_t valid_ndim = ndim == 0 ? node()->InputAt(0)->Ndim() : ndim;
   int axis = node()->GetTypeAttr<int>(key);
   return CommonUtils::GetIndex(axis, valid_ndim);
 }
 
 template <typename T>
-void TensorRTOpCode::SetLayerByAttr(const ffi::String& method, const ffi::String& key) {
+void TensorRTOpCode::SetLayerByAttr(const String& method, const String& key) {
   stack_.func_call("set" + method, std::nullopt, DocUtils::ToPtr(IdxNode())).op_arg<T>(key, "");
 }
 
 template <typename T>
-void TensorRTOpCode::SetLayerByValue(const ffi::String& method, const T& value) {
+void TensorRTOpCode::SetLayerByValue(const String& method, const T& value) {
   stack_.func_call("set" + method, std::nullopt, DocUtils::ToPtr(IdxNode())).call_arg(value);
 }
 
-void TensorRTOpCode::SetLayerByDimsAttr(const ffi::String& method, const ffi::String& key,
-                                        bool use_ndim) {
+void TensorRTOpCode::SetLayerByDimsAttr(const String& method, const String& key, bool use_ndim) {
   stack_.func_call("set" + method, std::nullopt, DocUtils::ToPtr(IdxNode()))
       .call_arg(AttrToDims(key, use_ndim));
 }
 
 template <typename T>
-void TensorRTOpCode::SetLayerByDimsValue(const ffi::String& method, const std::vector<T>& value,
+void TensorRTOpCode::SetLayerByDimsValue(const String& method, const std::vector<T>& value,
                                          bool use_ndim) {
   stack_.func_call("set" + method, std::nullopt, DocUtils::ToPtr(IdxNode()))
       .call_arg(ToDims(value, use_ndim));
 }
 
-void TensorRTOpCode::SetLayerByDimsValue(const ffi::String& method,
-                                         const ffi::Array<Integer>& value, bool use_ndim) {
+void TensorRTOpCode::SetLayerByDimsValue(const String& method, const Array<Integer>& value,
+                                         bool use_ndim) {
   stack_.func_call("set" + method, std::nullopt, DocUtils::ToPtr(IdxNode()))
       .call_arg(ToDims(value, use_ndim));
 }
 
 #define TENSORRT_OP_CODEGEN_METHODS(TypeName) \
  public:                                      \
-  TypeName(const ffi::String& func_name) : TensorRTOpCode(func_name) {}
+  TypeName(const String& func_name) : TensorRTOpCode(func_name) {}
 
-#define TENSORRT_FLAG_OP_CODEGEN_METHODS(TypeName)                                                \
- public:                                                                                          \
-  TypeName(const ffi::String& func_name, const ffi::String& symbol) : TensorRTOpCode(func_name) { \
-    symbol_ = symbol;                                                                             \
-  }                                                                                               \
-                                                                                                  \
- private:                                                                                         \
-  ffi::String symbol_;
+#define TENSORRT_FLAG_OP_CODEGEN_METHODS(TypeName)                                      \
+ public:                                                                                \
+  TypeName(const String& func_name, const String& symbol) : TensorRTOpCode(func_name) { \
+    symbol_ = symbol;                                                                   \
+  }                                                                                     \
+                                                                                        \
+ private:                                                                               \
+  String symbol_;
 
 class TensorRTActivationCodeGen : public TensorRTOpCode {
  public:
-  explicit TensorRTActivationCodeGen(const ffi::String& symbol) : TensorRTOpCode("Activation") {
+  explicit TensorRTActivationCodeGen(const String& symbol) : TensorRTOpCode("Activation") {
     symbol_ = symbol;
   }
 
@@ -216,7 +214,7 @@ class TensorRTActivationCodeGen : public TensorRTOpCode {
   }
 
  private:
-  ffi::String symbol_;
+  String symbol_;
 };
 
 class TensorRTAdaptivePool2dCodeGen : public TensorRTOpCode {
@@ -234,7 +232,7 @@ class TensorRTAdaptivePool2dCodeGen : public TensorRTOpCode {
       stride.push_back(in_sizes[i] / out_sizes[i]);
       kernel.push_back((in_sizes[i] - (out_sizes[i] - 1) * stride[i]));
     }
-    const ffi::String& suffix = CompareVersion(8, 0, 0) >= 0 ? "Nd" : "";
+    const String& suffix = CompareVersion(8, 0, 0) >= 0 ? "Nd" : "";
     stack_.op_call()
         .op_input_arg()
         .call_arg("PoolingType::k" + symbol_)
@@ -245,7 +243,7 @@ class TensorRTAdaptivePool2dCodeGen : public TensorRTOpCode {
 
 class TensorRTArgmaxminCodeGen : public TensorRTOpCode {
  public:
-  explicit TensorRTArgmaxminCodeGen(const ffi::String& symbol) : TensorRTOpCode("TopK") {
+  explicit TensorRTArgmaxminCodeGen(const String& symbol) : TensorRTOpCode("TopK") {
     symbol_ = symbol;
   }
 
@@ -260,7 +258,7 @@ class TensorRTArgmaxminCodeGen : public TensorRTOpCode {
   }
 
  private:
-  ffi::String symbol_;
+  String symbol_;
 };
 
 class TensorRTAstypeCodeGen : public TensorRTOpCode {
@@ -320,7 +318,7 @@ class TensorRTConstantCodeGen : public TensorRTOpCode {
 
 class TensorRTConvCodeGen : public TensorRTOpCode {
  public:
-  TensorRTConvCodeGen(const ffi::String& func_name, bool use_bias) : TensorRTOpCode(func_name) {
+  TensorRTConvCodeGen(const String& func_name, bool use_bias) : TensorRTOpCode(func_name) {
     use_bias_ = use_bias;
   }
 
@@ -344,7 +342,7 @@ class TensorRTConvCodeGen : public TensorRTOpCode {
     } else {
       stack_.call_arg("mWeights[\"" + node()->name + ".bias\"]");
     }
-    const ffi::String& suffix = CompareVersion(8, 0, 0) >= 0 ? "Nd" : "";
+    const String& suffix = CompareVersion(8, 0, 0) >= 0 ? "Nd" : "";
     SetLayerByDimsAttr("Stride" + suffix, "strides", false);
     SetLayerByDimsAttr("Dilation" + suffix, "dilation", false);
     SetLayerByAttr<int>("NbGroups", "groups");
@@ -357,7 +355,7 @@ class TensorRTConvCodeGen : public TensorRTOpCode {
 
 class TensorRTElemwiseCodeGen : public TensorRTOpCode {
  public:
-  explicit TensorRTElemwiseCodeGen(const ffi::String& symbol) : TensorRTOpCode("ElementWise") {
+  explicit TensorRTElemwiseCodeGen(const String& symbol) : TensorRTOpCode("ElementWise") {
     symbol_ = symbol;
   }
 
@@ -367,7 +365,7 @@ class TensorRTElemwiseCodeGen : public TensorRTOpCode {
   }
 
  private:
-  ffi::String symbol_;
+  String symbol_;
 };
 
 class TensorRTGetItemCodeGen : public TensorRTOpCode {
@@ -398,7 +396,7 @@ class TensorRTInputCodeGen : public TensorRTOpCode {
 
 class TensorRTLinearCodeGen : public TensorRTOpCode {
  public:
-  TensorRTLinearCodeGen(const ffi::String& func_name, bool use_bias) : TensorRTOpCode(func_name) {
+  TensorRTLinearCodeGen(const String& func_name, bool use_bias) : TensorRTOpCode(func_name) {
     use_bias_ = use_bias;
   }
 
@@ -466,7 +464,7 @@ class TensorRTPermuteDimsCodeGen : public TensorRTOpCode {
         axes.push_back(i - 1);
       }
     }
-    const ffi::String& perm_ref = "perm_" + std::to_string(node()->index);
+    const String& perm_ref = "perm_" + std::to_string(node()->index);
     stack_.op_call().op_input_arg().declare("Permutation", perm_ref);
     for (size_t i = 0; i < axes.size(); i++) {
       stack_.assign(perm_ref + ".order[" + std::to_string(i) + "]",
@@ -478,7 +476,7 @@ class TensorRTPermuteDimsCodeGen : public TensorRTOpCode {
 
 class TensorRTPool2dCodeGen : public TensorRTOpCode {
  public:
-  explicit TensorRTPool2dCodeGen(const ffi::String& symbol) : TensorRTOpCode("PoolingNd") {
+  explicit TensorRTPool2dCodeGen(const String& symbol) : TensorRTOpCode("PoolingNd") {
     symbol_ = symbol;
   }
 
@@ -488,7 +486,7 @@ class TensorRTPool2dCodeGen : public TensorRTOpCode {
         .op_input_arg()
         .call_arg("PoolingType::k" + symbol_)
         .call_arg(AttrToDims("pool_size", false));
-    const ffi::String& suffix = CompareVersion(8, 0, 0) >= 0 ? "Nd" : "";
+    const String& suffix = CompareVersion(8, 0, 0) >= 0 ? "Nd" : "";
     SetLayerByDimsAttr("Stride" + suffix, "strides", false);
     if (node()->GetTypeAttr<bool>("ceil_mode")) {
       SetLayerByValue("PaddingMode", "PaddingMode::kEXPLICIT_ROUND_UP");
@@ -500,12 +498,12 @@ class TensorRTPool2dCodeGen : public TensorRTOpCode {
   }
 
  private:
-  ffi::String symbol_;
+  String symbol_;
 };
 
 class TensorRTReduceCodeGen : public TensorRTOpCode {
  public:
-  explicit TensorRTReduceCodeGen(const ffi::String& symbol) : TensorRTOpCode("Reduce") {
+  explicit TensorRTReduceCodeGen(const String& symbol) : TensorRTOpCode("Reduce") {
     symbol_ = symbol;
   }
 
@@ -519,7 +517,7 @@ class TensorRTReduceCodeGen : public TensorRTOpCode {
   }
 
  private:
-  ffi::String symbol_;
+  String symbol_;
 };
 
 class TensorRTReshapeCodeGen : public TensorRTOpCode {
@@ -542,7 +540,7 @@ class TensorRTResize2dCodeGen : public TensorRTOpCode {
   void CodeGenBuild() final {
     stack_.op_call().op_input_arg();
     const auto& method = node()->GetTypeAttr<std::string>("method");
-    ffi::String resize_mode;
+    String resize_mode;
     if (method == "linear") {
       resize_mode = "LINEAR";
     } else if (method == "nearest_neighbor") {
@@ -665,7 +663,7 @@ class TensorRTTopkCodeGen : public TensorRTOpCode {
 
  protected:
   void CodeGenBuild() final {
-    const ffi::String& symbol = node()->GetTypeAttr<bool>("largest") ? "MAX" : "MIN";
+    const String& symbol = node()->GetTypeAttr<bool>("largest") ? "MAX" : "MIN";
     stack_.op_call()
         .op_input_arg()
         .call_arg("TopKOperation::k" + symbol)
@@ -687,7 +685,7 @@ class TensorRTTupleCodeGen : public TensorRTOpCode {
 
 class TensorRTUnaryCodeGen : public TensorRTOpCode {
  public:
-  explicit TensorRTUnaryCodeGen(const ffi::String& symbol) : TensorRTOpCode("Unary") {
+  explicit TensorRTUnaryCodeGen(const String& symbol) : TensorRTOpCode("Unary") {
     symbol_ = symbol;
   }
 
@@ -697,7 +695,7 @@ class TensorRTUnaryCodeGen : public TensorRTOpCode {
   }
 
  private:
-  ffi::String symbol_;
+  String symbol_;
 };
 
 class TensorRTWhereCodeGen : public TensorRTOpCode {
@@ -720,9 +718,9 @@ class TensorRTPluginOpCodeGen : public TensorRTOpCode {
 
     const auto& plugin = GetPlugin(node()->optype);
     const auto& input_ref = "inputs_" + std::to_string(producer->index);
-    const ffi::String& func_name = "plugin::" + node()->optype + "DynamicPlugin";
-    const ffi::String& plugin_ref = "plugin_" + std::to_string(node()->index);
-    const ffi::String& layouts_ref = "layouts_" + std::to_string(node()->index);
+    const String& func_name = "plugin::" + node()->optype + "DynamicPlugin";
+    const String& plugin_ref = "plugin_" + std::to_string(node()->index);
+    const String& layouts_ref = "layouts_" + std::to_string(node()->index);
     stack_.declare("std::vector<std::string>", layouts_ref, 0, false);
     for (const auto& i : node()->GetInputs()) {
       stack_.declare_arg(DocUtils::ToStr(i->layout.name()));
@@ -737,10 +735,9 @@ class TensorRTPluginOpCodeGen : public TensorRTOpCode {
   }
 };
 
-const std::shared_ptr<std::unordered_map<ffi::String, std::shared_ptr<TensorRTOpCode>>>
+const std::shared_ptr<std::unordered_map<String, std::shared_ptr<TensorRTOpCode>>>
 GetTensorRTOpCodes() {
-  static auto map =
-      std::make_shared<std::unordered_map<ffi::String, std::shared_ptr<TensorRTOpCode>>>();
+  static auto map = std::make_shared<std::unordered_map<String, std::shared_ptr<TensorRTOpCode>>>();
   if (!map->empty()) return map;
   // unary ops
   map->emplace("abs", std::make_shared<TensorRTUnaryCodeGen>("ABS"));

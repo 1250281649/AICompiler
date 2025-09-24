@@ -23,7 +23,6 @@
 #include "cublas_utils.h"
 
 #include <dmlc/thread_local.h>
-#include <tvm/ffi/extra/c_env_api.h>
 #include <tvm/ffi/function.h>
 
 #include "../../cuda/cuda_common.h"
@@ -42,11 +41,10 @@ CuBlasThreadEntry::~CuBlasThreadEntry() {
 
 typedef dmlc::ThreadLocalStore<CuBlasThreadEntry> CuBlasThreadStore;
 
-CuBlasThreadEntry* CuBlasThreadEntry::ThreadLocal(DLDevice curr_device) {
+CuBlasThreadEntry* CuBlasThreadEntry::ThreadLocal() {
+  auto stream = runtime::CUDAThreadEntry::ThreadLocal()->stream;
   CuBlasThreadEntry* retval = CuBlasThreadStore::Get();
-  cudaStream_t stream =
-      static_cast<cudaStream_t>(TVMFFIEnvGetStream(curr_device.device_type, curr_device.device_id));
-  CHECK_CUBLAS_ERROR(cublasSetStream(retval->handle, stream));
+  CHECK_CUBLAS_ERROR(cublasSetStream(retval->handle, static_cast<cudaStream_t>(stream)));
   return retval;
 }
 
@@ -73,9 +71,7 @@ CuBlasLtThreadEntry::~CuBlasLtThreadEntry() {
 
 typedef dmlc::ThreadLocalStore<CuBlasLtThreadEntry> CuBlasLtThreadStore;
 
-CuBlasLtThreadEntry* CuBlasLtThreadEntry::ThreadLocal(DLDevice curr_device) {
-  return CuBlasLtThreadStore::Get();
-}
+CuBlasLtThreadEntry* CuBlasLtThreadEntry::ThreadLocal() { return CuBlasLtThreadStore::Get(); }
 
 }  // namespace contrib
 }  // namespace tvm
