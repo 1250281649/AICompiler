@@ -24,7 +24,7 @@
 #ifndef TVM_TIR_STMT_H_
 #define TVM_TIR_STMT_H_
 
-#include <tvm/ffi/reflection/reflection.h>
+#include <tvm/ffi/reflection/registry.h>
 #include <tvm/tir/expr.h>
 
 #include <string>
@@ -1542,6 +1542,8 @@ constexpr const char* explicit_read_region = "explicit_read_region";
  * This is used to override the default write region inference in TIR.
  */
 constexpr const char* explicit_write_region = "explicit_write_region";
+
+constexpr const char* tilelang_assume = "tl.assume";
 
 /*!
  * \brief Check if attr_key is a pragma key extension

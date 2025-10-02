@@ -16,7 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-#include <tvm/ffi/reflection/reflection.h>
+#include <tvm/ffi/reflection/accessor.h>
+#include <tvm/ffi/reflection/registry.h>
 #include <tvm/relax/attrs/op.h>
 #include <tvm/relax/distributed/struct_info.h>
 
@@ -40,7 +41,7 @@ class AttrPrinter {
       }
     } else {
       const TVMFFITypeInfo* attrs_tinfo = TVMFFIGetTypeInfo(attrs->type_index());
-      ICHECK(attrs_tinfo->extra_info != nullptr)
+      ICHECK(attrs_tinfo->metadata != nullptr)
           << "Object `" << attrs->GetTypeKey()
           << "` misses reflection registration and do not support serialization";
       // new printing mechanism using the new reflection

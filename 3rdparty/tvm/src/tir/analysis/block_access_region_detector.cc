@@ -23,6 +23,7 @@
  */
 
 #include <tvm/arith/analyzer.h>
+#include <tvm/ffi/reflection/registry.h>
 #include <tvm/tir/op.h>
 #include <tvm/tir/stmt_functor.h>
 
@@ -278,6 +279,7 @@ void BlockReadWriteDetector::VisitStmt_(const BlockRealizeNode* op) {
     }
     Update(&writes_buffers_, &write_regions_, write->buffer, relaxed_region);
   }
+  StmtVisitor::VisitStmt_(op);
 }
 
 std::vector<arith::IntSet> BlockReadWriteDetector::ConvertMatchedRegion(
@@ -410,9 +412,12 @@ Array<Array<BufferRegion>> GetBlockReadWriteRegion(const Block& block,
   return {reads, writes};
 }
 
-TVM_FFI_REGISTER_GLOBAL("tir.analysis.GetBlockAccessRegion").set_body_typed(GetBlockAccessRegion);
-TVM_FFI_REGISTER_GLOBAL("tir.analysis.GetBlockReadWriteRegion")
-    .set_body_typed(GetBlockReadWriteRegion);
+TVM_FFI_STATIC_INIT_BLOCK({
+  namespace refl = tvm::ffi::reflection;
+  refl::GlobalDef()
+      .def("tir.analysis.GetBlockAccessRegion", GetBlockAccessRegion)
+      .def("tir.analysis.GetBlockReadWriteRegion", GetBlockReadWriteRegion);
+});
 
 }  // namespace tir
 }  // namespace tvm

@@ -22,7 +22,8 @@
  * \file node/reflection.cc
  */
 #include <tvm/ffi/function.h>
-#include <tvm/ffi/reflection/reflection.h>
+#include <tvm/ffi/reflection/accessor.h>
+#include <tvm/ffi/reflection/registry.h>
 #include <tvm/ir/attrs.h>
 #include <tvm/node/node.h>
 #include <tvm/node/reflection.h>
@@ -43,7 +44,7 @@ ffi::Any ReflectionVTable::GetAttr(Object* self, const String& field_name) const
     const TVMFFITypeInfo* type_info = TVMFFIGetTypeInfo(self->type_index());
     success = false;
     // use new reflection mechanism
-    if (type_info->extra_info != nullptr) {
+    if (type_info->metadata != nullptr) {
       ffi::reflection::ForEachFieldInfo(type_info, [&](const TVMFFIFieldInfo* field_info) {
         if (field_name.compare(field_info->name) == 0) {
           ffi::reflection::FieldGetter field_getter(field_info);
@@ -75,7 +76,7 @@ std::vector<std::string> ReflectionVTable::ListAttrNames(Object* self) const {
 
   if (!self->IsInstance<DictAttrsNode>()) {
     const TVMFFITypeInfo* type_info = TVMFFIGetTypeInfo(self->type_index());
-    if (type_info->extra_info != nullptr) {
+    if (type_info->metadata != nullptr) {
       // use new reflection mechanism
       ffi::reflection::ForEachFieldInfo(type_info, [&](const TVMFFIFieldInfo* field_info) {
         names.push_back(std::string(field_info->name.data, field_info->name.size));
@@ -175,15 +176,17 @@ void MakeNode(const ffi::PackedArgs& args, ffi::Any* rv) {
   *rv = ReflectionVTable::Global()->CreateObject(args[0].cast<std::string>(), args.Slice(1));
 }
 
-TVM_FFI_REGISTER_GLOBAL("node.NodeGetAttr").set_body_packed(NodeGetAttr);
-
-TVM_FFI_REGISTER_GLOBAL("node.NodeListAttrNames").set_body_packed(NodeListAttrNames);
-
-TVM_FFI_REGISTER_GLOBAL("node.MakeNode").set_body_packed(MakeNode);
+TVM_FFI_STATIC_INIT_BLOCK({
+  namespace refl = tvm::ffi::reflection;
+  refl::GlobalDef()
+      .def_packed("node.NodeGetAttr", NodeGetAttr)
+      .def_packed("node.NodeListAttrNames", NodeListAttrNames)
+      .def_packed("node.MakeNode", MakeNode);
+});
 
 Optional<String> GetAttrKeyByAddress(const Object* object, const void* attr_address) {
   const TVMFFITypeInfo* tinfo = TVMFFIGetTypeInfo(object->type_index());
-  if (tinfo->extra_info != nullptr) {
+  if (tinfo->metadata != nullptr) {
     Optional<String> result;
     // visit fields with the new reflection
     ffi::reflection::ForEachFieldInfoWithEarlyStop(tinfo, [&](const TVMFFIFieldInfo* field_info) {

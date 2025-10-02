@@ -78,6 +78,23 @@ compile_mlc_llm() {
     make -j$PHYSICAL_CORES
 }
 
+compile_tilelang() {
+    log_info "开始编译 TVM..."
+
+    tilelang_home=${PROJECT_ROOT}/3rdparty/tilelang
+    cd ${tilelang_home}
+    tl_build=${tilelang_home}/build
+    if [ ! -d "${tl_build}" ]; then
+        log_info "目录 ${tl_build} 不存在，自动创建该目录。"
+        mkdir -p ${tl_build}
+    fi
+
+    cd ${tl_build}
+    cp ${PROJECT_ROOT}/cmake/tile_lang_config.cmake ./config.cmake
+    cmake .. -DTVM_SOURCE_DIR=/${PROJECT_ROOT}/3rdparty/tvm -DTVM_PREBUILD_PATH=/${PROJECT_ROOT}/3rdparty/tvm/build -DTILE_LANG_INSTALL_STATIC_LIB=OFF
+    make -j$PHYSICAL_CORES
+}
+
 # 主函数
 main() {
     # 检查必要命令
@@ -90,7 +107,9 @@ main() {
     log_info "开始 MLC-LLM 编译流程..."
 
     # # 步骤执行
-    compile_mlc_llm
+    # compile_mlc_llm
+
+    compile_tilelang
 
     log_info "编译完成！"
 }

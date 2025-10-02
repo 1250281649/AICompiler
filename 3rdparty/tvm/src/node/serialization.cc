@@ -24,7 +24,8 @@
 #include <dmlc/json.h>
 #include <dmlc/memory_io.h>
 #include <tvm/ffi/function.h>
-#include <tvm/ffi/reflection/reflection.h>
+#include <tvm/ffi/reflection/accessor.h>
+#include <tvm/ffi/reflection/registry.h>
 #include <tvm/ir/attrs.h>
 #include <tvm/node/reflection.h>
 #include <tvm/node/serialization.h>
@@ -118,7 +119,7 @@ class NodeIndexer {
 
   void VisitObjectFields(Object* obj) {
     const TVMFFITypeInfo* tinfo = TVMFFIGetTypeInfo(obj->type_index());
-    ICHECK(tinfo->extra_info != nullptr)
+    ICHECK(tinfo->metadata != nullptr)
         << "Object `" << obj->GetTypeKey()
         << "` misses reflection registration and do not support serialization";
     ffi::reflection::ForEachFieldInfo(tinfo, [&](const TVMFFIFieldInfo* field_info) {
@@ -311,7 +312,7 @@ class JSONAttrGetter {
   void VisitObjectFields(Object* obj) {
     // dispatch between new reflection and old reflection
     const TVMFFITypeInfo* tinfo = TVMFFIGetTypeInfo(obj->type_index());
-    ICHECK(tinfo->extra_info != nullptr)
+    ICHECK(tinfo->metadata != nullptr)
         << "Object `" << obj->GetTypeKey()
         << "` misses reflection registration and do not support serialization";
     ffi::reflection::ForEachFieldInfo(tinfo, [&](const TVMFFIFieldInfo* field_info) {
@@ -418,7 +419,7 @@ class FieldDependencyFinder {
   void VisitObjectFields(Object* obj) {
     // dispatch between new reflection and old reflection
     const TVMFFITypeInfo* tinfo = TVMFFIGetTypeInfo(obj->type_index());
-    ICHECK(tinfo->extra_info != nullptr)
+    ICHECK(tinfo->metadata != nullptr)
         << "Object `" << obj->GetTypeKey()
         << "` misses reflection registration and do not support serialization";
     ffi::reflection::ForEachFieldInfo(tinfo, [&](const TVMFFIFieldInfo* field_info) {
@@ -594,7 +595,7 @@ class JSONAttrSetter {
   void SetObjectFields(Object* obj) {
     // dispatch between new reflection and old reflection
     const TVMFFITypeInfo* tinfo = TVMFFIGetTypeInfo(obj->type_index());
-    ICHECK(tinfo->extra_info != nullptr)
+    ICHECK(tinfo->metadata != nullptr)
         << "Object `" << obj->GetTypeKey()
         << "` misses reflection registration and do not support serialization";
     ffi::reflection::ForEachFieldInfo(
@@ -785,7 +786,8 @@ Any LoadJSON(std::string json_str) {
   return nodes.at(jgraph.root);
 }
 
-TVM_FFI_REGISTER_GLOBAL("node.SaveJSON").set_body_typed(SaveJSON);
-
-TVM_FFI_REGISTER_GLOBAL("node.LoadJSON").set_body_typed(LoadJSON);
+TVM_FFI_STATIC_INIT_BLOCK({
+  namespace refl = tvm::ffi::reflection;
+  refl::GlobalDef().def("node.SaveJSON", SaveJSON).def("node.LoadJSON", LoadJSON);
+});
 }  // namespace tvm

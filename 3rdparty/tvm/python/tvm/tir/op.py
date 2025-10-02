@@ -570,11 +570,10 @@ def address_of(obj: Union[Buffer, BufferLoad], span: Optional[Span] = None) -> P
         The call expression.
     """
     if isinstance(obj, Buffer):
-
         n_dim = len(obj.shape)
         buffer_load = BufferLoad(obj, [0] * n_dim)
         return call_intrin("handle", "tir.address_of", buffer_load, span=span)
-    elif isinstance(obj, BufferLoad):
+    elif isinstance(obj, (BufferLoad, Var)):
         return call_intrin("handle", "tir.address_of", obj, span=span)
     else:
         raise ValueError(f"Invalid object type: {type(obj)}")
@@ -1880,6 +1879,23 @@ def ret(val, span=None):
     """
 
     return _ffi_api.ret(val, span)
+
+
+def thread_return(span=None):
+    """Return from a GPU thread.
+
+    Parameters
+    ----------
+    span : Optional[Span]
+        The location of this operator in the source code.
+
+    Returns
+    -------
+    ret : PrimExpr
+        The return expression
+    """
+
+    return _ffi_api.thread_return(span)
 
 
 def any(*args, span=None):

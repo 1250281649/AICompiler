@@ -1316,6 +1316,17 @@ def buffer_store(
     )
 
 
+def customized_code(code: str):
+    """Add a customized code block.
+
+    Parameters
+    ----------
+    code : str
+        The code block to be added.
+    """
+    return _ffi_api.CustomizedCode(code)  # type: ignore[attr-defined] # pylint: disable=no-member
+
+
 def evaluate(value: PrimExpr) -> None:
     """Evaluate the input expression.
 
@@ -1927,6 +1938,7 @@ sinh = _op_wrapper(_tir_op.sinh)
 sqrt = _op_wrapper(_tir_op.sqrt)
 tan = _op_wrapper(_tir_op.tan)
 tanh = _op_wrapper(_tir_op.tanh)
+thread_return = _op_wrapper(_tir_op.thread_return)
 trunc = _op_wrapper(_tir_op.trunc)
 truncdiv = _op_wrapper(_tir_op.truncdiv)
 truncmod = _op_wrapper(_tir_op.truncmod)
@@ -2205,6 +2217,7 @@ __all__ = float_types + [
     "sqrt",
     "tan",
     "tanh",
+    "thread_return",
     "trunc",
     "truncdiv",
     "truncmod",

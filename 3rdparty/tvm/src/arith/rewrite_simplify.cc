@@ -774,12 +774,6 @@ PrimExpr RewriteSimplifier::Impl::VisitExpr_(const DivNode* op) {
   // Pattern var for lanes in broadcast and ramp
   PVar<PrimExpr> lanes;
 
-  // x / 2.0 = x * 0.5
-  if (const FloatImmNode* ptr = op->b.as<FloatImmNode>()) {
-    ICHECK(op->dtype.is_float() || op->dtype.is_bfloat16() ||
-           datatype::Registry::Global()->GetTypeRegistered(op->dtype.code()));
-    return op->a * make_const(op->b.dtype(), 1.0 / ptr->value);
-  }
 
   // Vector rules
   if (op->dtype.is_scalable_or_fixed_length_vector()) {
@@ -1222,7 +1216,7 @@ PrimExpr RewriteSimplifier::Impl::VisitExpr_(const FloorModNode* op) {
                            CanProveEqual(floordiv(y.Eval(), c1.Eval()), 0));
 
     TVM_TRY_REWRITE_IF(floormod(x * c1 + y, c2), floormod(x * floormod(c1, c2) + y, c2),
-                       c2.Eval()->value > 0);
+                       c2.Eval()->value > 0 && c1.Eval()->value % c2.Eval()->value == 0);
 
     // (x + 5) % 2 -> (x + 1) %2,  (x + 3) % 3 => x
     TVM_TRY_REWRITE_IF(

@@ -17,7 +17,8 @@
  * under the License.
  */
 #include <tvm/ffi/function.h>
-#include <tvm/ffi/reflection/reflection.h>
+#include <tvm/ffi/reflection/accessor.h>
+#include <tvm/ffi/reflection/registry.h>
 #include <tvm/node/reflection.h>
 #include <tvm/runtime/logging.h>
 #include <tvm/script/printer/ir_docsifier.h>
@@ -146,7 +147,7 @@ void IRDocsifierNode::SetCommonPrefix(const ObjectRef& root,
         }
       } else {
         const TVMFFITypeInfo* tinfo = TVMFFIGetTypeInfo(obj->type_index());
-        if (tinfo->extra_info != nullptr) {
+        if (tinfo->metadata != nullptr) {
           ffi::reflection::ForEachFieldInfo(tinfo, [&](const TVMFFIFieldInfo* field_info) {
             Any field_value = ffi::reflection::FieldGetter(field_info)(obj);
             this->RecursiveVisitAny(&field_value);

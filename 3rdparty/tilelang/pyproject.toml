@@ -1,0 +1,60 @@
+[build-system]
+requires = [
+    "build",
+    "cmake>=3.26",
+    "packaging",
+    "setuptools>=61",
+    "wheel",
+    "patchelf",
+    "Cython>=3.0.0",
+]
+build-backend = "setuptools.build_meta"
+
+[tool.yapf]
+based_on_style = "yapf"
+column_limit = 100
+indent_width = 4
+
+[tool.codespell]
+ignore-words-list = "nd, te, ist, LOD, offen, NotIn, HSA"
+skip = [
+    "build",
+    "3rdparty",
+    "dist",
+    ".venv"
+]
+
+[tool.ruff.lint]
+select = [
+    # pycodestyle
+    "E", "W",
+    # Pyflakes
+    "F",
+    # pyupgrade
+    # "UP",
+    # flake8-bugbear
+    "B",
+    # flake8-simplify
+    "SIM",
+    # isort
+    # "I",
+]
+ignore = [
+    # Module level import not at top of file
+    "E402",
+    # star imports
+    "F405", "F403",
+    # ambiguous name
+    "E741",
+    # line too long
+    "E501",
+    # key in dict.keys()
+    "SIM118",
+    # memory leaks
+    "B019",
+    # No such file or directory
+    "E902",
+]
+[tool.ruff.lint.per-file-ignores]
+"3rdparty/**/*" = ["ALL"]
+"examples/deepseek_v32/inference/**/*" = ["ALL"]

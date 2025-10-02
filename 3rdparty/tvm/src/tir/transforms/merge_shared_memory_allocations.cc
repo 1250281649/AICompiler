@@ -24,6 +24,7 @@
  * allocation.
  */
 #include <tvm/ffi/function.h>
+#include <tvm/ffi/reflection/registry.h>
 #include <tvm/tir/expr.h>
 #include <tvm/tir/op.h>
 #include <tvm/tir/stmt_functor.h>
@@ -167,9 +168,8 @@ class SharedMemLinearAccessPatternFinder final : public StmtExprVisitor {
       for (const auto& index : load->indices) {
         this->VisitExpr(index);
       }
-    } else {
-      StmtExprVisitor::VisitExpr_(op);
     }
+    StmtExprVisitor::VisitExpr_(op);
   }
 
   void VisitExpr_(const VarNode* buf) final {
@@ -214,6 +214,10 @@ class SharedMemLinearAccessPatternFinder final : public StmtExprVisitor {
       VisitNewScope(op);
     } else if (op->attr_key == attr::virtual_thread) {
       VisitNewScope(op);
+    } else if (op->attr_key == "kWarpSpecializationScope") {
+      IfThenElse body = Downcast<IfThenElse>(op->body);
+      this->VisitStmt(body->then_case);
+      this->VisitStmt(body->else_case.value());
     } else {
       StmtExprVisitor::VisitStmt_(op);
     }
@@ -695,8 +699,10 @@ Pass MergeSharedMemoryAllocations() {
   return CreatePrimFuncPass(pass_func, 0, "tir.MergeSharedMemoryAllocations", {});
 }
 
-TVM_FFI_REGISTER_GLOBAL("tir.transform.MergeSharedMemoryAllocations")
-    .set_body_typed(MergeSharedMemoryAllocations);
+TVM_FFI_STATIC_INIT_BLOCK({
+  namespace refl = tvm::ffi::reflection;
+  refl::GlobalDef().def("tir.transform.MergeSharedMemoryAllocations", MergeSharedMemoryAllocations);
+});
 
 }  // namespace transform
 }  // namespace tir

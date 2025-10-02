@@ -26,7 +26,8 @@
 
 #include <dmlc/any.h>
 #include <dmlc/json.h>
-#include <tvm/ffi/reflection/reflection.h>
+#include <tvm/ffi/reflection/accessor.h>
+#include <tvm/ffi/reflection/registry.h>
 #include <tvm/node/reflection.h>
 #include <tvm/relax/struct_info.h>
 #include <tvm/tir/op.h>
@@ -150,7 +151,7 @@ class OpAttrExtractor {
  private:
   void VisitObjectFields(Object* obj) {
     const TVMFFITypeInfo* tinfo = TVMFFIGetTypeInfo(obj->type_index());
-    ICHECK(tinfo->extra_info != nullptr)
+    ICHECK(tinfo->metadata != nullptr)
         << "Object `" << obj->GetTypeKey()
         << "` misses reflection registration and do not support serialization";
     ffi::reflection::ForEachFieldInfo(tinfo, [&](const TVMFFIFieldInfo* field_info) {

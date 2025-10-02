@@ -22,6 +22,7 @@
  * \brief Target kind registry
  */
 #include <tvm/ffi/function.h>
+#include <tvm/ffi/reflection/registry.h>
 #include <tvm/ir/expr.h>
 #include <tvm/runtime/device_api.h>
 #include <tvm/target/target.h>
@@ -356,6 +357,19 @@ TVM_REGISTER_TARGET_KIND("rocm", kDLROCM)
     .set_default_keys({"rocm", "gpu"})
     .set_target_parser(UpdateROCmAttrs);
 
+TVM_REGISTER_TARGET_KIND("hip", kDLROCM)
+    .add_attr_option<String>("mcpu")
+    .add_attr_option<String>("mtriple")
+    .add_attr_option<Array<String>>("mattr")
+    // TODO(masahi): Support querying from a target device
+    // On RDNA cards, thread_warp_size should be 32
+    .add_attr_option<int64_t>("max_num_threads", 256)
+    .add_attr_option<int64_t>("max_threads_per_block", 256)
+    .add_attr_option<int64_t>("max_shared_memory_per_block", 65536)
+    .add_attr_option<int64_t>("thread_warp_size", 64)
+    .set_default_keys({"hip", "gpu"})
+    .set_target_parser(UpdateROCmAttrs);
+
 TVM_REGISTER_TARGET_KIND("opencl", kDLOpenCL)
     .add_attr_option<int64_t>("max_threads_per_block", 256)
     .add_attr_option<int64_t>("max_shared_memory_per_block", 16384)
@@ -448,23 +462,24 @@ TVM_REGISTER_TARGET_KIND("test", kDLCPU)  // line break
 
 /**********  Registry  **********/
 
-TVM_FFI_REGISTER_GLOBAL("target.TargetKindGetAttr")
-    .set_body_typed([](TargetKind kind, String attr_name) -> ffi::Any {
-      auto target_attr_map = TargetKind::GetAttrMap<ffi::Any>(attr_name);
-      ffi::Any rv;
-      if (target_attr_map.count(kind)) {
-        rv = target_attr_map[kind];
-      }
-      return rv;
-    });
-TVM_FFI_REGISTER_GLOBAL("target.ListTargetKinds")
-    .set_body_typed(TargetKindRegEntry::ListTargetKinds);
-TVM_FFI_REGISTER_GLOBAL("target.ListTargetKindOptions")
-    .set_body_typed(TargetKindRegEntry::ListTargetKindOptions);
-TVM_FFI_REGISTER_GLOBAL("target.ListTargetKindOptionsFromName")
-    .set_body_typed([](String target_kind_name) {
-      TargetKind kind = TargetKind::Get(target_kind_name).value();
-      return TargetKindRegEntry::ListTargetKindOptions(kind);
-    });
+TVM_FFI_STATIC_INIT_BLOCK({
+  namespace refl = tvm::ffi::reflection;
+  refl::GlobalDef()
+      .def("target.TargetKindGetAttr",
+           [](TargetKind kind, String attr_name) -> ffi::Any {
+             auto target_attr_map = TargetKind::GetAttrMap<ffi::Any>(attr_name);
+             ffi::Any rv;
+             if (target_attr_map.count(kind)) {
+               rv = target_attr_map[kind];
+             }
+             return rv;
+           })
+      .def("target.ListTargetKinds", TargetKindRegEntry::ListTargetKinds)
+      .def("target.ListTargetKindOptions", TargetKindRegEntry::ListTargetKindOptions)
+      .def("target.ListTargetKindOptionsFromName", [](String target_kind_name) {
+        TargetKind kind = TargetKind::Get(target_kind_name).value();
+        return TargetKindRegEntry::ListTargetKindOptions(kind);
+      });
+});
 
 }  // namespace tvm
